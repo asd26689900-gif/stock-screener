@@ -141,13 +141,8 @@ function maskValue(v) {
   return '<span class="masked">●●●●</span>';
 }
 
-// ── 啟動：SDK 載入重試 + 初始化後立即觸發 onAuthReady ──
+// ── 啟動：初始化後立即觸發 onAuthReady ──
 async function boot() {
-  // 等 SDK 載入（最多 5 秒）
-  for (let i = 0; i < 20; i++) {
-    if (typeof supabase !== 'undefined') break;
-    await new Promise(r => setTimeout(r, 250));
-  }
   const ok = await initSupabase();
   if (ok && typeof onAuthReady === 'function') onAuthReady();
 }
