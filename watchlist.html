@@ -1,0 +1,170 @@
+<title>自選股 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.page-header h2{font-family:var(--font-display);font-size:22px;color:var(--ink);margin-bottom:6px}
+.page-header p{font-size:13px;color:var(--text-secondary)}
+.add-bar{display:flex;gap:8px;align-items:center}
+.add-bar input{flex:1;max-width:240px;padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--text);font-size:14px;font-family:var(--font-mono)}
+.add-bar button{padding:8px 16px;border:none;border-radius:var(--radius);background:var(--gold);color:white;font-size:13px;font-weight:600;cursor:pointer}
+.add-bar button:hover{opacity:0.9}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;background:var(--card);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)}
+thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
+tbody tr:hover{background:var(--gold-soft)}
+tbody tr{cursor:pointer}
+.up{color:var(--red)}.dn{color:var(--green)}
+.btn-del{background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:var(--radius)}
+.btn-del:hover{color:var(--red);background:rgba(192,84,79,0.1)}
+.empty-msg{text-align:center;padding:40px 20px;color:var(--text-secondary);font-size:14px}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}thead th,tbody td{padding:8px;font-size:11px}.container{padding:16px 8px 60px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a>
+    <a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="strategy.html">選股策略</a>
+    <a href="filter.html">自訂篩選</a>
+    <a href="watchlist.html" class="active">★ 自選股</a>
+  </div>
+  <div class="spacer"></div>
+  <div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h2>★ 自選股</h2>
+    <p>加入常關注的股票，一頁查看最新數據。資料儲存在瀏覽器中，換裝置需重新加入。</p>
+  </div>
+  <div class="add-bar">
+    <input type="text" id="addInput" placeholder="輸入股號，如 2330" maxlength="10">
+    <button onclick="addStock()">加入</button>
+  </div>
+  <div id="app"><div class="empty-msg">尚未加入自選股</div></div>
+</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
+
+<script src="js/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const LS_KEY = 'watchlist';
+function getList(){ return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
+function saveList(list){ localStorage.setItem(LS_KEY, JSON.stringify(list)); }
+
+function addStock(){
+  const input = document.getElementById('addInput');
+  const sid = input.value.trim().toUpperCase();
+  if(!sid) return;
+  const list = getList();
+  if(list.includes(sid)){ input.value=''; return; }
+  list.push(sid);
+  saveList(list);
+  input.value='';
+  loadWatchlist();
+}
+document.getElementById('addInput').addEventListener('keydown', e => {
+  if(e.key==='Enter') addStock();
+});
+
+function removeStock(sid){
+  const list = getList().filter(s => s !== sid);
+  saveList(list);
+  loadWatchlist();
+}
+
+function fmt(v){ return typeof v==='number' ? v.toLocaleString('zh-TW') : v; }
+
+async function loadWatchlist(){
+  const list = getList();
+  const app = document.getElementById('app');
+  if(!list.length){ app.innerHTML='<div class="empty-msg">尚未加入自選股，在上方輸入股號加入</div>'; return; }
+  if(!sb){ app.innerHTML='<div class="empty-msg">系統載入中...</div>'; return; }
+
+  // 從 stock_metrics 撈最新數據
+  const { data, error } = await sb.from('stock_metrics')
+    .select('stock_id,name,date,close,change_pct,volume,ma5,ma20,ma60,rev_mom,rev_yoy,foreign_consec_days,trust_consec_days')
+    .in('stock_id', list);
+
+  if(error || !data){ app.innerHTML='<div class="empty-msg">⚠ 載入失敗</div>'; return; }
+
+  // 建 map 方便排序
+  const map = {};
+  data.forEach(d => { map[d.stock_id] = d; });
+
+  // 按原始加入順序排
+  const rows = list.map(sid => {
+    const d = map[sid];
+    if(!d) return `<tr><td>${sid}</td><td>—</td><td colspan="8" style="text-align:center;color:var(--text-secondary)">無資料</td><td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">✕</button></td></tr>`;
+    const cls = (d.change_pct||0) >= 0 ? 'up' : 'dn';
+    const chg = d.change_pct != null ? (d.change_pct >= 0 ? '+' : '') + d.change_pct.toFixed(2) + '%' : '—';
+    const fc = d.foreign_consec_days || 0;
+    const tc = d.trust_consec_days || 0;
+    const fcCls = fc > 0 ? 'up' : fc < 0 ? 'dn' : '';
+    const tcCls = tc > 0 ? 'up' : tc < 0 ? 'dn' : '';
+    return `<tr onclick="location.href='stk.html#${sid}'">
+      <td>${sid}</td><td>${d.name||'—'}</td>
+      <td>${d.close != null ? fmt(d.close) : '—'}</td>
+      <td class="${cls}">${chg}</td>
+      <td>${d.volume != null ? fmt(d.volume) : '—'}</td>
+      <td>${d.ma5 != null ? d.ma5.toFixed(1) : '—'}</td>
+      <td>${d.ma20 != null ? d.ma20.toFixed(1) : '—'}</td>
+      <td class="${fcCls}">${fc > 0 ? '連買'+fc+'日' : fc < 0 ? '連賣'+Math.abs(fc)+'日' : '—'}</td>
+      <td class="${tcCls}">${tc > 0 ? '連買'+tc+'日' : tc < 0 ? '連賣'+Math.abs(tc)+'日' : '—'}</td>
+      <td>${d.rev_yoy != null ? (d.rev_yoy >= 0 ? '+' : '') + d.rev_yoy.toFixed(1) + '%' : '—'}</td>
+      <td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">✕</button></td>
+    </tr>`;
+  }).join('');
+
+  app.innerHTML = `<table>
+    <thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th><th>MA5</th><th>MA20</th><th>外資動向</th><th>投信動向</th><th>營收YoY</th><th></th></tr></thead>
+    <tbody>${rows}</tbody></table>`;
+}
+
+function onAuthReady(){ loadWatchlist(); }
+</script>

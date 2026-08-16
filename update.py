@@ -717,6 +717,7 @@ for sid in stocks:
     data = stocks.get(sid, [])
     if len(data) < 20: continue
     p = data[-1]
+    if not p["close"]: continue  # 跳過收盤價為0的股票
     prev = data[-2] if len(data) >= 2 else p
     name = name_map.get(sid, sid)
     close = p["close"]
@@ -790,7 +791,7 @@ for sid in stocks:
         tech_criteria.append({"text": text, "pass": bool(cond)})
     consec_up = all(data[-(i+1)]["close"] > data[-(i+2)]["close"] for i in range(min(3, len(data)-1)))
     tech_check("收盤價連3日漲", consec_up)
-    d3_chg = (close - data[-4]["close"]) / data[-4]["close"] * 100 if len(data) >= 4 else 0
+    d3_chg = (close - data[-4]["close"]) / data[-4]["close"] * 100 if len(data) >= 4 and data[-4]["close"] else 0
     tech_check("3日漲幅 > 5%", d3_chg > 5)
     tech_check("連3日打敗大盤", consec_up)
     if len(data) >= 9:
