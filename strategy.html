@@ -83,11 +83,11 @@ tbody tr{cursor:pointer}
 </div>
 
 <div class="container">
-  <div class="page-header"><h2>選股策略</h2><p>四種不同角度的盤後篩選策略，每日 21:30 後更新。建議停利 10% / 停損 -10%。</p></div>
+  <div class="page-header"><h2>選股策略</h2><p>四種不同角度的盤後資料篩選，每日 21:30 後更新。本系統僅提供數據整理，不構成任何買賣建議。</p></div>
   <div class="tabs" id="tabs"></div>
   <div id="stratContainer"></div>
 </div>
-<div class="footer">盤後精選模組 — 資料僅供參考，不構成投資建議。</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
@@ -113,10 +113,10 @@ function renderTabs(){
 function showStrat(key){
   const m=STRATEGIES[key],data=stratData[key]||[];
   const rows=data.length===0?`<tr class="empty-row"><td colspan="${m.cols.length}">今日無符合標的</td></tr>`:data.map(row=>'<tr onclick="location.href=\'stk.html#'+row[0]+'\'">' +row.map((v,i)=>{
-    if(i<=1)return'<td>'+maskValue(v)+'</td>';
+    if(i<=1)return'<td>'+v+'</td>';
     if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return`<td class="${c}">${d}</td>`;}
     return'<td>'+fmt(v)+'</td>';}).join('')+'</tr>').join('');
-  document.getElementById('stratContainer').innerHTML=`<div class="strat"><div class="strat-header"><div class="strat-title">${m.title}</div><div class="strat-desc">${m.desc}</div><div class="strat-rules">${m.rules.map(r=>'<span class="strat-rule">'+r+'</span>').join('')}</div></div><div class="strat-meta"><span>建議停利：10%</span><span>建議停損：-10%</span></div><div class="table-wrap"><table><thead><tr>${m.cols.map(c=>'<th>'+c+'</th>').join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  document.getElementById('stratContainer').innerHTML=`<div class="strat"><div class="strat-header"><div class="strat-title">${m.title}</div><div class="strat-desc">${m.desc}</div><div class="strat-rules">${m.rules.map(r=>'<span class="strat-rule">'+r+'</span>').join('')}</div></div><div class="table-wrap"><table><thead><tr>${m.cols.map(c=>'<th>'+c+'</th>').join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
 
 async function loadStrategies(){

@@ -710,18 +710,10 @@ results["triple_signal"] = m9[:15]
 # ══════════════════════════════════════
 print("\n🔍 產生個股分析資料...")
 
-module_sids = set()
-for v in results.values():
-    for row in v:
-        module_sids.add(row[0])
-popular = ["2330","2317","2454","2382","3711","2308","2303","6505","2881","2882",
-           "2891","2886","1301","1303","2412","3008","2357","1216","2002","3034"]
-for s in popular:
-    if s in stocks: module_sids.add(s)
-
 stk_analysis = {}
 
-for sid in module_sids:
+# 分析全部有足夠資料的股票（非 ETF/權證/牛熊證）
+for sid in stocks:
     data = stocks.get(sid, [])
     if len(data) < 20: continue
     p = data[-1]

@@ -144,7 +144,7 @@ tbody tr{cursor:pointer}
     <div class="empty-msg">設定條件後按「篩選」</div>
   </div>
 </div>
-<div class="footer">盤後精選模組 — 資料僅供參考，不構成投資建議。</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
@@ -212,7 +212,7 @@ function renderTable(){
   const rows = lastData.map(row=>{
     return '<tr onclick="location.href=\'stk.html#'+row.stock_id+'\'">' + COLS.map(c=>{
       let v = row[c.key];
-      if(c.key==='stock_id'||c.key==='name') return '<td>'+maskValue(v)+'</td>';
+      if(c.key==='stock_id'||c.key==='name') return '<td>'+v+'</td>';
       if(c.key==='change_pct'){
         const cls = v>=0?'up':'dn';
         return `<td class="${cls}">${v>=0?'+':''}${(v||0).toFixed(1)}%</td>`;

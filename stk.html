@@ -111,7 +111,7 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 <div class="container" id="app">
   <div class="empty-state">輸入股號查詢個股分析<br><small>例如 <code>2330</code>、<code>2454</code>、<code>3661</code></small></div>
 </div>
-<div class="footer">盤後精選模組 — 資料僅供參考，不構成投資建議。</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
@@ -134,7 +134,7 @@ function cls(v){return v>0?'up':v<0?'dn':'';}
 function sign(v){return v>0?'+'+v:v;}
 function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
 function scoreBadge(n){const p=n/10;return p>=.7?'badge-high':p>=.4?'badge-mid':'badge-low';}
-function scoreComment(t){if(t>=25)return'主流重點創高領先';if(t>=20)return'多方格局偏強整理';if(t>=15)return'中性觀望待確認';if(t>=10)return'偏弱留意風險';return'空方主導建議觀望';}
+function scoreComment(t){if(t>=25)return'多項指標正向';if(t>=20)return'指標偏正向';if(t>=15)return'指標中性';if(t>=10)return'指標偏弱';return'多項指標偏空';}
 function scoreColor(t){if(t>=25)return'var(--green)';if(t>=20)return'var(--teal)';if(t>=15)return'var(--gold)';return'var(--red)';}
 
 function renderStock(sid,d){

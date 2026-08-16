@@ -96,8 +96,8 @@ tbody tr{cursor:pointer}
 </div>
 
 <div class="footer">
-  盤後精選模組 — 多因子交叉驗證選股系統<br>
-  資料僅供參考，不構成投資建議。投資有風險，請審慎評估。
+  盤後精選模組 — 多因子交叉驗證數據篩選<br>
+  本站僅整理公開資訊，不構成投資建議，亦非投顧服務。投資有風險，請自行判斷。
 </div>
 
 <script src="js/supabase.min.js"></script>
@@ -130,7 +130,7 @@ function render(filterEmpty){
     const rows=data.length===0
       ?'<tr class="empty-row"><td colspan="'+meta.cols.length+'">今日無符合標的</td></tr>'
       :data.map(row=>'<tr onclick="window.open(\'stk.html#'+row[0]+'\',\'_self\')">'+row.map((v,i)=>{
-        if(i<=1) return '<td>'+maskValue(v)+'</td>';
+        if(i<=1) return '<td>'+v+'</td>';
         if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return '<td class="'+c+'">'+d+'</td>';}
         return '<td>'+fmt(v)+'</td>';
       }).join('')+'</tr>').join('');
