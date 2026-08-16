@@ -160,30 +160,33 @@ def fetch_tpex_inst(date_dt):
 def fetch_monthly_revenue(year, month, market="sii"):
     """
     market: 'sii' (上市), 'otc' (上櫃)
-    用兩種方式嘗試抓 MOPS 營收，都失敗就回空
+    嘗試多種方式抓 MOPS 營收。MOPS 有 WAF 防護，週末可能維護。
+    GitHub Actions (平日) 上成功率較高。
     """
     import re
     roc_y = year - 1911
 
-    # 方式1: 靜態 HTML (舊版，有時還能用)
+    # 方式1: 靜態 HTML (舊版)
     for fmt in [f"{roc_y}_{month}_0", f"{roc_y}_{month:02d}_0"]:
         url = f"https://mops.twse.com.tw/nas/t21/{market}/t21sc03_{fmt}.html"
         try:
             r = requests.get(url, headers=HEADERS, timeout=15)
-            if r.status_code != 200 or len(r.text) < 2000: continue
-            r.encoding = "big5"
-            return _parse_mops_html(r.text)
-        except: continue
+            if r.status_code == 200 and len(r.text) > 2000:
+                r.encoding = "big5"
+                result = _parse_mops_html(r.text)
+                if result:
+                    print(f"     MOPS靜態: {market} {year}/{month} → {len(result)} 檔")
+                    return result
+        except: pass
 
-    # 方式2: AJAX POST (需繞 WAF)
+    # 方式2: AJAX POST (需 session cookie)
     try:
         s = requests.Session()
         s.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "zh-TW,zh;q=0.9,en;q=0.8",
+            "Accept": "text/html,application/xhtml+xml",
+            "Accept-Language": "zh-TW,zh;q=0.9",
         })
-        # 先訪問首頁拿 cookie
         s.get("https://mops.twse.com.tw/mops/web/t21sc03_ifrs", timeout=10)
         time.sleep(1)
         r = s.post("https://mops.twse.com.tw/mops/web/ajax_t21sc03",
@@ -194,7 +197,27 @@ def fetch_monthly_revenue(year, month, market="sii"):
             timeout=30)
         r.encoding = "utf-8"
         if len(r.text) > 2000 and "<table" in r.text:
-            return _parse_mops_html(r.text)
+            result = _parse_mops_html(r.text)
+            if result:
+                print(f"     MOPS AJAX: {market} {year}/{month} → {len(result)} 檔")
+                return result
+    except: pass
+
+    # 方式3: cloudscraper (如果有安裝)
+    try:
+        import cloudscraper
+        scraper = cloudscraper.create_scraper()
+        r = scraper.post("https://mops.twse.com.tw/mops/web/ajax_t21sc03",
+            data={"encodeURIComponent": "1", "step": "1", "firstin": "1",
+                  "off": "1", "TYPEK": market, "year": str(roc_y), "month": f"{month:02d}"},
+            timeout=30)
+        r.encoding = "utf-8"
+        if len(r.text) > 2000 and "<table" in r.text:
+            result = _parse_mops_html(r.text)
+            if result:
+                print(f"     MOPS cloudscraper: {market} {year}/{month} → {len(result)} 檔")
+                return result
+    except ImportError: pass
     except: pass
 
     return []
