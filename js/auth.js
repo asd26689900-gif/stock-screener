@@ -122,5 +122,10 @@ function maskValue(v) {
   return '<span class="masked">●●●●</span>';
 }
 
-// 初始化
-document.addEventListener('DOMContentLoaded', initSupabase);
+// 初始化（含重試，防止 CDN 載入延遲）
+function bootSupabase(retries) {
+  if (typeof supabase !== 'undefined') { initSupabase(); return; }
+  if (retries > 0) setTimeout(() => bootSupabase(retries - 1), 500);
+  else console.error('Supabase SDK 載入失敗');
+}
+document.addEventListener('DOMContentLoaded', () => bootSupabase(10));

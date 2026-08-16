@@ -171,17 +171,11 @@ async function loadDates(){
   }
 }
 
+let dataLoaded = false;
 function onAuthReady(){
-  render(document.getElementById('filterEmpty').checked);
+  if(!dataLoaded){ dataLoaded=true; loadDates(); loadData(); }
+  else render(document.getElementById('filterEmpty').checked);
 }
 
 document.getElementById('filterEmpty').addEventListener('change',function(){ render(this.checked); });
-
-// Init
-document.addEventListener('DOMContentLoaded',()=>{
-  setTimeout(()=>{
-    loadDates();
-    loadData();
-  },300);
-});
 </script>
