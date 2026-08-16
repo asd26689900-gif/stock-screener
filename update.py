@@ -514,6 +514,11 @@ def is_bullish_alignment(sid):
     return m5 > m10 > m20 > m60
 
 def change_pct(p, prev):
+    # 優先用 API 回傳的 change 欄位（TWSE STOCK_DAY_ALL 不回歷史，close 可能重複）
+    if p.get("change") and p["close"]:
+        prev_close = p["close"] - p["change"]
+        if prev_close != 0:
+            return round(p["change"] / prev_close * 100, 2)
     if not prev or prev["close"] == 0: return 0
     return round((p["close"] - prev["close"]) / prev["close"] * 100, 2)
 
@@ -727,8 +732,9 @@ for sid in module_sids:
     high = p.get("high", close)
     low = p.get("low", close)
     vol = int(p["Trading_Volume"] / 1000)
-    chg = round(close - prev["close"], 2)
-    chg_pct = round(chg / prev["close"] * 100, 2) if prev["close"] else 0
+    chg = p.get("change", 0) or round(close - prev["close"], 2)
+    prev_close = close - chg if chg else prev["close"]
+    chg_pct = round(chg / prev_close * 100, 2) if prev_close else 0
 
     ma5 = ma(sid, 5)
     ma10 = ma(sid, 10)
