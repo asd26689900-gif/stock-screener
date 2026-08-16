@@ -1,0 +1,196 @@
+<title>產業熱力圖 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.date-label{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);white-space:nowrap}
+.container{max-width:1100px;margin:0 auto;padding:24px 16px 80px}
+h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom:8px}
+.subtitle{font-size:13px;color:var(--text-secondary);margin-bottom:20px}
+.treemap-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:24px}
+.treemap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:4px}
+.tm-cell{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.15);cursor:pointer;overflow:hidden;transition:opacity .15s}
+.tm-cell:hover{opacity:.85;z-index:2}
+.tm-label{font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:95%;pointer-events:none}
+.tm-val{font-size:10px;font-family:var(--font-mono);color:rgba(255,255,255,0.85);text-shadow:0 1px 2px rgba(0,0,0,0.5);pointer-events:none}
+.tm-cell.small .tm-label{font-size:9px}.tm-cell.tiny .tm-label,.tm-cell.tiny .tm-val{display:none}
+.tooltip{display:none;position:fixed;z-index:999;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:12px 16px;font-size:13px;pointer-events:none;max-width:260px}
+.tooltip.show{display:block}
+.tooltip .tt-name{font-weight:700;color:var(--ink);margin-bottom:4px}
+.tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;font-family:var(--font-mono);font-size:12px}
+.legend{display:flex;align-items:center;gap:4px;margin-top:12px;justify-content:center;flex-wrap:wrap}
+.legend-bar{width:200px;height:12px;border-radius:6px;background:linear-gradient(to right,#2d8f4e,#4a8b6e,#888,#c07050,#c0544f)}
+.legend-label{font-size:11px;color:var(--text-secondary);font-family:var(--font-mono)}
+.breadcrumb{font-size:13px;color:var(--text-secondary);margin-bottom:12px;display:flex;align-items:center;gap:6px}
+.breadcrumb a{color:var(--gold);cursor:pointer;text-decoration:none}
+.breadcrumb a:hover{text-decoration:underline}
+.stk-table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px;display:none}
+.stk-table-wrap.show{display:block}
+.stk-table-title{padding:14px 20px;font-family:var(--font-display);font-size:16px;color:var(--ink);border-bottom:1px solid var(--border-light)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
+tbody tr:hover{background:var(--gold-soft)}
+.up{color:var(--red)}.dn{color:var(--green)}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.treemap{aspect-ratio:4/3}.container{padding:16px 8px 60px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a><a href="stk.html">個股分析</a>
+    <a href="heatmap.html" class="active">產業熱力圖</a><a href="strategy.html">選股策略</a>
+    <a href="filter.html">自訂篩選</a>
+  </div>
+  <div class="spacer"></div>
+  <span class="date-label" id="dateLabel">載入中...</span>
+  <div id="authArea"></div>
+</div>
+
+<div class="container">
+  <h2>產業熱力圖</h2>
+  <p class="subtitle">色塊面積 = 成交金額，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
+  <div class="breadcrumb" id="breadcrumb" style="display:none"><a onclick="showIndustry()">全部產業</a> <span>›</span> <span id="bcName"></span></div>
+  <div class="treemap-wrap"><div class="treemap" id="treemap"></div>
+    <div class="legend"><span class="legend-label">-5%</span><div class="legend-bar"></div><span class="legend-label">+5%</span></div>
+  </div>
+  <div class="stk-table-wrap" id="stkTable">
+    <div class="stk-table-title" id="stkTableTitle"></div>
+    <div class="table-wrap"><table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交金額(百萬)</th></tr></thead><tbody id="stkTableBody"></tbody></table></div>
+  </div>
+</div>
+<div class="footer">盤後精選模組 — 資料僅供參考，不構成投資建議。</div>
+<div class="tooltip" id="tooltip"><div class="tt-name" id="ttName"></div><div class="tt-row"><span>漲跌幅</span><span id="ttChg"></span></div><div class="tt-row"><span>成交金額</span><span id="ttVol"></span></div></div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+let hmData={};
+const treemapEl=document.getElementById('treemap');
+const tooltip=document.getElementById('tooltip');
+
+function chgColor(pct){
+  const c=Math.max(-5,Math.min(5,pct)),t=(c+5)/10;
+  let r,g,b;
+  if(t<.5){const s=t/.5;r=Math.round(45+s*91);g=Math.round(143-s*7);b=Math.round(78+s*58);}
+  else{const s=(t-.5)/.5;r=Math.round(136+s*56);g=Math.round(136-s*52);b=Math.round(136-s*57);}
+  return`rgb(${r},${g},${b})`;
+}
+
+function squarify(items,x,y,w,h){
+  if(!items.length)return[];
+  const rects=[];let remaining=[...items],cx=x,cy=y,cw=w,ch=h;
+  while(remaining.length){
+    const isW=cw>=ch,side=isW?ch:cw,totR=remaining.reduce((s,i)=>s+i.value,0);
+    let row=[remaining[0]],rv=remaining[0].value;
+    for(let i=1;i<remaining.length;i++){
+      const wC=worstR(row,rv,side,totR,isW?cw:ch);
+      row.push(remaining[i]);
+      const wN=worstR(row,rv+remaining[i].value,side,totR,isW?cw:ch);
+      if(wN>wC&&row.length>1){row.pop();break;}
+      rv+=remaining[i].value;
+    }
+    const ss=isW?cw*(rv/totR):ch*(rv/totR);let off=0;
+    for(const it of row){const fr=it.value/rv,cs=side*fr;
+      if(isW)rects.push({...it,x:cx,y:cy+off,w:ss,h:cs});
+      else rects.push({...it,x:cx+off,y:cy,w:cs,h:ss});
+      off+=cs;}
+    remaining=remaining.slice(row.length);
+    if(isW){cx+=ss;cw-=ss;}else{cy+=ss;ch-=ss;}
+  }
+  return rects;
+}
+function worstR(row,rv,side,total,fs){
+  const ss=fs*(rv/total);if(ss<=0)return Infinity;let w=0;
+  for(const it of row){const cs=side*(it.value/rv),r=Math.max(ss/cs,cs/ss);if(r>w)w=r;}return w;
+}
+
+function renderTreemap(items){
+  const rect=treemapEl.getBoundingClientRect(),W=rect.width||800,H=rect.height||450;
+  const sorted=[...items].sort((a,b)=>b.value-a.value);
+  const rects=squarify(sorted,0,0,W,H);
+  treemapEl.innerHTML='';
+  for(const r of rects){
+    const div=document.createElement('div');
+    div.className='tm-cell'+(r.w<60||r.h<40?' small':'')+(r.w<35||r.h<25?' tiny':'');
+    div.style.cssText=`left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;background:${chgColor(r.chg)}`;
+    div.innerHTML=`<span class="tm-label">${r.label}</span><span class="tm-val">${r.chg>=0?'+':''}${r.chg.toFixed(1)}%</span>`;
+    div.addEventListener('mouseenter',e=>showTT(e,r));
+    div.addEventListener('mousemove',moveTT);
+    div.addEventListener('mouseleave',hideTT);
+    if(r.onClick)div.addEventListener('click',r.onClick);
+    treemapEl.appendChild(div);
+  }
+}
+function showTT(e,r){document.getElementById('ttName').textContent=r.label;const el=document.getElementById('ttChg');el.textContent=(r.chg>=0?'+':'')+r.chg.toFixed(2)+'%';el.className=r.chg>=0?'up':'dn';document.getElementById('ttVol').textContent=(r.value/1e6).toFixed(0)+' 百萬';tooltip.classList.add('show');moveTT(e);}
+function moveTT(e){tooltip.style.left=(e.clientX+12)+'px';tooltip.style.top=(e.clientY-40)+'px';}
+function hideTT(){tooltip.classList.remove('show');}
+
+function showIndustry(){
+  document.getElementById('breadcrumb').style.display='none';
+  document.getElementById('stkTable').classList.remove('show');
+  const items=(hmData.industries||[]).map(ind=>({label:ind.name,value:ind.total_amount,chg:ind.avg_chg,onClick:()=>drillDown(ind)}));
+  renderTreemap(items);
+}
+function drillDown(ind){
+  document.getElementById('breadcrumb').style.display='flex';
+  document.getElementById('bcName').textContent=ind.name;
+  renderTreemap((ind.stocks||[]).map(s=>({label:s.name,value:s.amount,chg:s.chg_pct,onClick:()=>{location.href='stk.html#'+s.id;}})));
+  const tw=document.getElementById('stkTable');tw.classList.add('show');
+  document.getElementById('stkTableTitle').textContent=ind.name+' — 成分股明細';
+  document.getElementById('stkTableBody').innerHTML=[...(ind.stocks||[])].sort((a,b)=>b.amount-a.amount).map(s=>`<tr><td>${s.id}</td><td>${s.name}</td><td>${s.close.toLocaleString()}</td><td class="${s.chg_pct>=0?'up':'dn'}">${s.chg_pct>=0?'+':''}${s.chg_pct.toFixed(2)}%</td><td>${(s.amount/1e6).toFixed(0)}</td></tr>`).join('');
+}
+
+async function loadHeatmap(){
+  if(!sb)return;
+  const{data}=await sb.from('daily_heatmap').select('date,data').order('date',{ascending:false}).limit(1).single();
+  if(!data)return;
+  document.getElementById('dateLabel').textContent='📅 '+data.date;
+  hmData=data.data||{};
+  showIndustry();
+}
+function onAuthReady(){loadHeatmap();}
+window.addEventListener('resize',()=>{if(document.getElementById('breadcrumb').style.display==='none')showIndustry();});
+</script>

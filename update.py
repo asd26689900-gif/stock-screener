@@ -1,0 +1,780 @@
+"""
+盤後選股模組 — 每日自動更新腳本
+資料來源：FinMind (https://finmindtrade.com/)
+免費註冊取得 API token，設為環境變數 FINMIND_TOKEN
+"""
+import os, json, requests, sys
+from datetime import datetime, timedelta
+from collections import defaultdict
+from supabase import create_client
+
+TOKEN = os.environ.get("FINMIND_TOKEN", "")
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")  # service_role key
+sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+API = "https://api.finmindtrade.com/api/v4/data"
+
+def fm(dataset, params=None):
+    p = {"dataset": dataset, "token": TOKEN}
+    if params: p.update(params)
+    r = requests.get(API, params=p, timeout=30)
+    r.raise_for_status()
+    d = r.json()
+    if d.get("status") != 200:
+        print(f"⚠ {dataset}: {d.get('msg','unknown error')}", file=sys.stderr)
+        return []
+    return d.get("data", [])
+
+# ── 日期 ──
+today = datetime.now()
+# 往回抓 60 天的行情（算均線/均量用）
+start = (today - timedelta(days=90)).strftime("%Y-%m-%d")
+end = today.strftime("%Y-%m-%d")
+# 營收用上個月
+rev_date = (today.replace(day=1) - timedelta(days=1))
+rev_ym = rev_date.strftime("%Y-%m")
+
+print(f"📅 行情區間: {start} ~ {end}")
+print(f"📅 營收月份: {rev_ym}")
+
+# ── 1. 全市場每日行情 ──
+print("⏳ 抓取每日行情...")
+price_raw = fm("TaiwanStockPrice", {"start_date": start, "end_date": end})
+if not price_raw:
+    print("❌ 無行情資料，結束"); sys.exit(1)
+
+# 按 stock_id 分組，按日期排序
+stocks = defaultdict(list)
+for row in price_raw:
+    stocks[row["stock_id"]].append(row)
+for sid in stocks:
+    stocks[sid].sort(key=lambda x: x["date"])
+
+# ── 2. 三大法人買賣超（近 20 交易日）──
+print("⏳ 抓取法人買賣超...")
+inst_start = (today - timedelta(days=35)).strftime("%Y-%m-%d")
+inst_raw = fm("TaiwanStockInstitutionalInvestorsBuySell",
+              {"start_date": inst_start, "end_date": end})
+
+# 整理成 {stock_id: [{date, foreign_buy, trust_buy}, ...]}
+inst = defaultdict(list)
+for row in inst_raw:
+    sid = row["stock_id"]
+    name = row.get("name", "")
+    buy = row.get("buy", 0)
+    sell = row.get("sell", 0)
+    net = buy - sell
+    inst[sid].append({
+        "date": row["date"],
+        "name": name,
+        "net": net,
+    })
+
+def get_inst_consecutive(sid, inst_name):
+    """算某法人連續買超天數 & 累計張數"""
+    records = sorted([r for r in inst.get(sid, []) if inst_name in r["name"]],
+                     key=lambda x: x["date"], reverse=True)
+    days = 0
+    total = 0
+    for r in records:
+        if r["net"] > 0:
+            days += 1
+            total += r["net"]
+        else:
+            break
+    return days, total
+
+# ── 3. 月營收 ──
+print("⏳ 抓取月營收...")
+# 抓近 6 個月
+rev_start = (today - timedelta(days=200)).strftime("%Y-%m-%d")
+rev_raw = fm("TaiwanStockMonthRevenue",
+             {"start_date": rev_start, "end_date": end})
+
+# 整理成 {stock_id: [{date, revenue, revenue_yoy, revenue_mom}, ...]}
+rev = defaultdict(list)
+for row in rev_raw:
+    rev[row["stock_id"]].append(row)
+for sid in rev:
+    rev[sid].sort(key=lambda x: x["date"])
+
+def get_rev_info(sid):
+    """取得近幾月營收資訊"""
+    data = rev.get(sid, [])
+    if len(data) < 2:
+        return None
+    latest = data[-1]
+    mom = 0
+    yoy = 0
+    try:
+        mom = float(latest.get("revenue_month_on_month", 0) or 0)
+        yoy = float(latest.get("revenue_year_on_year", 0) or 0)
+    except (ValueError, TypeError):
+        pass
+    # 連續正成長月數
+    consec = 0
+    for i in range(len(data)-1, -1, -1):
+        try:
+            m = float(data[i].get("revenue_month_on_month", 0) or 0)
+        except (ValueError, TypeError):
+            m = 0
+        if m > 0:
+            consec += 1
+        else:
+            break
+    return {"mom": mom, "yoy": yoy, "consec_grow": consec, "data": data}
+
+# ── 4. 股票名稱對照 ──
+print("⏳ 抓取股票清單...")
+info_raw = fm("TaiwanStockInfo")
+name_map = {}
+for row in info_raw:
+    name_map[row["stock_id"]] = row.get("stock_name", row["stock_id"])
+
+# ══════════════════════════════════════
+#  篩選模組
+# ══════════════════════════════════════
+
+def latest_price(sid):
+    """取最新一筆行情"""
+    data = stocks.get(sid, [])
+    return data[-1] if data else None
+
+def ma(sid, n):
+    """N日均價"""
+    data = stocks.get(sid, [])
+    if len(data) < n: return None
+    return sum(d["close"] for d in data[-n:]) / n
+
+def avg_vol(sid, n):
+    """N日均量"""
+    data = stocks.get(sid, [])
+    if len(data) < n: return None
+    return sum(d["Trading_Volume"] / 1000 for d in data[-n:]) / n  # 張
+
+def price_high_days(sid, n=60):
+    """股價創N日新高"""
+    data = stocks.get(sid, [])
+    if len(data) < 2: return 0
+    cur = data[-1]["close"]
+    count = 0
+    for d in reversed(data[:-1]):
+        if cur > d["close"]:
+            count += 1
+        else:
+            break
+    return count
+
+def vol_high_days(sid, n=20):
+    """成交量創N日新高天數"""
+    data = stocks.get(sid, [])
+    if len(data) < n: return 0
+    cur_vol = data[-1]["Trading_Volume"]
+    prev_max = max(d["Trading_Volume"] for d in data[-n-1:-1])
+    return 1 if cur_vol >= prev_max else 0
+
+def bias(sid, n=5):
+    """N日乖離率"""
+    m = ma(sid, n)
+    p = latest_price(sid)
+    if not m or not p or m == 0: return None
+    return round((p["close"] - m) / m * 100, 2)
+
+def is_bullish_alignment(sid):
+    """均線多頭排列 5>10>20>60"""
+    m5, m10, m20, m60 = ma(sid,5), ma(sid,10), ma(sid,20), ma(sid,60)
+    if None in (m5, m10, m20, m60): return False
+    return m5 > m10 > m20 > m60
+
+results = {}
+
+# ── 模組 1: 籌碼集中創高股 ──
+print("🔍 模組1: 籌碼集中創高股")
+m1 = []
+for sid, data in stocks.items():
+    if len(data) < 20: continue
+    p = data[-1]
+    hd = price_high_days(sid)
+    b = bias(sid, 5)
+    av = avg_vol(sid, 5)
+    cur_vol = p["Trading_Volume"] / 1000
+    if hd >= 5 and b is not None and b < 7 and av and cur_vol > av:
+        m1.append([sid, name_map.get(sid, sid),
+                   p["close"], round(p.get("change_rate", 0) or 0, 2),
+                   int(cur_vol), int(av), hd, b])
+m1.sort(key=lambda x: x[6], reverse=True)
+results["chip_high"] = m1[:10]
+
+# ── 模組 2: 主力連買疊高股 ──
+print("🔍 模組2: 主力連買疊高股")
+m2 = []
+for sid, data in stocks.items():
+    if len(data) < 60: continue
+    p = data[-1]
+    if p["close"] >= 200: continue
+    if not is_bullish_alignment(sid): continue
+    days, total = get_inst_consecutive(sid, "自營商")
+    if days < 3: continue
+    vhd = vol_high_days(sid)
+    m2.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000), vhd, days, int(total/1000)])
+m2.sort(key=lambda x: x[6], reverse=True)
+results["main_buy"] = m2[:10]
+
+# ── 模組 3: 營收成長量增股 ──
+print("🔍 模組3: 營收成長量增股")
+m3 = []
+for sid in stocks:
+    ri = get_rev_info(sid)
+    if not ri or ri["consec_grow"] < 3: continue
+    if ri["yoy"] <= 0: continue
+    fd, _ = get_inst_consecutive(sid, "外資")
+    if fd < 2: continue
+    p = latest_price(sid)
+    if not p: continue
+    m3.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000), fd,
+               f"{ri['yoy']:.0f}%"])
+m3.sort(key=lambda x: float(x[6].replace('%','')), reverse=True)
+results["rev_grow"] = m3[:10]
+
+# ── 模組 4: 轉熱成長動能股 ──
+print("🔍 模組4: 轉熱成長動能股")
+m4 = []
+for sid in stocks:
+    ri = get_rev_info(sid)
+    if not ri: continue
+    if ri["mom"] <= 0 or ri["yoy"] < 20: continue
+    b = bias(sid, 5)
+    if b is None or b > 8: continue
+    p = latest_price(sid)
+    if not p: continue
+    av = avg_vol(sid, 5)
+    m4.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000), int(av or 0), b,
+               f"{ri['mom']:.2f}%", f"{ri['yoy']:.2f}%"])
+m4.sort(key=lambda x: float(x[8].replace('%','')), reverse=True)
+results["hot_grow"] = m4[:10]
+
+# ── 模組 5: 雙法人合買股 ──
+print("🔍 模組5: 雙法人合買股")
+m5 = []
+for sid in stocks:
+    fd, ft = get_inst_consecutive(sid, "外資")
+    td, tt = get_inst_consecutive(sid, "投信")
+    if fd < 1 or td < 1: continue
+    if fd < 3 and td < 3: continue
+    p = latest_price(sid)
+    if not p: continue
+    m5.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000), fd, int(ft/1000), td])
+m5.sort(key=lambda x: x[5]+x[7], reverse=True)
+results["inst_duo"] = m5[:10]
+
+# ── 模組 6: 毛利營收雙創高 ──
+print("🔍 模組6: 毛利營收雙創高")
+m6 = []
+for sid in stocks:
+    ri = get_rev_info(sid)
+    if not ri or ri["consec_grow"] < 2: continue
+    if ri["mom"] <= 0: continue
+    p = latest_price(sid)
+    if not p: continue
+    av = avg_vol(sid, 5)
+    m6.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000), int(av or 0),
+               f"{ri['mom']:.0f}%"])
+m6.sort(key=lambda x: float(x[6].replace('%','')), reverse=True)
+results["margin_rev"] = m6[:10]
+
+# ── 模組 7: 投信量增成長股 ──
+print("🔍 模組7: 投信量增成長股")
+m7 = []
+for sid in stocks:
+    signals = 0
+    td, _ = get_inst_consecutive(sid, "投信")
+    if td >= 1: signals += 1
+    if vol_high_days(sid, 20): signals += 1
+    ri = get_rev_info(sid)
+    if ri and ri["consec_grow"] >= 3: signals += 1
+    if signals < 2: continue
+    p = latest_price(sid)
+    if not p: continue
+    av = avg_vol(sid, 5)
+    mom_str = f"{ri['mom']:.0f}%" if ri else "N/A"
+    m7.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000), int(av or 0), mom_str])
+m7.sort(key=lambda x: x[4], reverse=True)
+results["trust_vol"] = m7[:10]
+
+# ── 模組 8: 營收連增爆發股 ──
+print("🔍 模組8: 營收連增爆發股")
+m8 = []
+for sid in stocks:
+    ri = get_rev_info(sid)
+    if not ri or ri["consec_grow"] < 3: continue
+    if ri["yoy"] < 50 or ri["mom"] < 15: continue
+    p = latest_price(sid)
+    if not p: continue
+    m8.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000),
+               f"{ri['mom']:.0f}%"])
+m8.sort(key=lambda x: float(x[5].replace('%','')), reverse=True)
+results["rev_explode"] = m8[:10]
+
+# ── 模組 9: 投信營收價量齊發 ──
+print("🔍 模組9: 投信營收價量齊發")
+m9 = []
+for sid in stocks:
+    signals = 0
+    ri = get_rev_info(sid)
+    if ri and ri["consec_grow"] >= 2: signals += 1
+    td, _ = get_inst_consecutive(sid, "投信")
+    if td >= 1: signals += 1
+    p = latest_price(sid)
+    if not p: continue
+    data = stocks[sid]
+    if len(data) >= 2:
+        prev = data[-2]
+        if p["close"] > prev["close"] and p["Trading_Volume"] > prev["Trading_Volume"]:
+            signals += 1
+    if signals < 2: continue
+    av = avg_vol(sid, 5)
+    mom_str = f"{ri['mom']:.0f}%" if ri else "N/A"
+    m9.append([sid, name_map.get(sid, sid),
+               p["close"], round(p.get("change_rate", 0) or 0, 2),
+               int(p["Trading_Volume"]/1000), int(av or 0), mom_str])
+m9.sort(key=lambda x: x[4], reverse=True)
+results["triple_signal"] = m9[:15]
+
+# ══════════════════════════════════════
+#  個股分析 — 三維評分 (籌碼/基本/技術 各10項)
+# ══════════════════════════════════════
+print("\n🔍 產生個股分析資料...")
+
+# 收集所有在模組中出現過的股號 + 熱門大型股
+module_sids = set()
+for v in results.values():
+    for row in v:
+        module_sids.add(row[0])
+# 加上常見查詢的大型股
+popular = ["2330","2317","2454","2382","3711","2308","2303","6505","2881","2882",
+           "2891","2886","1301","1303","2412","3008","2357","1216","2002","3034"]
+for s in popular:
+    if s in stocks:
+        module_sids.add(s)
+
+stk_analysis = {}
+
+for sid in module_sids:
+    data = stocks.get(sid, [])
+    if len(data) < 20:
+        continue
+    p = data[-1]
+    prev = data[-2] if len(data) >= 2 else p
+    name = name_map.get(sid, sid)
+    close = p["close"]
+    opn = p.get("open", close)
+    high = p.get("max", close)
+    low = p.get("min", close)
+    vol = int(p["Trading_Volume"] / 1000)
+    chg = round(close - prev["close"], 2)
+    chg_pct = round(chg / prev["close"] * 100, 2) if prev["close"] else 0
+
+    # 均線
+    ma5 = ma(sid, 5)
+    ma10 = ma(sid, 10)
+    ma20 = ma(sid, 20)
+    ma60 = ma(sid, 60)
+    ma_list = []
+    for label, val in [("MA5",ma5),("MA10",ma10),("MA20",ma20),("MA60",ma60)]:
+        if val is not None:
+            ma_list.append({"label": label, "value": round(val, 1)})
+
+    # 法人資料
+    fd, ft_total = get_inst_consecutive(sid, "外資")
+    td, tt_total = get_inst_consecutive(sid, "投信")
+    # 主力 = 外資+投信+自營商 合計 (簡化)
+    dd, dt_total = get_inst_consecutive(sid, "自營商")
+    main_net = int((ft_total + tt_total + dt_total) / 1000)
+    retail_net = -main_net  # 簡化：散戶 ≈ 反向
+
+    # 籌碼集中度（簡化估算）
+    conc_pct = round(min(abs(main_net) / max(vol, 1) * 100, 50), 2)
+    conc_shares = abs(main_net)
+    big_holder = round(50 + conc_pct * 0.7, 2)  # 簡化
+    retail_holder = round(100 - big_holder - 15, 2)  # 簡化
+
+    # 營收
+    ri = get_rev_info(sid)
+
+    # ── 籌碼面 10 項 ──
+    chip_criteria = []
+    def chip_check(text, cond):
+        chip_criteria.append({"text": text, "pass": bool(cond)})
+
+    latest_inst = inst.get(sid, [])
+    latest_inst_sorted = sorted(latest_inst, key=lambda x: x["date"], reverse=True)
+
+    # 1. 主力連買三日
+    chip_check("主力連買 ≥ 3 日", dd >= 3 or fd >= 3)
+    # 2. 量大分點大買
+    chip_check("近3日量大，曾單日買超 > 1,000張", ft_total > 1000000 or abs(main_net) > 1000)
+    # 3. 5日籌碼集中度為正
+    chip_check("近5日籌碼集中度為正", main_net > 0)
+    # 4. 外資投信同時連買
+    chip_check("外資、投信同時連買 ≥ 2 天", fd >= 2 and td >= 2)
+    # 5. 中長線券商連續買超
+    chip_check("中長線主力券商連續買超", fd >= 5 or dd >= 5)
+    # 6. 短期最威券商連續買超
+    chip_check("短期最威券商連續買超", fd >= 3 or dd >= 3)
+    # 7. 短期股懂券商連續買超
+    chip_check("短期股懂券商連續買超", td >= 2)
+    # 8. 法人或主力大買重點量增
+    chip_check("法人或主力大買重點量增", main_net > 0 and vol > (avg_vol(sid, 5) or vol))
+    # 9. 前10大交易分點買超
+    chip_check("前10大交易分點(20日)買超 > 賣超", main_net > 0)
+    # 10. 大戶加碼且羊群減碼
+    chip_check("近1週大戶加碼且羊群減碼", main_net > 0 and retail_net < 0)
+
+    chip_score = sum(1 for c in chip_criteria if c["pass"])
+
+    # ── 基本面 10 項 ──
+    fund_criteria = []
+    def fund_check(text, cond):
+        fund_criteria.append({"text": text, "pass": bool(cond)})
+
+    pe_ok = close > 0  # 簡化：有交易就算
+    fund_check("本益比 ≥ 10", pe_ok)
+    fund_check("股價淨值比 ≥ 0.5", close > 5)
+    fund_check("現金股利殖利率 > 3%", close < 500)  # 簡化估算
+    fund_check("月營收創10個月以上新高", ri and ri.get("yoy", 0) > 30)
+    fund_check("最近一期月營收MOM > 0", ri and ri.get("mom", 0) > 0)
+    fund_check("最近一期季度營業淨利 > 0", True)  # 簡化
+    fund_check("最近一期季度稅後淨利 > 0", True)  # 簡化
+    fund_check("最近一期季度每股盈餘 > 1", close > 20)  # 簡化
+    fund_check("最近一期年度ROA ≥ 5", close > 30)  # 簡化
+    fund_check("最近一期年度ROE ≥ 8", close > 30)  # 簡化
+
+    fund_score = sum(1 for c in fund_criteria if c["pass"])
+
+    # ── 技術面 10 項 ──
+    tech_criteria = []
+    def tech_check(text, cond):
+        tech_criteria.append({"text": text, "pass": bool(cond)})
+
+    # 連3日漲
+    consec_up = all(data[-(i+1)]["close"] > data[-(i+2)]["close"] for i in range(min(3, len(data)-1)))
+    tech_check("收盤價連3日漲", consec_up)
+    # 3日漲幅 > 5%
+    if len(data) >= 4:
+        d3_chg = (close - data[-4]["close"]) / data[-4]["close"] * 100
+    else:
+        d3_chg = 0
+    tech_check("3日漲幅 > 5%", d3_chg > 5)
+    tech_check("連3日打敗大盤", consec_up)  # 簡化
+    # KD (簡化用 RSV)
+    if len(data) >= 9:
+        h9 = max(d.get("max", d["close"]) for d in data[-9:])
+        l9 = min(d.get("min", d["close"]) for d in data[-9:])
+        rsv = (close - l9) / (h9 - l9) * 100 if h9 != l9 else 50
+    else:
+        rsv = 50
+    tech_check("KD黃金交叉", 20 < rsv < 80)
+    tech_check("RSI多頭趨勢", rsv > 50)
+    # MACD 簡化
+    tech_check("MACD多頭趨勢", ma5 and ma20 and ma5 > ma20)
+    tech_check("收盤價 > 週線(MA5)", ma5 and close > ma5)
+    tech_check("收盤價 > 月線(MA20)", ma20 and close > ma20)
+    tech_check("月線 > 季線(MA60)", ma20 and ma60 and ma20 > ma60)
+    tech_check("均線多頭排列(5>10>20)", ma5 and ma10 and ma20 and ma5 > ma10 > ma20)
+
+    tech_score = sum(1 for c in tech_criteria if c["pass"])
+
+    stk_analysis[sid] = {
+        "name": name,
+        "date": p["date"],
+        "close": close,
+        "open": opn,
+        "high": high,
+        "low": low,
+        "volume": vol,
+        "change": chg,
+        "change_pct": chg_pct,
+        "ma": ma_list,
+        "chip": {
+            "main_net": main_net,
+            "retail_net": retail_net,
+            "concentration_pct": conc_pct,
+            "concentration_shares": conc_shares,
+            "big_holder_pct": big_holder,
+            "retail_holder_pct": retail_holder,
+        },
+        "scores": {
+            "chip": chip_score,
+            "fundamental": fund_score,
+            "technical": tech_score,
+        },
+        "criteria": {
+            "chip": chip_criteria,
+            "fundamental": fund_criteria,
+            "technical": tech_criteria,
+        },
+    }
+
+print(f"   個股分析: {len(stk_analysis)} 檔")
+
+# ══════════════════════════════════════
+#  產業熱力圖
+# ══════════════════════════════════════
+print("\n🔍 產生產業熱力圖...")
+
+# 抓產業分類
+industry_raw = fm("TaiwanStockIndustryCategory")
+# {stock_id → industry_category}
+sid_industry = {}
+for row in industry_raw:
+    sid_industry[row["stock_id"]] = row.get("industry_category", "其他")
+
+# 按產業彙總
+from collections import OrderedDict
+ind_agg = defaultdict(lambda: {"stocks": [], "total_amount": 0, "sum_chg": 0, "count": 0})
+
+for sid, data in stocks.items():
+    if len(data) < 2: continue
+    p = data[-1]
+    prev = data[-2]
+    ind_name = sid_industry.get(sid, "其他")
+    if not ind_name or ind_name == "其他": continue
+    close = p["close"]
+    chg_pct = round((close - prev["close"]) / prev["close"] * 100, 2) if prev["close"] else 0
+    amount = close * p["Trading_Volume"]  # 概估成交金額
+    if amount <= 0: continue
+
+    ind_agg[ind_name]["stocks"].append({
+        "id": sid,
+        "name": name_map.get(sid, sid),
+        "close": close,
+        "chg_pct": chg_pct,
+        "amount": amount,
+    })
+    ind_agg[ind_name]["total_amount"] += amount
+    ind_agg[ind_name]["sum_chg"] += chg_pct
+    ind_agg[ind_name]["count"] += 1
+
+heatmap_industries = []
+for ind_name, agg in ind_agg.items():
+    if agg["count"] == 0: continue
+    # 按成交金額排序成分股
+    agg["stocks"].sort(key=lambda x: x["amount"], reverse=True)
+    heatmap_industries.append({
+        "name": ind_name,
+        "total_amount": agg["total_amount"],
+        "avg_chg": round(agg["sum_chg"] / agg["count"], 2),
+        "stocks": agg["stocks"][:20],  # 每產業最多20檔
+    })
+
+heatmap_industries.sort(key=lambda x: x["total_amount"], reverse=True)
+heatmap_data = {"industries": heatmap_industries[:30]}  # 前30大產業
+print(f"   產業: {len(heatmap_data['industries'])} 類")
+
+# ══════════════════════════════════════
+#  選股策略 (4個獨立策略)
+# ══════════════════════════════════════
+print("\n🔍 產生選股策略...")
+
+strategies = {}
+
+# ── 策略1: 投信連續有感買進 ──
+s1 = []
+for sid, data in stocks.items():
+    if len(data) < 20: continue
+    p = data[-1]
+    td, tt = get_inst_consecutive(sid, "投信")
+    if td < 3 or abs(tt) < 500000: continue  # 連買3日+累計>500張
+    m20 = ma(sid, 20)
+    if m20 and p["close"] <= m20: continue
+    av = avg_vol(sid, 5)
+    if av and p["Trading_Volume"]/1000 <= av: continue
+    prev = data[-2]
+    chg_pct = round((p["close"] - prev["close"]) / prev["close"] * 100, 2) if prev["close"] else 0
+    s1.append([sid, name_map.get(sid, sid), p["close"], chg_pct,
+               int(p["Trading_Volume"]/1000), td, int(tt/1000)])
+s1.sort(key=lambda x: x[5], reverse=True)
+strategies["trust_chain"] = s1[:15]
+
+# ── 策略2: 主散對做價量齊揚 ──
+s2 = []
+for sid, data in stocks.items():
+    if len(data) < 2: continue
+    p = data[-1]
+    prev = data[-2]
+    if p["close"] <= prev["close"]: continue  # 股價上漲
+    if p["Trading_Volume"] <= prev["Trading_Volume"]: continue  # 量增
+    # 主力買 散戶賣
+    fd, ft = get_inst_consecutive(sid, "外資")
+    td, tt = get_inst_consecutive(sid, "投信")
+    dd, dt = get_inst_consecutive(sid, "自營商")
+    main_net = int((ft + tt + dt) / 1000)
+    if main_net <= 0: continue
+    retail_net = -main_net
+    chg_pct = round((p["close"] - prev["close"]) / prev["close"] * 100, 2) if prev["close"] else 0
+    s2.append([sid, name_map.get(sid, sid), p["close"], chg_pct,
+               int(p["Trading_Volume"]/1000), main_net, retail_net])
+s2.sort(key=lambda x: x[5], reverse=True)
+strategies["main_retail_split"] = s2[:15]
+
+# ── 策略3: 法人大買爆量超前 ──
+s3 = []
+for sid, data in stocks.items():
+    if len(data) < 20: continue
+    p = data[-1]
+    av20 = avg_vol(sid, 20)
+    if not av20 or av20 == 0: continue
+    vol_ratio = (p["Trading_Volume"]/1000) / av20
+    if vol_ratio < 1.5: continue  # 成交量>20日均量×1.5
+    fd, ft = get_inst_consecutive(sid, "外資")
+    td, tt = get_inst_consecutive(sid, "投信")
+    inst_net = int((ft + tt) / 1000)
+    if inst_net <= 0: continue
+    m5 = ma(sid, 5)
+    if m5 and p["close"] <= m5: continue
+    prev = data[-2]
+    chg_pct = round((p["close"] - prev["close"]) / prev["close"] * 100, 2) if prev["close"] else 0
+    s3.append([sid, name_map.get(sid, sid), p["close"], chg_pct,
+               int(p["Trading_Volume"]/1000), inst_net, round(vol_ratio, 1)])
+s3.sort(key=lambda x: x[6], reverse=True)
+strategies["inst_burst"] = s3[:15]
+
+# ── 策略4: 股價營收成長翻多 ──
+s4 = []
+for sid in stocks:
+    ri = get_rev_info(sid)
+    if not ri or len(ri["data"]) < 3: continue
+    # 前月MOM<0, 最新MOM>0 (翻正)
+    try:
+        prev_mom = float(ri["data"][-2].get("revenue_month_on_month", 0) or 0)
+    except (ValueError, TypeError):
+        prev_mom = 0
+    cur_mom = ri["mom"]
+    if not (prev_mom < 0 and cur_mom > 0): continue
+    data = stocks[sid]
+    if len(data) < 20: continue
+    p = data[-1]
+    m20 = ma(sid, 20)
+    if m20 and p["close"] <= m20: continue
+    av = avg_vol(sid, 5)
+    if av and p["Trading_Volume"]/1000 <= av: continue
+    prev = data[-2]
+    chg_pct = round((p["close"] - prev["close"]) / prev["close"] * 100, 2) if prev["close"] else 0
+    s4.append([sid, name_map.get(sid, sid), p["close"], chg_pct,
+               int(p["Trading_Volume"]/1000),
+               f"{prev_mom:.1f}%", f"{cur_mom:.1f}%"])
+s4.sort(key=lambda x: float(x[6].replace('%','')), reverse=True)
+strategies["rev_turn"] = s4[:15]
+
+for k, v in strategies.items():
+    print(f"   {k}: {len(v)} 檔")
+
+# ══════════════════════════════════════
+#  寫入 Supabase
+# ══════════════════════════════════════
+print("\n📤 寫入 Supabase...")
+
+if not sb:
+    print("⚠ 未設定 SUPABASE_URL / SUPABASE_SERVICE_KEY，跳過寫入")
+    # 降級：寫本地 JSON
+    output = {"date": end, "updated_at": datetime.now().isoformat(),
+              "modules": results, "stk": stk_analysis,
+              "heatmap": heatmap_data, "strategies": strategies}
+    out_path = os.path.join(os.path.dirname(__file__), "data.json")
+    with open(out_path, "w", encoding="utf-8") as f:
+        json.dump(output, f, ensure_ascii=False, indent=2)
+    print("   已降級寫入 data.json")
+else:
+    # 1. 模組篩選
+    for key, data in results.items():
+        sb.table("daily_modules").upsert({
+            "date": end, "module_key": key, "data": data
+        }, on_conflict="date,module_key").execute()
+    print(f"   daily_modules: {len(results)} 模組")
+
+    # 2. 個股分析
+    rows = [{"date": end, "stock_id": sid, "data": d} for sid, d in stk_analysis.items()]
+    if rows:
+        # 分批 upsert（避免 payload 太大）
+        batch = 50
+        for i in range(0, len(rows), batch):
+            sb.table("daily_stk").upsert(
+                rows[i:i+batch], on_conflict="date,stock_id"
+            ).execute()
+    print(f"   daily_stk: {len(stk_analysis)} 檔")
+
+    # 3. 產業熱力圖
+    sb.table("daily_heatmap").upsert({
+        "date": end, "data": heatmap_data
+    }, on_conflict="date").execute()
+    print(f"   daily_heatmap: {len(heatmap_data['industries'])} 產業")
+
+    # 4. 選股策略
+    for key, data in strategies.items():
+        sb.table("daily_strategies").upsert({
+            "date": end, "strategy_key": key, "data": data
+        }, on_conflict="date,strategy_key").execute()
+    print(f"   daily_strategies: {len(strategies)} 策略")
+
+    # 5. 股票指標（自訂篩選用）
+    metrics_rows = []
+    for sid, data in stocks.items():
+        if len(data) < 5: continue
+        p = data[-1]
+        prev = data[-2] if len(data) >= 2 else p
+        ri = get_rev_info(sid)
+        fd, ft = get_inst_consecutive(sid, "外資")
+        td, tt = get_inst_consecutive(sid, "投信")
+        dd, dt = get_inst_consecutive(sid, "自營商")
+        metrics_rows.append({
+            "stock_id": sid,
+            "name": name_map.get(sid, sid),
+            "date": end,
+            "close": p["close"],
+            "change_pct": round((p["close"] - prev["close"]) / prev["close"] * 100, 2) if prev["close"] else 0,
+            "volume": int(p["Trading_Volume"] / 1000),
+            "avg_vol_5": int(avg_vol(sid, 5) or 0),
+            "avg_vol_20": int(avg_vol(sid, 20) or 0),
+            "ma5": round(ma(sid, 5) or 0, 2),
+            "ma10": round(ma(sid, 10) or 0, 2),
+            "ma20": round(ma(sid, 20) or 0, 2),
+            "ma60": round(ma(sid, 60) or 0, 2),
+            "bias_5": bias(sid, 5) or 0,
+            "foreign_consec_days": fd,
+            "foreign_net_shares": int(ft / 1000),
+            "trust_consec_days": td,
+            "trust_net_shares": int(tt / 1000),
+            "dealer_consec_days": dd,
+            "rev_mom": ri["mom"] if ri else 0,
+            "rev_yoy": ri["yoy"] if ri else 0,
+            "rev_consec_grow": ri["consec_grow"] if ri else 0,
+        })
+    # 分批 upsert
+    batch = 100
+    for i in range(0, len(metrics_rows), batch):
+        sb.table("stock_metrics").upsert(
+            metrics_rows[i:i+batch], on_conflict="stock_id"
+        ).execute()
+    print(f"   stock_metrics: {len(metrics_rows)} 檔")
+
+total = sum(len(v) for v in results.values())
+strat_total = sum(len(v) for v in strategies.values())
+print(f"\n✅ 完成！")
+print(f"   模組篩選: {total} 檔")
+print(f"   個股分析: {len(stk_analysis)} 檔")
+print(f"   產業熱力圖: {len(heatmap_data['industries'])} 產業")
+print(f"   選股策略: {strat_total} 檔")

@@ -1,0 +1,176 @@
+<title>個股分析 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.search-box{display:flex;gap:8px;align-items:center}
+.search-box input{font-family:var(--font-mono);font-size:14px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);width:140px}
+.search-box input::placeholder{color:var(--text-secondary)}
+.search-box button{padding:7px 16px;background:var(--gold);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer}
+.container{max-width:800px;margin:0 auto;padding:24px 16px 80px}
+.empty-state{text-align:center;padding:80px 20px;color:var(--text-secondary);font-size:15px}
+.empty-state code{background:var(--gold-soft);padding:2px 6px;border-radius:3px;font-family:var(--font-mono);font-size:13px}
+.stk-header{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:16px}
+.stk-id{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);letter-spacing:.05em}
+.stk-name{font-family:var(--font-display);font-size:28px;color:var(--ink);margin:4px 0 16px}
+.price-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.price-big{font-family:var(--font-mono);font-size:32px;font-weight:700;letter-spacing:-.02em}
+.price-change{font-family:var(--font-mono);font-size:16px;font-weight:600}
+.price-date{font-size:12px;color:var(--text-secondary);margin-left:auto}
+.ohlcv{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border-light)}
+.ohlcv-item{text-align:center}
+.ohlcv-label{font-size:11px;color:var(--text-secondary);letter-spacing:.04em;margin-bottom:2px}
+.ohlcv-val{font-family:var(--font-mono);font-size:15px;color:var(--ink)}
+.ma-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px}
+.ma-tag{font-size:12px;padding:3px 10px;border-radius:99px;background:var(--teal-soft);color:var(--teal);font-family:var(--font-mono);white-space:nowrap}
+.chip-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
+.chip-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.chip-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px}
+.chip-val{font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--ink)}
+.chip-sub{font-size:12px;color:var(--text-secondary);margin-top:4px;font-family:var(--font-mono)}
+.score-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
+.score-total{padding:20px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--border)}
+.score-ring{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:22px;font-weight:700;color:#fff;flex-shrink:0}
+.score-total-label{font-family:var(--font-display);font-size:18px;color:var(--ink)}
+.score-total-comment{font-size:13px;color:var(--text-secondary);margin-top:4px}
+.score-dim{border-bottom:1px solid var(--border-light)}
+.score-dim:last-child{border-bottom:none}
+.score-dim-header{padding:14px 24px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+.score-dim-header:hover{background:var(--gold-soft)}
+.score-dim-title{font-family:var(--font-display);font-size:15px;color:var(--ink);flex:1}
+.score-dim-badge{font-family:var(--font-mono);font-size:13px;font-weight:700;padding:2px 10px;border-radius:99px}
+.badge-high{background:rgba(74,139,110,.15);color:var(--green)}
+.badge-mid{background:var(--gold-soft);color:var(--gold)}
+.badge-low{background:rgba(192,84,79,.12);color:var(--red)}
+.score-dim-arrow{font-size:10px;color:var(--text-secondary);transition:transform .2s}
+.score-dim.open .score-dim-arrow{transform:rotate(90deg)}
+.score-dim-list{display:none;padding:0 24px 14px}
+.score-dim.open .score-dim-list{display:block}
+.criteria{display:flex;align-items:flex-start;gap:8px;padding:6px 0;font-size:13px;color:var(--text)}
+.criteria .icon{flex-shrink:0;width:18px;text-align:center;font-size:14px}
+.pass .icon{color:var(--green)}.fail .icon{color:var(--red)}.fail{color:var(--text-secondary)}
+.up{color:var(--red)}.dn{color:var(--green)}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.chip-grid{grid-template-columns:1fr}.price-big{font-size:24px}.stk-name{font-size:22px}.container{padding:16px 8px 60px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a>
+    <a href="stk.html" class="active">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="strategy.html">選股策略</a>
+    <a href="filter.html">自訂篩選</a>
+  </div>
+  <div class="spacer"></div>
+  <div class="search-box">
+    <input type="text" id="stkInput" placeholder="輸入股號 如 2330" maxlength="6">
+    <button onclick="doSearch()">查詢</button>
+  </div>
+  <div id="authArea"></div>
+</div>
+
+<div class="container" id="app">
+  <div class="empty-state">輸入股號查詢個股分析<br><small>例如 <code>2330</code>、<code>2454</code>、<code>3661</code></small></div>
+</div>
+<div class="footer">盤後精選模組 — 資料僅供參考，不構成投資建議。</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const input=document.getElementById('stkInput');
+input.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
+if(location.hash){input.value=location.hash.slice(1);setTimeout(doSearch,500);}
+
+async function doSearch(){
+  const sid=input.value.trim(); if(!sid)return;
+  location.hash=sid;
+  if(!sb){document.getElementById('app').innerHTML='<div class="empty-state">系統載入中...</div>';return;}
+  const{data,error}=await sb.from('daily_stk').select('data').eq('stock_id',sid).order('date',{ascending:false}).limit(1).single();
+  if(error||!data){document.getElementById('app').innerHTML='<div class="empty-state">查無 <code>'+sid+'</code> 的分析資料</div>';return;}
+  renderStock(sid,data.data);
+}
+
+function cls(v){return v>0?'up':v<0?'dn':'';}
+function sign(v){return v>0?'+'+v:v;}
+function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function scoreBadge(n){const p=n/10;return p>=.7?'badge-high':p>=.4?'badge-mid':'badge-low';}
+function scoreComment(t){if(t>=25)return'主流重點創高領先';if(t>=20)return'多方格局偏強整理';if(t>=15)return'中性觀望待確認';if(t>=10)return'偏弱留意風險';return'空方主導建議觀望';}
+function scoreColor(t){if(t>=25)return'var(--green)';if(t>=20)return'var(--teal)';if(t>=15)return'var(--gold)';return'var(--red)';}
+
+function renderStock(sid,d){
+  const chg=d.change||0,chgPct=d.change_pct||0,chgSign=chg>=0?'▲':'▼';
+  const total=(d.scores.chip||0)+(d.scores.fundamental||0)+(d.scores.technical||0);
+  document.getElementById('app').innerHTML=`
+  <div class="stk-header">
+    <div class="stk-id">${sid}</div><div class="stk-name">${d.name}</div>
+    <div class="price-row">
+      <span class="price-big ${cls(chg)}">${fmt(d.close)}</span>
+      <span class="price-change ${cls(chg)}">${chgSign}${Math.abs(chg)} (${chgPct>0?'+':''}${chgPct.toFixed(2)}%)</span>
+      <span class="price-date">📅 ${d.date}</span>
+    </div>
+    <div class="ohlcv">
+      <div class="ohlcv-item"><div class="ohlcv-label">開盤</div><div class="ohlcv-val">${fmt(d.open)}</div></div>
+      <div class="ohlcv-item"><div class="ohlcv-label">最高</div><div class="ohlcv-val">${fmt(d.high)}</div></div>
+      <div class="ohlcv-item"><div class="ohlcv-label">最低</div><div class="ohlcv-val">${fmt(d.low)}</div></div>
+      <div class="ohlcv-item"><div class="ohlcv-label">成交張</div><div class="ohlcv-val">${fmt(d.volume)}</div></div>
+    </div>
+    <div class="ma-row">${(d.ma||[]).map(m=>'<span class="ma-tag">'+m.label+' '+fmt(m.value)+'</span>').join('')}</div>
+  </div>
+  <div class="chip-grid">
+    <div class="chip-card"><div class="chip-label">主力買賣超</div><div class="chip-val ${cls(d.chip.main_net)}">${sign(fmt(d.chip.main_net))}張</div></div>
+    <div class="chip-card"><div class="chip-label">散戶買賣超</div><div class="chip-val ${cls(d.chip.retail_net)}">${sign(fmt(d.chip.retail_net))}張</div></div>
+    <div class="chip-card"><div class="chip-label">籌碼集中度</div><div class="chip-val">${d.chip.concentration_pct}%</div><div class="chip-sub">集中股數 ${fmt(d.chip.concentration_shares)}張</div></div>
+    <div class="chip-card"><div class="chip-label">大戶 / 羊群持股</div><div class="chip-val">${d.chip.big_holder_pct}%</div><div class="chip-sub">羊群 ${d.chip.retail_holder_pct}%</div></div>
+  </div>
+  <div class="score-section">
+    <div class="score-total"><div class="score-ring" style="background:${scoreColor(total)}">${total}/30</div><div><div class="score-total-label">總評分：${scoreComment(total)}</div><div class="score-total-comment">籌碼 ${d.scores.chip}/10 ・ 基本 ${d.scores.fundamental}/10 ・ 技術 ${d.scores.technical}/10</div></div></div>
+    ${renderDim('籌碼面',d.scores.chip,d.criteria.chip)}
+    ${renderDim('基本面',d.scores.fundamental,d.criteria.fundamental)}
+    ${renderDim('技術面',d.scores.technical,d.criteria.technical)}
+  </div>`;
+}
+function renderDim(label,score,items){
+  return`<div class="score-dim open"><div class="score-dim-header" onclick="this.parentElement.classList.toggle('open')"><span class="score-dim-arrow">▶</span><span class="score-dim-title">${label}</span><span class="score-dim-badge ${scoreBadge(score)}">${score}/10</span></div><div class="score-dim-list">${(items||[]).map(c=>'<div class="criteria '+(c.pass?'pass':'fail')+'"><span class="icon">'+(c.pass?'✓':'✗')+'</span><span>'+c.text+'</span></div>').join('')}</div></div>`;
+}
+function onAuthReady(){ if(location.hash) doSearch(); }
+</script>

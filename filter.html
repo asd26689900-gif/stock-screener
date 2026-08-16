@@ -1,0 +1,244 @@
+<title>自訂篩選 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+
+.container{max-width:1000px;margin:0 auto;padding:24px 16px 80px}
+h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom:4px}
+.subtitle{font-size:13px;color:var(--text-secondary);margin-bottom:20px}
+
+/* Filter panel */
+.filter-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:20px}
+.filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.filter-group label{display:block;font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:.03em;margin-bottom:4px}
+.filter-row{display:flex;gap:6px;align-items:center}
+.filter-row input{width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-mono);font-size:13px;background:var(--surface);color:var(--text);text-align:center}
+.filter-row span{font-size:12px;color:var(--text-secondary)}
+.filter-actions{margin-top:16px;display:flex;gap:10px;align-items:center}
+.btn-filter{padding:8px 24px;background:var(--gold);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer}
+.btn-filter:hover{opacity:.85}
+.btn-reset{padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-secondary);cursor:pointer}
+.btn-reset:hover{border-color:var(--red);color:var(--red)}
+.result-count{font-size:13px;color:var(--text-secondary);margin-left:auto}
+
+/* Results table */
+.results{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{position:sticky;top:0;background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em;cursor:pointer;user-select:none}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+thead th:hover{color:var(--gold)}
+thead th.sorted{color:var(--gold)}
+thead th .sort-arrow{font-size:10px;margin-left:3px}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
+tbody tr:hover{background:var(--gold-soft)}
+tbody tr{cursor:pointer}
+.up{color:var(--red)}.dn{color:var(--green)}
+.empty-msg{text-align:center;padding:40px;color:var(--text-secondary);font-style:italic}
+
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.filter-grid{grid-template-columns:1fr 1fr}.container{padding:16px 8px 60px}thead th,tbody td{padding:8px;font-size:11px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a><a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a><a href="strategy.html">選股策略</a>
+    <a href="filter.html" class="active">自訂篩選</a>
+  </div>
+  <div class="spacer"></div>
+  <div id="authArea"></div>
+</div>
+
+<div class="container">
+  <h2>自訂篩選</h2>
+  <p class="subtitle">自由調整篩選條件，從 stock_metrics 表即時查詢。每日盤後更新指標。</p>
+
+  <div class="filter-panel">
+    <div class="filter-grid">
+      <div class="filter-group">
+        <label>股價區間</label>
+        <div class="filter-row"><input type="number" id="f_close_min" placeholder="最低"> <span>~</span> <input type="number" id="f_close_max" placeholder="最高"></div>
+      </div>
+      <div class="filter-group">
+        <label>漲跌幅 %</label>
+        <div class="filter-row"><input type="number" id="f_chg_min" placeholder="最低" step="0.1"> <span>~</span> <input type="number" id="f_chg_max" placeholder="最高" step="0.1"></div>
+      </div>
+      <div class="filter-group">
+        <label>成交張數 ≥</label>
+        <div class="filter-row"><input type="number" id="f_vol_min" placeholder="如 1000"></div>
+      </div>
+      <div class="filter-group">
+        <label>外資連買天數 ≥</label>
+        <div class="filter-row"><input type="number" id="f_foreign_min" placeholder="如 3"></div>
+      </div>
+      <div class="filter-group">
+        <label>投信連買天數 ≥</label>
+        <div class="filter-row"><input type="number" id="f_trust_min" placeholder="如 2"></div>
+      </div>
+      <div class="filter-group">
+        <label>營收 YOY % ≥</label>
+        <div class="filter-row"><input type="number" id="f_yoy_min" placeholder="如 20" step="1"></div>
+      </div>
+      <div class="filter-group">
+        <label>營收 MOM % ≥</label>
+        <div class="filter-row"><input type="number" id="f_mom_min" placeholder="如 0" step="1"></div>
+      </div>
+      <div class="filter-group">
+        <label>營收連續成長月數 ≥</label>
+        <div class="filter-row"><input type="number" id="f_grow_min" placeholder="如 3"></div>
+      </div>
+      <div class="filter-group">
+        <label>5日乖離率 % 範圍</label>
+        <div class="filter-row"><input type="number" id="f_bias_min" placeholder="-3" step="0.1"> <span>~</span> <input type="number" id="f_bias_max" placeholder="7" step="0.1"></div>
+      </div>
+    </div>
+    <div class="filter-actions">
+      <button class="btn-filter" onclick="doFilter()">篩選</button>
+      <button class="btn-reset" onclick="resetFilters()">清除條件</button>
+      <span class="result-count" id="resultCount"></span>
+    </div>
+  </div>
+
+  <div class="results" id="results">
+    <div class="empty-msg">設定條件後按「篩選」</div>
+  </div>
+</div>
+<div class="footer">盤後精選模組 — 資料僅供參考，不構成投資建議。</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const COLS = [
+  {key:'stock_id',label:'股號',align:'left'},
+  {key:'name',label:'名稱',align:'left'},
+  {key:'close',label:'收盤價'},
+  {key:'change_pct',label:'漲跌%'},
+  {key:'volume',label:'成交張'},
+  {key:'foreign_consec_days',label:'外資連買日'},
+  {key:'trust_consec_days',label:'投信連買日'},
+  {key:'rev_yoy',label:'YOY%'},
+  {key:'rev_mom',label:'MOM%'},
+  {key:'rev_consec_grow',label:'連續成長月'},
+  {key:'bias_5',label:'乖離率%'},
+];
+
+let sortCol = 'volume';
+let sortAsc = false;
+let lastData = [];
+
+function getVal(id){ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); }
+
+async function doFilter(){
+  if(!sb){document.getElementById('results').innerHTML='<div class="empty-msg">系統載入中...</div>';return;}
+
+  let q = sb.from('stock_metrics').select('*').order(sortCol,{ascending:sortAsc}).limit(200);
+
+  const fns = [
+    ['f_close_min','close','gte'], ['f_close_max','close','lte'],
+    ['f_chg_min','change_pct','gte'], ['f_chg_max','change_pct','lte'],
+    ['f_vol_min','volume','gte'],
+    ['f_foreign_min','foreign_consec_days','gte'],
+    ['f_trust_min','trust_consec_days','gte'],
+    ['f_yoy_min','rev_yoy','gte'],
+    ['f_mom_min','rev_mom','gte'],
+    ['f_grow_min','rev_consec_grow','gte'],
+    ['f_bias_min','bias_5','gte'], ['f_bias_max','bias_5','lte'],
+  ];
+
+  for(const [id,col,op] of fns){
+    const v = getVal(id);
+    if(v!==null) q = q[op](col, v);
+  }
+
+  const {data,error} = await q;
+  if(error){document.getElementById('results').innerHTML='<div class="empty-msg">查詢失敗: '+error.message+'</div>';return;}
+
+  lastData = data || [];
+  document.getElementById('resultCount').textContent = lastData.length + ' 檔符合';
+  renderTable();
+}
+
+function renderTable(){
+  if(!lastData.length){document.getElementById('results').innerHTML='<div class="empty-msg">無符合條件的標的</div>';return;}
+
+  const ths = COLS.map(c=>{
+    const sorted = c.key===sortCol;
+    const arrow = sorted?(sortAsc?'↑':'↓'):'';
+    return `<th class="${sorted?'sorted':''}" onclick="changeSort('${c.key}')">${c.label}<span class="sort-arrow">${arrow}</span></th>`;
+  }).join('');
+
+  const rows = lastData.map(row=>{
+    return '<tr onclick="location.href=\'stk.html#'+row.stock_id+'\'">' + COLS.map(c=>{
+      let v = row[c.key];
+      if(c.key==='stock_id'||c.key==='name') return '<td>'+maskValue(v)+'</td>';
+      if(c.key==='change_pct'){
+        const cls = v>=0?'up':'dn';
+        return `<td class="${cls}">${v>=0?'+':''}${(v||0).toFixed(1)}%</td>`;
+      }
+      if(c.key==='rev_yoy'||c.key==='rev_mom'||c.key==='bias_5'){
+        return '<td>'+(v||0).toFixed(1)+'</td>';
+      }
+      if(typeof v==='number') return '<td>'+v.toLocaleString()+'</td>';
+      return '<td>'+(v||'-')+'</td>';
+    }).join('') + '</tr>';
+  }).join('');
+
+  document.getElementById('results').innerHTML = `<div class="table-wrap"><table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+function changeSort(col){
+  if(sortCol===col) sortAsc=!sortAsc;
+  else{sortCol=col;sortAsc=false;}
+  doFilter();
+}
+
+function resetFilters(){
+  document.querySelectorAll('.filter-panel input').forEach(i=>i.value='');
+  document.getElementById('results').innerHTML='<div class="empty-msg">設定條件後按「篩選」</div>';
+  document.getElementById('resultCount').textContent='';
+}
+
+function onAuthReady(){ /* ready */ }
+</script>

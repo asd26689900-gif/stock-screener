@@ -1,0 +1,21 @@
+name: 盤後選股更新
+on:
+  schedule:
+    # 台股收盤 13:30 + 資料延遲 ~1hr → 15:00 台北 = 07:00 UTC
+    - cron: '0 7 * * 1-5'
+  workflow_dispatch: # 手動觸發
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python update.py
+        env:
+          FINMIND_TOKEN: ${{ secrets.FINMIND_TOKEN }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

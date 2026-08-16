@@ -1,0 +1,130 @@
+<title>選股策略 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.date-label{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);white-space:nowrap}
+.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.page-header h2{font-family:var(--font-display);font-size:20px;color:var(--ink)}
+.page-header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
+.tabs{display:flex;gap:4px;border-bottom:2px solid var(--border);padding-bottom:0}
+.tab{padding:10px 18px;font-size:13px;font-weight:600;color:var(--text-secondary);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-2px;white-space:nowrap;transition:color .15s}
+.tab:hover{color:var(--ink)}.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.strat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.strat-header{padding:20px;border-bottom:1px solid var(--border-light)}
+.strat-title{font-family:var(--font-display);font-size:18px;color:var(--ink);margin-bottom:6px}
+.strat-desc{font-size:13px;color:var(--text-secondary);line-height:1.7}
+.strat-rules{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border-light)}
+.strat-rule{font-size:11px;padding:3px 10px;border-radius:99px;background:var(--teal-soft);color:var(--teal)}
+.strat-rule::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--teal);margin-right:5px;vertical-align:middle}
+.strat-meta{padding:8px 20px;background:var(--gold-soft);font-size:11px;color:var(--text-secondary);display:flex;gap:20px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
+tbody tr:hover{background:var(--gold-soft)}
+tbody tr{cursor:pointer}
+.up{color:var(--red)}.dn{color:var(--green)}
+.empty-row td{text-align:center!important;color:var(--text-secondary);font-family:var(--font-body);padding:24px 12px;font-style:italic}
+.badge-count{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;background:var(--teal-soft);color:var(--teal);margin-left:8px}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.tabs{overflow-x:auto}.tab{padding:8px 12px;font-size:12px}thead th,tbody td{padding:8px;font-size:11px}.container{padding:16px 8px 60px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a><a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a><a href="strategy.html" class="active">選股策略</a>
+    <a href="filter.html">自訂篩選</a>
+  </div>
+  <div class="spacer"></div>
+  <span class="date-label" id="dateLabel">載入中...</span>
+  <div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div class="page-header"><h2>選股策略</h2><p>四種不同角度的盤後篩選策略，每日 21:30 後更新。建議停利 10% / 停損 -10%。</p></div>
+  <div class="tabs" id="tabs"></div>
+  <div id="stratContainer"></div>
+</div>
+<div class="footer">盤後精選模組 — 資料僅供參考，不構成投資建議。</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const STRATEGIES={
+  trust_chain:{title:'投信連續有感買進',desc:'投信連續買超3日以上且累計張數顯著，搭配股價站上月線確認技術面支撐。',rules:['投信連買≥3日','累計買超>500張','收盤價>MA20','成交量>5日均量'],cols:['股號','名稱','收盤價','漲跌%','成交張','投信連買日','投信累買張']},
+  main_retail_split:{title:'主散對做價量齊揚',desc:'主力買超同時散戶賣出，籌碼從弱手流向強手。配合股價上漲且成交量放大。',rules:['主力當日買超','散戶當日賣超','收盤價上漲','成交量>前日量'],cols:['股號','名稱','收盤價','漲跌%','成交張','主力買超張','散戶賣超張']},
+  inst_burst:{title:'法人大買爆量超前',desc:'外資或投信單日買超金額異常放大（超過近20日平均2倍），搭配成交量爆量。',rules:['法人買超>20日均值×2','成交量>20日均量×1.5','收盤價>MA5','KD未超買(K<80)'],cols:['股號','名稱','收盤價','漲跌%','成交張','法人買超張','量比(倍)']},
+  rev_turn:{title:'股價營收成長翻多',desc:'月營收由衰退轉為正成長（MOM翻正），且股價同步突破月線，基本面拐點出現。',rules:['前月MOM<0','最新MOM>0（翻正）','收盤價突破MA20','成交量>5日均量'],cols:['股號','名稱','收盤價','漲跌%','成交張','前月MOM','最新MOM']},
+};
+const ORDER=['trust_chain','main_retail_split','inst_burst','rev_turn'];
+let stratData={};
+
+function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+
+function renderTabs(){
+  const el=document.getElementById('tabs');
+  el.innerHTML=ORDER.map((k,i)=>{const s=STRATEGIES[k];const c=(stratData[k]||[]).length;return`<button class="tab${i===0?' active':''}" data-key="${k}">${s.title}<span class="badge-count">${c}</span></button>`;}).join('');
+  el.querySelectorAll('.tab').forEach(b=>{b.addEventListener('click',()=>{el.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));b.classList.add('active');showStrat(b.dataset.key);});});
+}
+
+function showStrat(key){
+  const m=STRATEGIES[key],data=stratData[key]||[];
+  const rows=data.length===0?`<tr class="empty-row"><td colspan="${m.cols.length}">今日無符合標的</td></tr>`:data.map(row=>'<tr onclick="location.href=\'stk.html#'+row[0]+'\'">' +row.map((v,i)=>{
+    if(i<=1)return'<td>'+maskValue(v)+'</td>';
+    if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return`<td class="${c}">${d}</td>`;}
+    return'<td>'+fmt(v)+'</td>';}).join('')+'</tr>').join('');
+  document.getElementById('stratContainer').innerHTML=`<div class="strat"><div class="strat-header"><div class="strat-title">${m.title}</div><div class="strat-desc">${m.desc}</div><div class="strat-rules">${m.rules.map(r=>'<span class="strat-rule">'+r+'</span>').join('')}</div></div><div class="strat-meta"><span>建議停利：10%</span><span>建議停損：-10%</span></div><div class="table-wrap"><table><thead><tr>${m.cols.map(c=>'<th>'+c+'</th>').join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+}
+
+async function loadStrategies(){
+  if(!sb)return;
+  const{data}=await sb.from('daily_strategies').select('strategy_key,data').order('date',{ascending:false}).limit(4);
+  if(!data)return;
+  stratData={};data.forEach(r=>{stratData[r.strategy_key]=r.data;});
+  renderTabs();showStrat(ORDER[0]);
+}
+function onAuthReady(){loadStrategies();}
+</script>

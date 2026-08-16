@@ -1,0 +1,187 @@
+<title>盤後精選模組 — 多因子選股系統</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --mask-bg: rgba(60,60,60,0.06);
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070; --mask-bg: rgba(200,200,200,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070; --mask-bg: rgba(200,200,200,0.06);
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.date-label{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);white-space:nowrap}
+.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.loading{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:15px}
+.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.controls label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;white-space:nowrap}
+.controls input[type="checkbox"]{accent-color:var(--gold)}
+.controls select{font-family:var(--font-mono);font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer}
+.module{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.module-header{display:flex;align-items:center;gap:12px;padding:16px 20px 12px;cursor:pointer;user-select:none}
+.module-header:hover{background:var(--gold-soft)}
+.module-header .arrow{font-size:10px;color:var(--text-secondary);transition:transform .2s;flex-shrink:0}
+.module.open .module-header .arrow{transform:rotate(90deg)}
+.module-title{font-family:var(--font-display);font-size:17px;color:var(--ink);letter-spacing:-0.01em}
+.badge-count{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;background:var(--teal-soft);color:var(--teal);white-space:nowrap}
+.module-desc{display:none;padding:0 20px 14px;font-size:13px;color:var(--text-secondary);line-height:1.7;border-bottom:1px solid var(--border-light)}
+.module.open .module-desc{display:block}
+.module-meta{padding:8px 20px;font-size:11px;color:var(--text-secondary);background:var(--teal-soft);display:flex;gap:20px;flex-wrap:wrap}
+.module-meta span::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:5px;vertical-align:middle}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
+tbody tr:hover{background:var(--gold-soft)}
+tbody tr{cursor:pointer}
+.up{color:var(--red)}.dn{color:var(--green)}
+.empty-row td{text-align:center!important;color:var(--text-secondary);font-family:var(--font-body);padding:24px 12px;font-style:italic}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.module-header{padding:14px 14px 10px}.module-title{font-size:15px}thead th,tbody td{padding:8px;font-size:11px}.container{padding:16px 8px 60px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html" class="active">選股模組</a>
+    <a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="strategy.html">選股策略</a>
+    <a href="filter.html">自訂篩選</a>
+  </div>
+  <div class="spacer"></div>
+  <div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div class="controls">
+    <span class="date-label" id="dateLabel">載入中...</span>
+    <select id="datePicker"></select>
+    <label><input type="checkbox" id="filterEmpty" checked> 僅顯示有標的</label>
+  </div>
+  <div id="app"><div class="loading">⏳ 正在載入選股資料...</div></div>
+</div>
+
+<div class="footer">
+  盤後精選模組 — 多因子交叉驗證選股系統<br>
+  資料僅供參考，不構成投資建議。投資有風險，請審慎評估。
+</div>
+
+<script src="https://unpkg.com/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+const MODULE_META = {
+  chip_high: { title: '籌碼集中創高股', desc: '交易家數遞減代表籌碼從散戶流向大戶，同時股價創近期新高且乖離率仍在合理範圍。', rules: ['股價創N日新高','交易家數連3日遞減','5日均線乖離率<7%','成交量>5日均量'], cols: ['股號','名稱','收盤價','漲跌%','成交張','5日均量','創高天數','乖離率%'] },
+  main_buy: { title: '主力連買疊高股', desc: '技術面多頭排列，主力連續買超且散戶賣出，籌碼向大戶集中。鎖定中低價位。', rules: ['均線多頭排列','主力連買≥3日','散戶持股下降','股價<200元'], cols: ['股號','名稱','收盤價','漲跌%','成交張','量創高天','主力連買日','主力累買張'] },
+  rev_grow: { title: '營收成長量增股', desc: '連續三個月營收YOY正成長且幅度遞增，搭配價量創高與外資介入。', rules: ['近3月YOY皆正成長','YOY逐月遞增','外資連買≥2日','量創20日新高'], cols: ['股號','名稱','收盤價','漲跌%','成交張','外資連買日','近月YOY%'] },
+  hot_grow: { title: '轉熱成長動能股', desc: '營收MOM與YOY雙成長，加上分點參與率升溫。', rules: ['月營收MOM>0','月營收YOY>20%','分點參與率上升','乖離率<8%'], cols: ['股號','名稱','收盤價','漲跌%','成交張','5日均量','乖離率%','MOM','YOY'] },
+  inst_duo: { title: '雙法人合買股', desc: '外資與投信同日買超且呈連續性，籌碼集中態勢確立。', rules: ['外資當日買超','投信當日買超','至少一方連買≥3日','KD未超買'], cols: ['股號','名稱','收盤價','漲跌%','成交張','外資連買日','外資累買張','投信連買日'] },
+  margin_rev: { title: '毛利營收雙創高', desc: '成交量周轉率達標，營收連續正成長，毛利率與月營收皆創新高。', rules: ['量周轉率>門檻','營收連2月正成長','毛利率創近4季新高','月營收創12月新高'], cols: ['股號','名稱','收盤價','漲跌%','成交張','5日均量','MOM%'] },
+  trust_vol: { title: '投信量增成長股', desc: '投信買進、量創20日新高、營收連3月正成長，至少命中2項。', rules: ['投信買超(A)','量創20日新高(B)','營收連3月正成長(C)','≥2項命中'], cols: ['股號','名稱','收盤價','漲跌%','成交張','5日均量','MOM%'] },
+  rev_explode: { title: '營收連增爆發股', desc: '連續3個月正成長，最近1個月YOY/QOQ/MOM皆達高門檻。', rules: ['營收連3月MOM正成長','近月YOY>50%','近月QOQ>20%','近月MOM>15%'], cols: ['股號','名稱','收盤價','漲跌%','成交張','MOM%'] },
+  triple_signal: { title: '投信營收價量齊發', desc: '營收連續成長、投信持有上櫃股、價漲量增，至少命中2項。', rules: ['營收連2月正成長(A)','投信持有上櫃股(B)','價漲且量增(C)','≥2項命中'], cols: ['股號','名稱','收盤價','漲跌%','成交張','5日均量','MOM%'] },
+};
+const MODULE_ORDER = ['chip_high','main_buy','rev_grow','hot_grow','inst_duo','margin_rev','trust_vol','rev_explode','triple_signal'];
+
+const app = document.getElementById('app');
+let allModules = {};
+
+function fmt(v){ return typeof v==='number'?v.toLocaleString('zh-TW'):v; }
+
+function render(filterEmpty){
+  let html='';
+  for(const key of MODULE_ORDER){
+    const meta=MODULE_META[key]; const data=allModules[key]||[];
+    if(filterEmpty&&data.length===0) continue;
+    const rows=data.length===0
+      ?'<tr class="empty-row"><td colspan="'+meta.cols.length+'">今日無符合標的</td></tr>'
+      :data.map(row=>'<tr onclick="window.open(\'stk.html#'+row[0]+'\',\'_self\')">'+row.map((v,i)=>{
+        if(i<=1) return '<td>'+maskValue(v)+'</td>';
+        if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return '<td class="'+c+'">'+d+'</td>';}
+        return '<td>'+fmt(v)+'</td>';
+      }).join('')+'</tr>').join('');
+    html+=`<div class="module open"><div class="module-header" onclick="this.parentElement.classList.toggle('open')"><span class="arrow">▶</span><span class="module-title">${meta.title}</span><span class="badge-count">${data.length} 檔</span></div><div class="module-desc">${meta.desc}</div><div class="module-meta">${meta.rules.map(r=>'<span>'+r+'</span>').join('')}</div><div class="table-wrap"><table><thead><tr>${meta.cols.map(c=>'<th>'+c+'</th>').join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+  app.innerHTML=html||'<div class="loading">今日無任何模組有符合標的</div>';
+}
+
+async function loadData(date){
+  if(!sb) return;
+  let query = sb.from('daily_modules').select('module_key,data');
+  if(date) query = query.eq('date', date);
+  else query = query.order('date',{ascending:false}).limit(9);
+
+  const {data,error} = await query;
+  if(error||!data||!data.length){
+    app.innerHTML='<div class="loading">⚠ 無法載入資料</div>'; return;
+  }
+  allModules={};
+  data.forEach(r=>{ allModules[r.module_key]=r.data; });
+  const filterBox=document.getElementById('filterEmpty');
+  render(filterBox.checked);
+}
+
+async function loadDates(){
+  if(!sb) return;
+  const {data}=await sb.from('daily_modules').select('date').order('date',{ascending:false}).limit(100);
+  if(!data) return;
+  const dates=[...new Set(data.map(r=>r.date))];
+  const picker=document.getElementById('datePicker');
+  picker.innerHTML=dates.map(d=>'<option value="'+d+'">'+d+'</option>').join('');
+  picker.addEventListener('change',()=>{
+    document.getElementById('dateLabel').textContent='📅 '+picker.value;
+    loadData(picker.value);
+  });
+  if(dates.length){
+    document.getElementById('dateLabel').textContent='📅 '+dates[0];
+  }
+}
+
+function onAuthReady(){
+  render(document.getElementById('filterEmpty').checked);
+}
+
+document.getElementById('filterEmpty').addEventListener('change',function(){ render(this.checked); });
+
+// Init
+document.addEventListener('DOMContentLoaded',()=>{
+  setTimeout(()=>{
+    loadDates();
+    loadData();
+  },300);
+});
+</script>
