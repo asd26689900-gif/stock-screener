@@ -5,12 +5,29 @@ let sb = null;
 let currentUser = null;
 let currentPlan = 'free'; // 'free' | 'pro'
 
-function initSupabase() {
+async function initSupabase() {
   if (typeof supabase === 'undefined') {
     console.warn('Supabase SDK 未載入');
-    return;
+    return false;
   }
   sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // 先嘗試取得現有 session
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      currentUser = session.user;
+      const { data } = await sb.from('subscriptions')
+        .select('plan,status')
+        .eq('user_id', currentUser.id)
+        .single();
+      currentPlan = (data && data.status === 'active') ? data.plan : 'free';
+    }
+  } catch(e) { /* 無 session，繼續 */ }
+
+  updateAuthUI();
+
+  // 監聽後續登入/登出變化
   sb.auth.onAuthStateChange(async (event, session) => {
     currentUser = session?.user || null;
     if (currentUser) {
@@ -25,6 +42,8 @@ function initSupabase() {
     updateAuthUI();
     if (typeof onAuthReady === 'function') onAuthReady();
   });
+
+  return true;
 }
 
 function isPro() { return currentPlan === 'pro'; }
@@ -122,10 +141,14 @@ function maskValue(v) {
   return '<span class="masked">●●●●</span>';
 }
 
-// 初始化（含重試，防止 CDN 載入延遲）
-function bootSupabase(retries) {
-  if (typeof supabase !== 'undefined') { initSupabase(); return; }
-  if (retries > 0) setTimeout(() => bootSupabase(retries - 1), 500);
-  else console.error('Supabase SDK 載入失敗');
+// ── 啟動：SDK 載入重試 + 初始化後立即觸發 onAuthReady ──
+async function boot() {
+  // 等 SDK 載入（最多 5 秒）
+  for (let i = 0; i < 20; i++) {
+    if (typeof supabase !== 'undefined') break;
+    await new Promise(r => setTimeout(r, 250));
+  }
+  const ok = await initSupabase();
+  if (ok && typeof onAuthReady === 'function') onAuthReady();
 }
-document.addEventListener('DOMContentLoaded', () => bootSupabase(10));
+document.addEventListener('DOMContentLoaded', boot);
