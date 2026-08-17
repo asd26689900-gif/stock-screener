@@ -1,0 +1,244 @@
+<title>題材概念股 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px;flex-wrap:wrap}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.container{max-width:1100px;margin:0 auto;padding:24px 16px 80px}
+.page-header{margin-bottom:20px}
+.page-header h2{font-family:var(--font-display);font-size:22px;color:var(--ink);margin-bottom:6px}
+.page-header p{font-size:13px;color:var(--text-secondary)}
+.concept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:14px}
+.concept-card{background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:16px;cursor:pointer;transition:box-shadow .15s,border-color .15s;position:relative;overflow:hidden}
+.concept-card:hover{box-shadow:var(--shadow);border-color:var(--border)}
+.concept-card .border-left{position:absolute;left:0;top:0;bottom:0;width:4px}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px}
+.card-title{font-family:var(--font-display);font-size:16px;color:var(--ink);font-weight:600}
+.card-chg{font-family:var(--font-mono);font-size:15px;font-weight:700}
+.card-chg.up{color:var(--red)}.card-chg.dn{color:var(--green)}
+.card-desc{font-size:12px;color:var(--text-secondary);margin-bottom:10px;line-height:1.5}
+.card-bottom{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--text-secondary)}
+.card-count{background:var(--teal-soft);color:var(--teal);padding:2px 8px;border-radius:99px;font-weight:600}
+.card-leader{font-family:var(--font-mono)}
+.card-leader .lname{color:var(--gold);margin-right:4px}
+/* 展開的成分股表格 */
+.concept-detail{display:none;position:fixed;top:0;left:0;right:0;bottom:0;z-index:200;background:rgba(0,0,0,0.4);align-items:center;justify-content:center}
+.concept-detail.show{display:flex}
+.detail-box{background:var(--card);border-radius:8px;padding:24px;max-width:700px;width:90vw;max-height:85vh;overflow-y:auto;box-shadow:0 8px 30px rgba(0,0,0,0.15)}
+.detail-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}
+.detail-title{font-family:var(--font-display);font-size:20px;color:var(--ink)}
+.detail-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-secondary);padding:4px 8px}
+.detail-close:hover{color:var(--ink)}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{padding:8px 10px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;border-bottom:2px solid var(--border);white-space:nowrap}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+tbody td{padding:7px 10px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
+tbody tr:hover{background:var(--gold-soft)}
+tbody tr{cursor:pointer}
+.up{color:var(--red)}.dn{color:var(--green)}
+.loading{text-align:center;padding:60px;color:var(--text-secondary)}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.concept-grid{grid-template-columns:1fr}.container{padding:16px 8px 60px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a>
+    <a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="concepts.html" class="active">題材概念</a>
+    <a href="strategy.html">選股策略</a>
+    <a href="filter.html">自訂篩選</a>
+    <a href="watchlist.html">★ 自選股</a>
+  </div>
+  <div class="spacer"></div>
+  <div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div class="page-header">
+    <h2>題材概念股</h2>
+    <p>依投資題材分類的概念股群組，顯示各題材當日平均漲跌幅與領漲股。點擊可展開成分股明細。</p>
+  </div>
+  <div id="app"><div class="loading">⏳ 載入題材資料...</div></div>
+</div>
+<div id="detailModal" class="concept-detail" onclick="if(event.target===this)closeDetail()"></div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
+
+<script src="js/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+// ── 題材概念股對照表 ──
+const CONCEPTS = [
+  {key:'ai_server', title:'AI 伺服器', desc:'AI 訓練/推論伺服器組裝與關鍵零組件供應鏈',
+   ids:['2382','3231','2324','4938','3450','2356','3005','6669','5765','3035']},
+  {key:'cowos', title:'CoWoS／先進封裝', desc:'AI 晶片 CoWoS 先進封裝產能擴張受惠供應鏈',
+   ids:['2330','3711','2449','6770','3037','6239','2351','4952','3529']},
+  {key:'ic_design', title:'IC 設計', desc:'手機 SoC、利基型與 ASIC 設計服務',
+   ids:['2454','3443','2379','6415','3661','5274','3034','2436','6547']},
+  {key:'memory', title:'記憶體', desc:'DRAM/NAND 製造、模組與控制 IC',
+   ids:['2337','4967','6510','3450','2344','8299','3006']},
+  {key:'thermal', title:'散熱', desc:'AI 晶片散熱：氣冷 3D VC 到水冷板/液冷',
+   ids:['3017','6230','2059','6166','3032','3653','6223']},
+  {key:'pcb', title:'PCB', desc:'ABF 載板、CCL 與高階 HDI',
+   ids:['4958','2353','3037','8046','6274','3673','2313']},
+  {key:'silicon_photonics', title:'矽光子／光通訊', desc:'CPO 共同封裝光學與高速光收發模組',
+   ids:['2455','3714','4966','6209','5309','3702','2327']},
+  {key:'passive', title:'被動元件', desc:'MLCC、晶片電阻與電感',
+   ids:['2327','3257','2375','6285','2456']},
+  {key:'robot', title:'機器人', desc:'人形機器人工業自動化關鍵零組件',
+   ids:['2231','4523','2049','6289','4510','1590','2059']},
+  {key:'tesla', title:'特斯拉鏈', desc:'電動車 Tier-1 零組件供應鏈',
+   ids:['2308','6152','3661','2395','3665','1513','2231']},
+  {key:'apple', title:'蘋果概念', desc:'iPhone/Mac 供應鏈核心',
+   ids:['2317','2354','3231','2474','6278','4938','2498']},
+  {key:'military', title:'軍工', desc:'國防自主、無人機與太空品供應鏈',
+   ids:['2208','2634','2014','1513','2233','2601','4722']},
+  {key:'finance', title:'金融', desc:'大型金控（市值權值股）',
+   ids:['2881','2882','2886','2891','2884','2880','5880','2883']},
+  {key:'shipping', title:'航運', desc:'貨櫃三雄、散裝與航空',
+   ids:['2603','2609','2615','2605','2606','2608','2610']},
+  {key:'construction', title:'營建資產', desc:'建商與資產股',
+   ids:['2504','2501','2542','2520','5522','2534','2527','2530']},
+  {key:'biotech', title:'生技新藥', desc:'新藥研發、CDMO 與疫苗',
+   ids:['4743','6472','4174','4726','1734','4130','6446']},
+  {key:'heavy_elec', title:'重電', desc:'電網強韌化、變壓器與輸配電設備',
+   ids:['1503','1504','1513','1514','1519','8261','6806']},
+  {key:'panel', title:'面板', desc:'TFT-LCD 與電子紙顯示',
+   ids:['2409','3481','6116','6285','3050']},
+  {key:'green_energy', title:'綠能儲能', desc:'太陽能、離岸風電與儲能系統',
+   ids:['6464','3691','6443','3576','6806','3708','6244']},
+  {key:'leo_satellite', title:'低軌衛星', desc:'LEO 衛星地面站設備與天線射頻',
+   ids:['3231','2455','6285','3380','5309','4977','3714']},
+];
+
+let metricsMap = {};
+
+function fmt(v){ return typeof v==='number' ? v.toLocaleString('zh-TW') : v; }
+
+async function loadConcepts(){
+  if(!sb){ document.getElementById('app').innerHTML='<div class="loading">系統載入中...</div>'; return; }
+
+  // 收集所有需要的股票 ID
+  const allIds = [...new Set(CONCEPTS.flatMap(c => c.ids))];
+
+  const { data, error } = await sb.from('stock_metrics')
+    .select('stock_id,name,close,change_pct,volume')
+    .in('stock_id', allIds);
+
+  if(error || !data){ document.getElementById('app').innerHTML='<div class="loading">⚠ 載入失敗</div>'; return; }
+
+  data.forEach(d => { metricsMap[d.stock_id] = d; });
+
+  // 計算每個題材的統計
+  const cards = CONCEPTS.map(c => {
+    const stocks = c.ids.map(id => metricsMap[id]).filter(Boolean);
+    if(!stocks.length) return null;
+    const avgChg = stocks.reduce((s, d) => s + (d.change_pct || 0), 0) / stocks.length;
+    const leader = stocks.reduce((best, d) => (d.change_pct||0) > (best.change_pct||0) ? d : best, stocks[0]);
+    return { ...c, stocks, avgChg, leader, count: stocks.length };
+  }).filter(Boolean);
+
+  // 按漲跌幅排序
+  cards.sort((a, b) => b.avgChg - a.avgChg);
+
+  const html = '<div class="concept-grid">' + cards.map(c => {
+    const cls = c.avgChg >= 0 ? 'up' : 'dn';
+    const arrow = c.avgChg >= 0 ? '▲' : '▼';
+    const borderColor = c.avgChg >= 0 ? 'var(--red)' : 'var(--green)';
+    const lChg = c.leader.change_pct || 0;
+    const lCls = lChg >= 0 ? 'up' : 'dn';
+    return `<div class="concept-card" onclick="showDetail('${c.key}')">
+      <div class="border-left" style="background:${borderColor}"></div>
+      <div class="card-top">
+        <div class="card-title">${c.title}</div>
+        <div class="card-chg ${cls}">${arrow}${Math.abs(c.avgChg).toFixed(2)}%</div>
+      </div>
+      <div class="card-desc">${c.desc}</div>
+      <div class="card-bottom">
+        <span class="card-count">${c.count} 檔</span>
+        <span class="card-leader">領漲 <span class="lname">${c.leader.name||c.leader.stock_id}</span> <span class="${lCls}">${lChg>=0?'+':''}${lChg.toFixed(2)}%</span></span>
+      </div>
+    </div>`;
+  }).join('') + '</div>';
+
+  document.getElementById('app').innerHTML = html;
+}
+
+function showDetail(key){
+  const c = CONCEPTS.find(x => x.key === key);
+  if(!c) return;
+  const stocks = c.ids.map(id => metricsMap[id]).filter(Boolean);
+  stocks.sort((a, b) => (b.change_pct||0) - (a.change_pct||0));
+  const rows = stocks.map(d => {
+    const chg = d.change_pct || 0;
+    const cls = chg >= 0 ? 'up' : 'dn';
+    return `<tr onclick="location.href='stk.html#${d.stock_id}'">
+      <td>${d.stock_id}</td><td>${d.name||'—'}</td>
+      <td>${fmt(d.close)}</td>
+      <td class="${cls}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
+      <td>${fmt(d.volume)}</td>
+    </tr>`;
+  }).join('');
+
+  const avgChg = stocks.reduce((s, d) => s + (d.change_pct||0), 0) / stocks.length;
+  const cls = avgChg >= 0 ? 'up' : 'dn';
+
+  document.getElementById('detailModal').innerHTML = `<div class="detail-box">
+    <div class="detail-header">
+      <div><span class="detail-title">${c.title}</span> <span class="card-chg ${cls}" style="font-size:16px;margin-left:8px">${avgChg>=0?'+':''}${avgChg.toFixed(2)}%</span></div>
+      <button class="detail-close" onclick="closeDetail()">✕</button>
+    </div>
+    <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">${c.desc}</p>
+    <table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+  </div>`;
+  document.getElementById('detailModal').classList.add('show');
+}
+
+function closeDetail(){
+  document.getElementById('detailModal').classList.remove('show');
+}
+document.addEventListener('keydown', e => { if(e.key==='Escape') closeDetail(); });
+
+function onAuthReady(){ loadConcepts(); }
+</script>
