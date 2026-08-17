@@ -809,6 +809,29 @@ for sid in stocks:
     tech_check("均線多頭排列(5>10>20)", ma5 and ma10 and ma20 and ma5 > ma10 > ma20)
     tech_score = sum(1 for c in tech_criteria if c["pass"])
 
+    # 近60日 OHLCV 歷史（K線圖用）
+    history = []
+    for d in data[-60:]:
+        history.append({
+            "d": d["date"],
+            "o": d.get("open", d["close"]),
+            "h": d.get("high", d["close"]),
+            "l": d.get("low", d["close"]),
+            "c": d["close"],
+            "v": int(d["Trading_Volume"] / 1000),
+        })
+
+    # 月營收歷史（營收圖用）
+    rev_history = []
+    rev_info = rev.get(sid, [])
+    for r in rev_info[-12:]:
+        rev_history.append({
+            "m": r.get("month", ""),
+            "rev": r.get("revenue", 0),
+            "mom": float(r.get("rev_mom", 0) or 0),
+            "yoy": float(r.get("rev_yoy", 0) or 0),
+        })
+
     stk_analysis[sid] = {
         "name": name, "date": p["date"],
         "close": close, "open": opn, "high": high, "low": low,
@@ -819,6 +842,8 @@ for sid in stocks:
                  "big_holder_pct": big_holder, "retail_holder_pct": retail_holder},
         "scores": {"chip": chip_score, "fundamental": fund_score, "technical": tech_score},
         "criteria": {"chip": chip_criteria, "fundamental": fund_criteria, "technical": tech_criteria},
+        "history": history,
+        "revenue": rev_history,
     }
 
 print(f"   個股分析: {len(stk_analysis)} 檔")
