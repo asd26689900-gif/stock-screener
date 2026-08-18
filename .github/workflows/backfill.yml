@@ -11,18 +11,24 @@ on:
       limit:
         description: '最多處理幾檔'
         default: '600'
+  push:
+    paths:
+      - '.github/backfill-trigger'
 
 jobs:
   backfill:
     runs-on: ubuntu-latest
     timeout-minutes: 330
+    strategy:
+      matrix:
+        batch: [0, 600, 1200, 1800]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - run: python -X utf8 backfill.py --months ${{ github.event.inputs.months }} --offset ${{ github.event.inputs.offset }} --limit ${{ github.event.inputs.limit }}
+      - run: python -X utf8 backfill.py --months ${{ github.event.inputs.months || '3' }} --offset ${{ matrix.batch }} --limit 600
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
