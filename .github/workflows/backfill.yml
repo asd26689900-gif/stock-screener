@@ -16,9 +16,11 @@ on:
         type: boolean
         default: false
   schedule:
-    # 每半天自動往回延伸 3 個月
-    - cron: '0 2 * * *'   # UTC 02:00 = 台北 10:00
-    - cron: '0 14 * * *'  # UTC 14:00 = 台北 22:00
+    # 每6小時自動往回延伸 3 個月
+    - cron: '0 0 * * *'   # UTC 00:00 = 台北 08:00
+    - cron: '0 6 * * *'   # UTC 06:00 = 台北 14:00
+    - cron: '0 12 * * *'  # UTC 12:00 = 台北 20:00
+    - cron: '0 18 * * *'  # UTC 18:00 = 台北 02:00
   push:
     paths:
       - '.github/backfill-trigger'
