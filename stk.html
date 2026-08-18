@@ -140,10 +140,18 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
 if(location.hash){input.value=location.hash.slice(1);setTimeout(doSearch,600);}
 
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
+const TF_MAP = {
+  '5m':  {interval:'5m',  range:'5d',  label:'5分'},
+  '60m': {interval:'60m', range:'1mo', label:'60分'},
+  'D':   {interval:null,  range:null,  label:'日'},
+  'W':   {interval:null,  range:null,  label:'週'},
+  'M':   {interval:null,  range:null,  label:'月'},
+};
+let minuteCache = {}; // {key: [{d,o,h,l,c,v}]}
 
 async function doSearch(){
   const sid=input.value.trim(); if(!sid)return;
-  location.hash=sid; currentSid=sid;
+  location.hash=sid; currentSid=sid; minuteCache={}; currentTF='D';
   if(!sb){document.getElementById('app').innerHTML='<div class="empty-state">系統載入中...</div>';return;}
 
   // 同時抓分析資料和歷史K線
@@ -213,13 +221,29 @@ function aggregateMonthly(data){
   return months;
 }
 function getChartData(){
-  // 統一成 {d,o,h,l,c,v} 格式
+  // 分K用 minuteCache
+  if(currentTF==='5m'||currentTF==='60m'){
+    return minuteCache[currentTF]||[];
+  }
+  // 日K以上用 stock_prices
   let src = rawDaily.length>2 ? rawDaily.map(r=>({d:r.date,o:r.open,h:r.high,l:r.low,c:r.close,v:r.volume||0}))
     : (currentAnalysis.history||[]);
   if(!src.length) return [];
   if(currentTF==='W') return aggregateWeekly(src);
   if(currentTF==='M') return aggregateMonthly(src);
-  return src; // 'D'
+  return src;
+}
+async function fetchMinuteData(tf){
+  const key=tf;
+  if(minuteCache[key]) return minuteCache[key];
+  const cfg=TF_MAP[tf];
+  try{
+    const r=await fetch(`/api/chart?sid=${currentSid}&interval=${cfg.interval}&range=${cfg.range}`);
+    if(!r.ok) return [];
+    const j=await r.json();
+    minuteCache[key]=j.bars||[];
+    return minuteCache[key];
+  }catch(e){return [];}
 }
 
 function renderStock(sid,d){
@@ -248,9 +272,11 @@ function renderStock(sid,d){
   <div class="chart-box">
     <div class="chart-toolbar">
       <span class="chart-label">📈 K線走勢圖</span>
-      <button class="tf-btn ${currentTF==='D'?'active':''}" onclick="switchTF('D')">日</button>
-      <button class="tf-btn ${currentTF==='W'?'active':''}" onclick="switchTF('W')">週</button>
-      <button class="tf-btn ${currentTF==='M'?'active':''}" onclick="switchTF('M')">月</button>
+      <button class="tf-btn ${currentTF==='5m'?'active':''}" data-tf="5m" onclick="switchTF('5m')">5分</button>
+      <button class="tf-btn ${currentTF==='60m'?'active':''}" data-tf="60m" onclick="switchTF('60m')">60分</button>
+      <button class="tf-btn ${currentTF==='D'?'active':''}" data-tf="D" onclick="switchTF('D')">日</button>
+      <button class="tf-btn ${currentTF==='W'?'active':''}" data-tf="W" onclick="switchTF('W')">週</button>
+      <button class="tf-btn ${currentTF==='M'?'active':''}" data-tf="M" onclick="switchTF('M')">月</button>
     </div>
     <div class="ma-legend" id="maLegend"></div>
     <div class="chart-canvas" id="chartCanvas">
@@ -290,9 +316,16 @@ function renderStock(sid,d){
   if(rev.length>1) drawRevChart(rev);
 }
 
-function switchTF(tf){
+async function switchTF(tf){
   currentTF=tf;
-  renderStock(currentSid, currentAnalysis);
+  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
+  if(tf==='5m'||tf==='60m'){
+    const bars=await fetchMinuteData(tf);
+    if(bars.length>2){drawChart(bars);return;}
+    // 無資料 fallback
+  }
+  const data=getChartData();
+  if(data.length>2) drawChart(data);
 }
 
 // ══════════════════════════════════════
