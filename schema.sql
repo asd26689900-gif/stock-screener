@@ -79,7 +79,20 @@ create table if not exists stock_metrics (
   updated_at timestamptz default now()
 );
 
--- 7. 可查詢的日期清單
+-- 7. 每日個股 OHLCV 歷史（K線圖用，每日累積）
+create table if not exists stock_prices (
+  stock_id text not null,
+  date date not null,
+  open real,
+  high real,
+  low real,
+  close real not null,
+  volume int,
+  change real,
+  primary key (stock_id, date)
+);
+
+-- 8. 可查詢的日期清單
 create or replace view available_dates as
   select distinct date from daily_modules order by date desc;
 
@@ -97,6 +110,7 @@ alter table daily_stk enable row level security;
 alter table daily_heatmap enable row level security;
 alter table daily_strategies enable row level security;
 alter table stock_metrics enable row level security;
+alter table stock_prices enable row level security;
 
 -- 所有人可讀市場資料（付費牆在前端控制欄位顯示）
 create policy "公開讀取" on daily_modules for select using (true);
@@ -104,6 +118,7 @@ create policy "公開讀取" on daily_stk for select using (true);
 create policy "公開讀取" on daily_heatmap for select using (true);
 create policy "公開讀取" on daily_strategies for select using (true);
 create policy "公開讀取" on stock_metrics for select using (true);
+create policy "公開讀取" on stock_prices for select using (true);
 
 -- 訂閱表只能看自己的
 create policy "讀取自己的訂閱" on subscriptions for select using (auth.uid() = user_id);

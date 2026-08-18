@@ -399,6 +399,50 @@ for sid in stocks:
 
 print(f"   總股票數: {len(stocks)}")
 
+# ── 1b. 寫入 stock_prices（每日累積真實 OHLCV）──
+if sb:
+    today_prices = []
+    for row in all_prices:
+        if row["date"] == end_str and row.get("close"):
+            today_prices.append({
+                "stock_id": row["stock_id"], "date": row["date"],
+                "open": row.get("open", row["close"]),
+                "high": row.get("high", row["close"]),
+                "low": row.get("low", row["close"]),
+                "close": row["close"],
+                "volume": int(row.get("Trading_Volume", 0) / 1000),
+                "change": row.get("change", 0),
+            })
+    if today_prices:
+        try:
+            batch = 200
+            for i in range(0, len(today_prices), batch):
+                sb.table("stock_prices").upsert(
+                    today_prices[i:i+batch], on_conflict="stock_id,date"
+                ).execute()
+            print(f"   stock_prices: {len(today_prices)} 筆 ({end_str})")
+        except Exception as e:
+            print(f"   ⚠ stock_prices 寫入失敗: {e}")
+
+# ── 1c. 讀取 stock_prices 歷史（K線圖用）──
+price_history = defaultdict(list)  # {sid: [{date,open,high,low,close,volume,change}]}
+if sb:
+    try:
+        page = 0
+        while True:
+            resp = sb.table("stock_prices").select("stock_id,date,open,high,low,close,volume,change") \
+                .gte("date", (today - timedelta(days=120)).strftime("%Y-%m-%d")) \
+                .order("date", desc=False) \
+                .range(page*1000, (page+1)*1000-1).execute()
+            if not resp.data: break
+            for r in resp.data:
+                price_history[r["stock_id"]].append(r)
+            if len(resp.data) < 1000: break
+            page += 1
+        print(f"   stock_prices 歷史: {sum(len(v) for v in price_history.values())} 筆 ({len(price_history)} 檔)")
+    except Exception as e:
+        print(f"   ⚠ stock_prices 讀取失敗（可能表不存在）: {e}")
+
 # ── 2. 三大法人買賣超（近 20 交易日）──
 print("⏳ 抓取法人買賣超 (TWSE+TPEX)...")
 inst_days = work_days[-25:]  # 最近 25 個工作日
@@ -809,17 +853,22 @@ for sid in stocks:
     tech_check("均線多頭排列(5>10>20)", ma5 and ma10 and ma20 and ma5 > ma10 > ma20)
     tech_score = sum(1 for c in tech_criteria if c["pass"])
 
-    # 近60日 OHLCV 歷史（K線圖用）
+    # 近60日 OHLCV 歷史（K線圖用）— 優先從 stock_prices 讀取真實歷史
     history = []
-    for d in data[-60:]:
-        history.append({
-            "d": d["date"],
-            "o": d.get("open", d["close"]),
-            "h": d.get("high", d["close"]),
-            "l": d.get("low", d["close"]),
-            "c": d["close"],
-            "v": int(d["Trading_Volume"] / 1000),
-        })
+    ph = price_history.get(sid, [])
+    if ph:
+        for d in ph[-90:]:
+            history.append({
+                "d": d["date"], "o": d["open"], "h": d["high"],
+                "l": d["low"], "c": d["close"], "v": d.get("volume", 0),
+            })
+    else:
+        for d in data[-60:]:
+            history.append({
+                "d": d["date"], "o": d.get("open", d["close"]),
+                "h": d.get("high", d["close"]), "l": d.get("low", d["close"]),
+                "c": d["close"], "v": int(d["Trading_Volume"] / 1000),
+            })
 
     # 月營收歷史（營收圖用）
     rev_history = []

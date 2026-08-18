@@ -1,0 +1,238 @@
+"""
+stock_prices 回填腳本 — 用 TWSE STOCK_DAY / TPEX 個股日成交 抓真實歷史 OHLCV
+用法:
+  python backfill.py              # 回填全部（從 stock_metrics 取股票清單）
+  python backfill.py --months 6   # 回填 6 個月
+  python backfill.py --offset 500 --limit 500  # 分批跑
+"""
+import os, sys, json, csv, io, time, requests
+from datetime import datetime, timedelta
+from collections import defaultdict
+
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
+SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+HEADERS = {"User-Agent": "Mozilla/5.0", "Accept-Language": "zh-TW,zh;q=0.9"}
+
+try:
+    from supabase import create_client
+    sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+except ImportError:
+    sb = None
+
+def parse_num(s):
+    if not s or str(s).strip() in ('', '--', 'X', '-', '—'): return 0
+    try: return float(str(s).replace(',', ''))
+    except: return 0
+
+def roc_date(dt):
+    return f"{dt.year - 1911}/{dt.month:02d}/{dt.day:02d}"
+
+# ═══════════════════════════════════════
+#  TWSE 個股日成交 (一次回傳一個月)
+# ═══════════════════════════════════════
+def fetch_twse_stock_day(sid, year, month):
+    """回傳 [{date, open, high, low, close, volume, change}, ...]"""
+    dt = f"{year}{month:02d}01"
+    url = f"https://www.twse.com.tw/exchangeReport/STOCK_DAY?response=json&date={dt}&stockNo={sid}"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        d = r.json()
+        if d.get("stat") != "OK" or not d.get("data"): return []
+    except:
+        return []
+    rows = []
+    for line in d["data"]:
+        if len(line) < 9: continue
+        try:
+            # 民國日期轉西元 "115/08/01"
+            parts = str(line[0]).strip().split("/")
+            y = int(parts[0]) + 1911
+            m = int(parts[1])
+            day = int(parts[2])
+            iso = f"{y}-{m:02d}-{day:02d}"
+            rows.append({
+                "stock_id": sid, "date": iso,
+                "open": parse_num(line[3]),
+                "high": parse_num(line[4]),
+                "low": parse_num(line[5]),
+                "close": parse_num(line[6]),
+                "volume": int(parse_num(line[1]) / 1000),  # 股→張
+                "change": parse_num(line[7]),
+            })
+        except:
+            continue
+    return rows
+
+# ═══════════════════════════════════════
+#  TPEX 個股日成交
+# ═══════════════════════════════════════
+def fetch_tpex_stock_day(sid, year, month):
+    roc_y = year - 1911
+    d = f"{roc_y}/{month:02d}"
+    url = f"https://www.tpex.org.tw/web/stock/aftertrading/daily_trading_info/st43_result.php?l=zh-tw&d={d}&stkno={sid}&o=json"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        data = r.json()
+        if not data.get("aaData"): return []
+    except:
+        return []
+    rows = []
+    for line in data["aaData"]:
+        if len(line) < 7: continue
+        try:
+            parts = str(line[0]).strip().split("/")
+            y = int(parts[0]) + 1911
+            m = int(parts[1])
+            day = int(parts[2])
+            iso = f"{y}-{m:02d}-{day:02d}"
+            close = parse_num(line[6])
+            rows.append({
+                "stock_id": sid, "date": iso,
+                "open": parse_num(line[3]),
+                "high": parse_num(line[4]),
+                "low": parse_num(line[5]),
+                "close": close,
+                "volume": int(parse_num(line[1]) / 1000),
+                "change": parse_num(line[7]) if len(line) > 7 else 0,
+            })
+        except:
+            continue
+    return rows
+
+# ═══════════════════════════════════════
+#  判斷上市/上櫃
+# ═══════════════════════════════════════
+def classify_market():
+    """回傳 {sid: 'twse'|'tpex'}"""
+    market = {}
+    # TWSE
+    try:
+        url = "https://www.twse.com.tw/exchangeReport/STOCK_DAY_ALL?response=json"
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        text = r.text.strip()
+        reader = csv.reader(io.StringIO(text))
+        skip = True
+        for line in reader:
+            if skip: skip = False; continue
+            if len(line) >= 2:
+                sid = line[1].strip().strip('"')
+                if sid and len(sid) >= 4:
+                    market[sid] = "twse"
+    except: pass
+    time.sleep(3)
+    # TPEX
+    try:
+        from datetime import date
+        today = date.today()
+        roc = f"{today.year-1911}/{today.month:02d}/{today.day:02d}"
+        url = f"https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&d={roc}&se=EW&o=json"
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        data = r.json()
+        for t in data.get("tables", []):
+            for line in t.get("data", []):
+                if len(line) >= 1:
+                    sid = str(line[0]).strip()
+                    if sid and len(sid) >= 4 and sid not in market:
+                        market[sid] = "tpex"
+    except: pass
+    return market
+
+# ═══════════════════════════════════════
+#  主程式
+# ═══════════════════════════════════════
+if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--months", type=int, default=3, help="回填幾個月 (預設 3)")
+    parser.add_argument("--offset", type=int, default=0, help="從第幾檔開始")
+    parser.add_argument("--limit", type=int, default=9999, help="最多處理幾檔")
+    parser.add_argument("--stocks", type=str, default="", help="指定股號 (逗號分隔)")
+    args = parser.parse_args()
+
+    if not sb:
+        print("ERROR: SUPABASE_URL / SUPABASE_SERVICE_KEY not set")
+        sys.exit(1)
+
+    # 取股票清單
+    if args.stocks:
+        stock_list = [s.strip() for s in args.stocks.split(",") if s.strip()]
+        market_map = {}
+        for sid in stock_list:
+            market_map[sid] = "twse"  # 預設, 會在 fetch 時自動 fallback
+    else:
+        print("📋 取得股票清單 (from stock_metrics)...")
+        all_stocks = []
+        page = 0
+        while True:
+            resp = sb.table("stock_metrics").select("stock_id").range(page*1000, (page+1)*1000-1).execute()
+            if not resp.data: break
+            all_stocks.extend([r["stock_id"] for r in resp.data])
+            if len(resp.data) < 1000: break
+            page += 1
+        print(f"   總共 {len(all_stocks)} 檔")
+        stock_list = all_stocks[args.offset:args.offset+args.limit]
+        print(f"   本次處理: offset={args.offset}, limit={args.limit} → {len(stock_list)} 檔")
+
+        print("🏢 分類上市/上櫃...")
+        market_map = classify_market()
+        print(f"   上市 {sum(1 for v in market_map.values() if v=='twse')} / 上櫃 {sum(1 for v in market_map.values() if v=='tpex')}")
+
+    # 計算要抓的月份
+    today = datetime.now()
+    months = []
+    for i in range(args.months):
+        dt = today - timedelta(days=30*i)
+        ym = (dt.year, dt.month)
+        if ym not in months:
+            months.append(ym)
+    print(f"📅 回填月份: {[f'{y}/{m:02d}' for y,m in months]}")
+
+    total = len(stock_list)
+    upserted = 0
+    errors = 0
+
+    for idx, sid in enumerate(stock_list):
+        mkt = market_map.get(sid, "twse")
+        all_rows = []
+        for y, m in months:
+            if mkt == "tpex":
+                rows = fetch_tpex_stock_day(sid, y, m)
+                if not rows:
+                    rows = fetch_twse_stock_day(sid, y, m)
+                    if rows: market_map[sid] = "twse"
+            else:
+                rows = fetch_twse_stock_day(sid, y, m)
+                if not rows:
+                    rows = fetch_tpex_stock_day(sid, y, m)
+                    if rows: market_map[sid] = "tpex"
+            all_rows.extend(rows)
+            time.sleep(3)  # 禮貌延遲
+
+        if all_rows:
+            # 去重
+            seen = set()
+            unique = []
+            for r in all_rows:
+                key = (r["stock_id"], r["date"])
+                if key not in seen and r["close"] > 0:
+                    seen.add(key)
+                    unique.append(r)
+            # upsert
+            try:
+                batch = 200
+                for i in range(0, len(unique), batch):
+                    sb.table("stock_prices").upsert(
+                        unique[i:i+batch], on_conflict="stock_id,date"
+                    ).execute()
+                upserted += len(unique)
+            except Exception as e:
+                errors += 1
+                print(f"   ❌ {sid} upsert error: {e}")
+
+        progress = f"[{idx+1}/{total}]"
+        print(f"   {progress} {sid} ({mkt}): {len(all_rows)} 筆", end="\r")
+
+    print(f"\n\n✅ 回填完成!")
+    print(f"   處理: {total} 檔")
+    print(f"   寫入: {upserted} 筆")
+    print(f"   錯誤: {errors} 筆")

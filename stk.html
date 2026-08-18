@@ -58,8 +58,17 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .ohlcv-item{text-align:center}
 .ohlcv-label{font-size:11px;color:var(--text-secondary);letter-spacing:.04em;margin-bottom:2px}
 .ohlcv-val{font-family:var(--font-mono);font-size:15px;color:var(--ink)}
-.ma-row{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px}
-.ma-tag{font-size:12px;padding:3px 10px;border-radius:99px;font-family:var(--font-mono);white-space:nowrap}
+/* ── K線圖區 ── */
+.chart-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 16px 12px;margin-bottom:16px;position:relative}
+.chart-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.chart-toolbar .chart-label{font-family:var(--font-display);font-size:15px;color:var(--ink);margin-right:auto}
+.tf-btn,.ind-btn{padding:4px 12px;border:1px solid var(--border);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-secondary);font-family:var(--font-mono)}
+.tf-btn.active,.ind-btn.active{background:var(--gold-soft);color:var(--gold);border-color:var(--gold)}
+.ma-legend{display:flex;gap:12px;font-size:11px;font-family:var(--font-mono);flex-wrap:wrap}
+.chart-canvas{position:relative;overflow-x:auto;overflow-y:hidden}
+.chart-canvas canvas{display:block}
+.chart-tooltip{position:absolute;top:0;left:0;pointer-events:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:11px;font-family:var(--font-mono);line-height:1.6;white-space:nowrap;box-shadow:var(--shadow);z-index:10;display:none}
+/* ── 籌碼 + 評分 ── */
 .chip-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 .chip-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
 .chip-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px}
@@ -87,17 +96,6 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .criteria .icon{flex-shrink:0;width:18px;text-align:center;font-size:14px}
 .pass .icon{color:var(--green)}.fail .icon{color:var(--red)}.fail{color:var(--text-secondary)}
 .up{color:var(--red)}.dn{color:var(--green)}
-/* ── K線圖區 ── */
-.chart-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 16px 12px;margin-bottom:16px;position:relative}
-.chart-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-.chart-toolbar .chart-label{font-family:var(--font-display);font-size:15px;color:var(--ink);margin-right:auto}
-.ind-btn{padding:4px 12px;border:1px solid var(--border);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-secondary);font-family:var(--font-mono)}
-.ind-btn.active{background:var(--gold-soft);color:var(--gold);border-color:var(--gold)}
-.ma-legend{display:flex;gap:12px;font-size:11px;font-family:var(--font-mono);flex-wrap:wrap}
-.ma-legend span::before{content:'';display:inline-block;width:14px;height:2px;margin-right:4px;vertical-align:middle;border-radius:1px}
-.chart-canvas{position:relative;overflow-x:auto;overflow-y:hidden}
-.chart-canvas canvas{display:block}
-.chart-tooltip{position:absolute;top:0;left:0;pointer-events:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:11px;font-family:var(--font-mono);line-height:1.6;white-space:nowrap;box-shadow:var(--shadow);z-index:10;display:none}
 /* ── 營收 ── */
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 .rev-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
@@ -139,15 +137,28 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 <script>
 const input=document.getElementById('stkInput');
 input.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
-if(location.hash){input.value=location.hash.slice(1);setTimeout(doSearch,500);}
+if(location.hash){input.value=location.hash.slice(1);setTimeout(doSearch,600);}
+
+let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
 
 async function doSearch(){
   const sid=input.value.trim(); if(!sid)return;
-  location.hash=sid;
+  location.hash=sid; currentSid=sid;
   if(!sb){document.getElementById('app').innerHTML='<div class="empty-state">系統載入中...</div>';return;}
-  const{data,error}=await sb.from('daily_stk').select('data').eq('stock_id',sid).order('date',{ascending:false}).limit(1).single();
-  if(error||!data){document.getElementById('app').innerHTML='<div class="empty-state">查無 <code>'+sid+'</code> 的分析資料</div>';return;}
-  renderStock(sid,data.data);
+
+  // 同時抓分析資料和歷史K線
+  const [stkRes, priceRes] = await Promise.all([
+    sb.from('daily_stk').select('data').eq('stock_id',sid).order('date',{ascending:false}).limit(1).single(),
+    sb.from('stock_prices').select('*').eq('stock_id',sid).order('date',{ascending:true}).limit(500)
+  ]);
+
+  if(stkRes.error||!stkRes.data){
+    document.getElementById('app').innerHTML='<div class="empty-state">查無 <code>'+sid+'</code> 的分析資料</div>';return;
+  }
+  currentAnalysis = stkRes.data.data;
+  rawDaily = (priceRes.data||[]).filter(r=>r.close>0);
+
+  renderStock(sid, currentAnalysis);
 }
 
 function cls(v){return v>0?'up':v<0?'dn':'';}
@@ -158,13 +169,66 @@ function scoreComment(t){if(t>=25)return'多項指標正向';if(t>=20)return'指
 function scoreColor(t){if(t>=25)return'var(--green)';if(t>=20)return'var(--teal)';if(t>=15)return'var(--gold)';return'var(--red)';}
 function fmtRev(v){if(!v)return'—';if(v>=1e8)return(v/1e8).toFixed(1)+'億';if(v>=1e4)return(v/1e4).toFixed(0)+'萬';return fmt(v);}
 
-let currentIndicator = 'kd';
+// ══════════════════════════════════════
+// 時間週期轉換
+// ══════════════════════════════════════
+function aggregateWeekly(data){
+  const weeks=[];let w=null;
+  data.forEach(d=>{
+    const dt=new Date(d.date||d.d);
+    const dow=dt.getDay();
+    if(!w||dow<=((w._lastDow===undefined)?-1:w._lastDow)){
+      if(w)weeks.push(w);
+      w={d:d.date||d.d,o:d.open??d.o,h:d.high??d.h,l:d.low??d.l,c:d.close??d.c,v:d.volume??d.v??0,_lastDow:dow};
+    } else {
+      w.h=Math.max(w.h,d.high??d.h);
+      w.l=Math.min(w.l,d.low??d.l);
+      w.c=d.close??d.c;
+      w.v+=(d.volume??d.v??0);
+      w.d=d.date||d.d;
+      w._lastDow=dow;
+    }
+  });
+  if(w)weeks.push(w);
+  return weeks.map(w=>({d:w.d,o:w.o,h:w.h,l:w.l,c:w.c,v:w.v}));
+}
+function aggregateMonthly(data){
+  const months=[];let m=null,curM='';
+  data.forEach(d=>{
+    const dt=d.date||d.d;
+    const ym=dt.slice(0,7);
+    if(ym!==curM){
+      if(m)months.push(m);
+      curM=ym;
+      m={d:dt,o:d.open??d.o,h:d.high??d.h,l:d.low??d.l,c:d.close??d.c,v:d.volume??d.v??0};
+    } else {
+      m.h=Math.max(m.h,d.high??d.h);
+      m.l=Math.min(m.l,d.low??d.l);
+      m.c=d.close??d.c;
+      m.v+=(d.volume??d.v??0);
+      m.d=dt;
+    }
+  });
+  if(m)months.push(m);
+  return months;
+}
+function getChartData(){
+  // 統一成 {d,o,h,l,c,v} 格式
+  let src = rawDaily.length>2 ? rawDaily.map(r=>({d:r.date,o:r.open,h:r.high,l:r.low,c:r.close,v:r.volume||0}))
+    : (currentAnalysis.history||[]);
+  if(!src.length) return [];
+  if(currentTF==='W') return aggregateWeekly(src);
+  if(currentTF==='M') return aggregateMonthly(src);
+  return src; // 'D'
+}
 
 function renderStock(sid,d){
   const chg=d.change||0,chgPct=d.change_pct||0,chgSign=chg>=0?'▲':'▼';
   const total=(d.scores.chip||0)+(d.scores.fundamental||0)+(d.scores.technical||0);
   const rev=d.revenue||[];
   const latestRev=rev.length?rev[rev.length-1]:null;
+  const chartData=getChartData();
+  const hasChart=chartData.length>2;
   document.getElementById('app').innerHTML=`
   <div class="stk-header">
     <div class="stk-id">${sid}</div><div class="stk-name">${d.name}</div>
@@ -179,36 +243,28 @@ function renderStock(sid,d){
       <div class="ohlcv-item"><div class="ohlcv-label">最低</div><div class="ohlcv-val">${fmt(d.low)}</div></div>
       <div class="ohlcv-item"><div class="ohlcv-label">成交張</div><div class="ohlcv-val">${fmt(d.volume)}</div></div>
     </div>
-    <div class="ma-row">
-      <span class="ma-tag" style="background:rgba(212,168,64,0.15);color:#D4A840">MA5 ${d.ma?.find(m=>m.label==='MA5')?.value??'—'}</span>
-      <span class="ma-tag" style="background:rgba(90,173,171,0.12);color:#5AADAB">MA10 ${d.ma?.find(m=>m.label==='MA10')?.value??'—'}</span>
-      <span class="ma-tag" style="background:rgba(192,84,79,0.12);color:#C0544F">MA20 ${d.ma?.find(m=>m.label==='MA20')?.value??'—'}</span>
-      <span class="ma-tag" style="background:rgba(128,90,200,0.12);color:#8060C0">MA60 ${d.ma?.find(m=>m.label==='MA60')?.value??'—'}</span>
-    </div>
   </div>
-  ${d.history&&d.history.length>2?`
+  ${hasChart?`
   <div class="chart-box">
     <div class="chart-toolbar">
       <span class="chart-label">📈 K線走勢圖</span>
-      <div class="ma-legend">
-        <span style="--c:#D4A840" id="maL5">MA5</span>
-        <span style="--c:#5AADAB" id="maL10">MA10</span>
-        <span style="--c:#C0544F" id="maL20">MA20</span>
-        <span style="--c:#8060C0" id="maL60">MA60</span>
-      </div>
+      <button class="tf-btn ${currentTF==='D'?'active':''}" onclick="switchTF('D')">日</button>
+      <button class="tf-btn ${currentTF==='W'?'active':''}" onclick="switchTF('W')">週</button>
+      <button class="tf-btn ${currentTF==='M'?'active':''}" onclick="switchTF('M')">月</button>
     </div>
+    <div class="ma-legend" id="maLegend"></div>
     <div class="chart-canvas" id="chartCanvas">
       <canvas id="kCanvas"></canvas>
       <div class="chart-tooltip" id="kTooltip"></div>
     </div>
     <div class="chart-toolbar" style="margin-top:8px;margin-bottom:0">
       <span class="chart-label" style="font-size:13px">技術指標</span>
-      <button class="ind-btn active" data-ind="kd" onclick="switchInd('kd')">KD</button>
-      <button class="ind-btn" data-ind="rsi" onclick="switchInd('rsi')">RSI</button>
-      <button class="ind-btn" data-ind="macd" onclick="switchInd('macd')">MACD</button>
+      <button class="ind-btn ${currentInd==='kd'?'active':''}" data-ind="kd" onclick="switchInd('kd')">KD</button>
+      <button class="ind-btn ${currentInd==='rsi'?'active':''}" data-ind="rsi" onclick="switchInd('rsi')">RSI</button>
+      <button class="ind-btn ${currentInd==='macd'?'active':''}" data-ind="macd" onclick="switchInd('macd')">MACD</button>
     </div>
     <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
-  </div>`:''}
+  </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">📈 K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
   ${rev.length?`
   <div class="rev-grid">
     <div class="rev-card"><div class="rev-label">最新月營收</div><div class="rev-val">${latestRev?fmtRev(latestRev.rev):'—'}</div><div class="rev-sub">${latestRev?latestRev.m:''}</div></div>
@@ -230,14 +286,19 @@ function renderStock(sid,d){
     ${renderDim('基本面',d.scores.fundamental,d.criteria.fundamental)}
     ${renderDim('技術面',d.scores.technical,d.criteria.technical)}
   </div>`;
-  if(d.history&&d.history.length>2) drawChart(d.history);
+  if(hasChart) drawChart(chartData);
   if(rev.length>1) drawRevChart(rev);
+}
+
+function switchTF(tf){
+  currentTF=tf;
+  renderStock(currentSid, currentAnalysis);
 }
 
 // ══════════════════════════════════════
 // K 線圖 (Canvas) — XQ 風格
 // ══════════════════════════════════════
-let chartData=[];
+let chartDataCache=[];
 const MA_COLORS=['#D4A840','#5AADAB','#C0544F','#8060C0'];
 const MA_PERIODS=[5,10,20,60];
 
@@ -278,8 +339,8 @@ function calcRSI(data,n=14){
   return r;
 }
 function calcMACD(data){
-  const ema12=[],ema26=[],dif=[],macd=[],osc=[];
   let e12=data[0].c,e26=data[0].c,sig=0;
+  const dif=[],macd=[],osc=[];
   for(let i=0;i<data.length;i++){
     e12=i===0?data[i].c:e12*11/13+data[i].c*2/13;
     e26=i===0?data[i].c:e26*25/27+data[i].c*2/27;
@@ -291,7 +352,7 @@ function calcMACD(data){
 }
 
 function drawChart(data){
-  chartData=data;
+  chartDataCache=data;
   const canvas=document.getElementById('kCanvas');
   if(!canvas)return;
   const cs=getComputedStyle(document.documentElement);
@@ -303,9 +364,9 @@ function drawChart(data){
 
   const dpr=window.devicePixelRatio||1;
   const n=data.length;
-  const cw=Math.max(14,Math.min(20,600/n));
-  const W=Math.max(n*cw+80,600);
-  const priceH=260,volH=70,gap=8,padL=56,padR=12,padT=8,padB=24;
+  const cw=Math.max(8,Math.min(18,700/n));
+  const W=Math.max(n*cw+80,400);
+  const priceH=280,volH=80,gap=8,padL=60,padR=12,padT=8,padB=24;
   const H=priceH+gap+volH+padT+padB;
 
   canvas.width=W*dpr;canvas.height=H*dpr;
@@ -314,21 +375,18 @@ function drawChart(data){
   ctx.scale(dpr,dpr);
   ctx.clearRect(0,0,W,H);
 
-  // 價格區域
   const prices=data.flatMap(d=>[d.h,d.l]);
   const pMin=Math.min(...prices),pMax=Math.max(...prices);
   const pMargin=(pMax-pMin)*0.05||1;
   const pLo=pMin-pMargin,pHi=pMax+pMargin;
   const yP=v=>padT+(1-(v-pLo)/(pHi-pLo))*priceH;
 
-  // 成交量區域
   const vMax=Math.max(...data.map(d=>d.v))||1;
   const volTop=padT+priceH+gap;
   const yV=v=>volTop+volH*(1-v/vMax);
 
   // 網格 + Y 軸
-  ctx.font='10px '+cs.getPropertyValue('--font-mono').trim();
-  ctx.textAlign='right';
+  ctx.font='10px monospace';ctx.textAlign='right';
   for(let i=0;i<=5;i++){
     const pv=pLo+(pHi-pLo)*i/5;
     const yy=yP(pv);
@@ -337,14 +395,17 @@ function drawChart(data){
     ctx.fillStyle=cText;
     ctx.fillText(pv>=100?pv.toFixed(0):pv.toFixed(1),padL-4,yy+3);
   }
+  // 成交量Y軸
+  ctx.fillStyle=cText;ctx.fillText(Math.round(vMax)+'張',padL-4,volTop+10);
 
   // X 軸日期
   ctx.textAlign='center';
-  const dateStep=Math.max(1,Math.floor(n/6));
+  const dateStep=Math.max(1,Math.floor(n/8));
   for(let i=0;i<n;i+=dateStep){
     const x=padL+i*cw+cw/2;
     ctx.fillStyle=cText;
-    ctx.fillText(data[i].d.slice(5),x,padT+priceH+gap+volH+14);
+    const lbl=data[i].d.length>5?data[i].d.slice(5):data[i].d;
+    ctx.fillText(lbl,x,padT+priceH+gap+volH+14);
   }
 
   // K 棒 + 成交量
@@ -352,7 +413,7 @@ function drawChart(data){
     const x=padL+i*cw+cw/2;
     const up=d.c>=d.o;
     const color=up?cUp:cDn;
-    const bw2=cw*0.35;
+    const bw2=Math.max(1,cw*0.35);
 
     // 上下影線
     ctx.strokeStyle=color;ctx.lineWidth=1;
@@ -365,7 +426,6 @@ function drawChart(data){
     if(up){
       ctx.strokeStyle=color;ctx.lineWidth=1;
       ctx.strokeRect(x-bw2,top,bw2*2,bh);
-      // 填充背景色（空心）
       ctx.fillStyle=cBg;ctx.fillRect(x-bw2+0.5,top+0.5,bw2*2-1,bh-1);
     }else{
       ctx.fillStyle=color;
@@ -383,8 +443,7 @@ function drawChart(data){
   const mas=MA_PERIODS.map(p=>calcMA(data,p));
   mas.forEach((maArr,mi)=>{
     ctx.strokeStyle=MA_COLORS[mi];ctx.lineWidth=1.5;
-    ctx.beginPath();
-    let started=false;
+    ctx.beginPath();let started=false;
     maArr.forEach((v,i)=>{
       if(v===null)return;
       const x=padL+i*cw+cw/2;
@@ -394,20 +453,18 @@ function drawChart(data){
     ctx.stroke();
   });
 
-  // MA 圖例文字更新
-  mas.forEach((maArr,mi)=>{
-    const last=maArr.filter(v=>v!==null).pop();
-    const el=document.getElementById(['maL5','maL10','maL20','maL60'][mi]);
-    if(el){
-      el.style.setProperty('--c',MA_COLORS[mi]);
-      el.innerHTML=`<span style="display:inline-block;width:14px;height:2px;background:${MA_COLORS[mi]};margin-right:4px;vertical-align:middle;border-radius:1px"></span>MA${MA_PERIODS[mi]} ${last!=null?last.toFixed(1):'—'}`;
-    }
-  });
+  // MA 圖例
+  const legend=document.getElementById('maLegend');
+  if(legend){
+    legend.innerHTML=mas.map((maArr,mi)=>{
+      const last=maArr.filter(v=>v!==null).pop();
+      return `<span><span style="display:inline-block;width:14px;height:2px;background:${MA_COLORS[mi]};margin-right:4px;vertical-align:middle;border-radius:1px"></span>MA${MA_PERIODS[mi]} ${last!=null?last.toFixed(1):'—'}</span>`;
+    }).join('');
+  }
 
-  // Tooltip 十字線
-  const canvasEl=document.getElementById('chartCanvas');
+  // Tooltip
   const tooltip=document.getElementById('kTooltip');
-  canvas.addEventListener('mousemove',e=>{
+  canvas.onmousemove=e=>{
     const rect=canvas.getBoundingClientRect();
     const mx=(e.clientX-rect.left)*(W/rect.width);
     const idx=Math.floor((mx-padL)/cw);
@@ -424,23 +481,22 @@ function drawChart(data){
       低 <span style="color:${c}">${d.l}</span>　收 <span style="color:${c}">${d.c}</span><br>
       量 ${fmt(d.v)}張<br>
       漲跌 <span style="color:${c}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgP>=0?'+':''}${chgP.toFixed(2)}%)</span>`;
-  });
-  canvas.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
+  };
+  canvas.onmouseleave=()=>{tooltip.style.display='none';};
 
-  // 畫技術指標
-  drawIndicator(currentIndicator);
+  drawIndicator(currentInd);
 }
 
 function switchInd(ind){
-  currentIndicator=ind;
+  currentInd=ind;
   document.querySelectorAll('.ind-btn').forEach(b=>b.classList.toggle('active',b.dataset.ind===ind));
   drawIndicator(ind);
 }
 
 function drawIndicator(ind){
   const canvas=document.getElementById('indCanvas');
-  if(!canvas||!chartData.length)return;
-  const data=chartData;
+  if(!canvas||!chartDataCache.length)return;
+  const data=chartDataCache;
   const cs=getComputedStyle(document.documentElement);
   const cGrid=cs.getPropertyValue('--border-light').trim()||'#EBE7E0';
   const cText=cs.getPropertyValue('--text-secondary').trim()||'#6B7280';
@@ -449,10 +505,10 @@ function drawIndicator(ind){
 
   const dpr=window.devicePixelRatio||1;
   const n=data.length;
-  const cw=Math.max(14,Math.min(20,600/n));
-  const W=Math.max(n*cw+80,600);
+  const cw=Math.max(8,Math.min(18,700/n));
+  const W=Math.max(n*cw+80,400);
   const H=120;
-  const padL=56,padR=12,padT=6,padB=4;
+  const padL=60,padR=12,padT=6,padB=4;
 
   canvas.width=W*dpr;canvas.height=H*dpr;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
@@ -461,28 +517,22 @@ function drawIndicator(ind){
   ctx.clearRect(0,0,W,H);
 
   const plotH=H-padT-padB;
-  ctx.font='9px '+cs.getPropertyValue('--font-mono').trim();
-  ctx.textAlign='right';
+  ctx.font='9px monospace';ctx.textAlign='right';
 
   if(ind==='kd'){
     const{k,d:dArr}=calcKD(data);
     const yy=v=>padT+(1-v/100)*plotH;
-    // 水平線 20/50/80
     [20,50,80].forEach(v=>{
       ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;ctx.setLineDash([3,3]);
       ctx.beginPath();ctx.moveTo(padL,yy(v));ctx.lineTo(W-padR,yy(v));ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle=cText;ctx.fillText(v,padL-4,yy(v)+3);
+      ctx.setLineDash([]);ctx.fillStyle=cText;ctx.fillText(v,padL-4,yy(v)+3);
     });
-    // K 線
     ctx.strokeStyle='#D4A840';ctx.lineWidth=1.5;ctx.beginPath();
     k.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
     ctx.stroke();
-    // D 線
     ctx.strokeStyle='#5AADAB';ctx.lineWidth=1.5;ctx.beginPath();
     dArr.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
     ctx.stroke();
-    // 圖例
     ctx.fillStyle='#D4A840';ctx.textAlign='left';ctx.fillText('K '+k[k.length-1].toFixed(1),padL+4,padT+10);
     ctx.fillStyle='#5AADAB';ctx.fillText('D '+dArr[dArr.length-1].toFixed(1),padL+60,padT+10);
   }else if(ind==='rsi'){
@@ -491,8 +541,7 @@ function drawIndicator(ind){
     [30,50,70].forEach(v=>{
       ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;ctx.setLineDash([3,3]);
       ctx.beginPath();ctx.moveTo(padL,yy(v));ctx.lineTo(W-padR,yy(v));ctx.stroke();
-      ctx.setLineDash([]);
-      ctx.fillStyle=cText;ctx.fillText(v,padL-4,yy(v)+3);
+      ctx.setLineDash([]);ctx.fillStyle=cText;ctx.fillText(v,padL-4,yy(v)+3);
     });
     ctx.strokeStyle='#D4A840';ctx.lineWidth=1.5;ctx.beginPath();
     rsi.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
@@ -503,25 +552,18 @@ function drawIndicator(ind){
     const allV=[...dif,...sig,...osc];
     const vMax=Math.max(...allV.map(Math.abs))||1;
     const yy=v=>padT+plotH/2-v/vMax*(plotH/2);
-    // 零軸
     ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
     ctx.beginPath();ctx.moveTo(padL,yy(0));ctx.lineTo(W-padR,yy(0));ctx.stroke();
     ctx.fillStyle=cText;ctx.textAlign='right';ctx.fillText('0',padL-4,yy(0)+3);
-    // 柱狀圖 (OSC)
     osc.forEach((v,i)=>{
-      const x=padL+i*cw+cw/2;
-      const bw2=cw*0.3;
+      const x=padL+i*cw+cw/2;const bw2=Math.max(1,cw*0.3);
       ctx.fillStyle=v>=0?cUp:cDn;ctx.globalAlpha=0.5;
-      const top=v>=0?yy(v):yy(0);
-      const h=Math.abs(yy(v)-yy(0));
-      ctx.fillRect(x-bw2,top,bw2*2,h||1);
-      ctx.globalAlpha=1;
+      const top=v>=0?yy(v):yy(0);const h=Math.abs(yy(v)-yy(0));
+      ctx.fillRect(x-bw2,top,bw2*2,h||1);ctx.globalAlpha=1;
     });
-    // DIF 線
     ctx.strokeStyle='#D4A840';ctx.lineWidth=1.5;ctx.beginPath();
     dif.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
     ctx.stroke();
-    // MACD 線
     ctx.strokeStyle='#5AADAB';ctx.lineWidth=1.5;ctx.beginPath();
     sig.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
     ctx.stroke();
@@ -543,51 +585,37 @@ function drawRevChart(data){
   const cGrid=cs.getPropertyValue('--border-light').trim()||'#EBE7E0';
   const cText=cs.getPropertyValue('--text-secondary').trim()||'#6B7280';
   const dpr=window.devicePixelRatio||1;
-  const n=data.length;
-  const bw=50;
+  const n=data.length;const bw=50;
   const W=Math.max(n*bw+80,400),H=180;
   const padL=60,padR=10,padT=15,padB=32;
-
   canvas.width=W*dpr;canvas.height=H*dpr;
   canvas.style.width=W+'px';canvas.style.height=H+'px';
-  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
-  ctx.clearRect(0,0,W,H);
-
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
   const vals=data.map(d=>d.rev).filter(Boolean);
   if(!vals.length)return;
-  const vMax=Math.max(...vals);
-  const plotH=H-padT-padB;
+  const vMax=Math.max(...vals);const plotH=H-padT-padB;
   const yy=v=>padT+(1-v/vMax)*plotH;
-
-  ctx.font='10px '+cs.getPropertyValue('--font-mono').trim();
-  ctx.textAlign='right';
+  ctx.font='10px monospace';ctx.textAlign='right';
   for(let i=0;i<=4;i++){
     const v=vMax*i/4;
     ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
     ctx.beginPath();ctx.moveTo(padL,yy(v));ctx.lineTo(W-padR,yy(v));ctx.stroke();
     ctx.fillStyle=cText;ctx.fillText(fmtRev(v),padL-4,yy(v)+3);
   }
-
   ctx.textAlign='center';
   data.forEach((d,i)=>{
     if(!d.rev)return;
-    const x=padL+i*bw;
-    const color=d.yoy>=0?cUp:cDn;
-    const h=d.rev/vMax*plotH;
-    ctx.fillStyle=color;
-    ctx.beginPath();
-    const rx=2;
+    const x=padL+i*bw;const color=d.yoy>=0?cUp:cDn;
+    const h=d.rev/vMax*plotH;const rx=2;
     const bx=x+4,by=yy(d.rev),bwi=bw-8,bhi=h;
+    ctx.fillStyle=color;ctx.beginPath();
     ctx.moveTo(bx+rx,by);ctx.lineTo(bx+bwi-rx,by);ctx.quadraticCurveTo(bx+bwi,by,bx+bwi,by+rx);
     ctx.lineTo(bx+bwi,by+bhi);ctx.lineTo(bx,by+bhi);ctx.lineTo(bx,by+rx);ctx.quadraticCurveTo(bx,by,bx+rx,by);
     ctx.fill();
-    // YoY
-    ctx.fillStyle=color;ctx.font='9px '+cs.getPropertyValue('--font-mono').trim();
+    ctx.fillStyle=color;ctx.font='9px monospace';
     ctx.fillText((d.yoy>=0?'+':'')+d.yoy.toFixed(0)+'%',x+bw/2,yy(d.rev)-4);
-    // 月份
     ctx.fillStyle=cText;
-    const ml=d.m.length>5?d.m.slice(-5):d.m;
-    ctx.fillText(ml,x+bw/2,H-padB+14);
+    ctx.fillText(d.m.length>5?d.m.slice(-5):d.m,x+bw/2,H-padB+14);
   });
 }
 

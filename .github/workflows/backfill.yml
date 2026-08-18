@@ -1,0 +1,28 @@
+name: 回填K線歷史資料
+on:
+  workflow_dispatch:
+    inputs:
+      months:
+        description: '回填幾個月'
+        default: '3'
+      offset:
+        description: '從第幾檔開始'
+        default: '0'
+      limit:
+        description: '最多處理幾檔'
+        default: '600'
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -X utf8 backfill.py --months ${{ github.event.inputs.months }} --offset ${{ github.event.inputs.offset }} --limit ${{ github.event.inputs.limit }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
