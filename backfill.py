@@ -147,6 +147,8 @@ if __name__ == "__main__":
     parser.add_argument("--offset", type=int, default=0, help="從第幾檔開始")
     parser.add_argument("--limit", type=int, default=9999, help="最多處理幾檔")
     parser.add_argument("--stocks", type=str, default="", help="指定股號 (逗號分隔)")
+    parser.add_argument("--extend", action="store_true", help="自動往回延伸：偵測現有最早日期，再往前補 N 個月")
+    parser.add_argument("--max-years", type=int, default=10, help="最多回填幾年 (預設 10)")
     args = parser.parse_args()
 
     if not sb:
@@ -177,14 +179,43 @@ if __name__ == "__main__":
         market_map = classify_market()
         print(f"   上市 {sum(1 for v in market_map.values() if v=='twse')} / 上櫃 {sum(1 for v in market_map.values() if v=='tpex')}")
 
-    # 計算要抓的月份
+    # ── extend 模式：查現有最早日期，往前再補 N 個月 ──
     today = datetime.now()
-    months = []
-    for i in range(args.months):
-        dt = today - timedelta(days=30*i)
-        ym = (dt.year, dt.month)
-        if ym not in months:
-            months.append(ym)
+    if args.extend:
+        print("🔄 延伸模式：查詢現有最早日期...")
+        resp = sb.table("stock_prices").select("date").order("date", desc=False).limit(1).execute()
+        if resp.data:
+            earliest = datetime.strptime(resp.data[0]["date"], "%Y-%m-%d")
+            # 已超過 max-years → 不再回填
+            cutoff = today - timedelta(days=args.max_years * 365)
+            if earliest <= cutoff:
+                print(f"   已達 {args.max_years} 年上限 ({earliest.date()})，跳過")
+                sys.exit(0)
+            # 往前推 args.months 個月
+            months = []
+            for i in range(1, args.months + 1):
+                dt = earliest - timedelta(days=30 * i)
+                ym = (dt.year, dt.month)
+                if ym not in months:
+                    months.append(ym)
+            print(f"   現有最早: {earliest.date()}, 往前補: {[f'{y}/{m:02d}' for y,m in months]}")
+        else:
+            # 沒資料 → 等同一般模式
+            print("   stock_prices 無資料，改用一般回填")
+            months = []
+            for i in range(args.months):
+                dt = today - timedelta(days=30*i)
+                ym = (dt.year, dt.month)
+                if ym not in months:
+                    months.append(ym)
+    else:
+        # 一般模式：從今天往回
+        months = []
+        for i in range(args.months):
+            dt = today - timedelta(days=30*i)
+            ym = (dt.year, dt.month)
+            if ym not in months:
+                months.append(ym)
     print(f"📅 回填月份: {[f'{y}/{m:02d}' for y,m in months]}")
 
     total = len(stock_list)

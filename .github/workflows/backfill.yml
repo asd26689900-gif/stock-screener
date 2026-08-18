@@ -11,6 +11,13 @@ on:
       limit:
         description: '最多處理幾檔'
         default: '600'
+      extend:
+        description: '延伸模式(往更早回填)'
+        type: boolean
+        default: false
+  schedule:
+    # 每週六 UTC 00:00 (台北 08:00) 自動往回延伸 3 個月
+    - cron: '0 0 * * 6'
   push:
     paths:
       - '.github/backfill-trigger'
@@ -28,7 +35,15 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install -r requirements.txt
-      - run: python -X utf8 backfill.py --months ${{ github.event.inputs.months || '3' }} --offset ${{ matrix.batch }} --limit 600
+      - name: 回填 (排程=延伸, 手動=一般或延伸)
+        run: |
+          EXTEND_FLAG=""
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            EXTEND_FLAG="--extend"
+          elif [ "${{ github.event.inputs.extend }}" = "true" ]; then
+            EXTEND_FLAG="--extend"
+          fi
+          python -X utf8 backfill.py $EXTEND_FLAG --months ${{ github.event.inputs.months || '3' }} --offset ${{ matrix.batch }} --limit 600
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
