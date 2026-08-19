@@ -1,0 +1,177 @@
+<title>法人買賣超 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root {
+  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
+  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
+  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
+  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
+  --green: #4A8B6E; --red: #C0544F;
+  --font-display: Georgia, 'Times New Roman', serif;
+  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+  --radius: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+    --green: #6BB88E; --red: #E07070;
+    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+  }
+}
+:root[data-theme="dark"] {
+  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
+  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
+  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
+  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
+  --green: #6BB88E; --red: #E07070;
+  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
+.topbar .brand span{color:var(--gold)}
+.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}
+.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
+.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.page-title{font-family:var(--font-display);font-size:22px;color:var(--ink);letter-spacing:-0.01em}
+.page-desc{font-size:13px;color:var(--text-secondary);line-height:1.7}
+.summary-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;text-align:center}
+.summary-label{font-size:11px;color:var(--text-secondary);margin-bottom:4px}
+.summary-val{font-family:var(--font-mono);font-size:20px;font-weight:700}
+.tab-bar{display:flex;gap:8px;flex-wrap:wrap}
+.tab-btn{font-size:13px;padding:6px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--text-secondary);cursor:pointer}
+.tab-btn.active{background:var(--gold);color:#fff;border-color:var(--gold)}
+.module{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em}
+thead th:first-child,thead th:nth-child(2),thead th:nth-child(3){text-align:left}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2),tbody td:nth-child(3){text-align:left;font-family:var(--font-body)}
+tbody td:nth-child(2){color:var(--gold);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+tbody tr:hover{background:var(--gold-soft)}
+.up{color:var(--red)}.dn{color:var(--green)}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+.loading{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:15px}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.summary-grid{grid-template-columns:1fr 1fr 1fr}.container{padding:16px 8px 60px}thead th,tbody td{padding:8px;font-size:11px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a>
+    <a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="institutional.html" class="active">法人買賣超</a>
+    <a href="tools.html">股票計算機</a>
+    <a href="watchlist.html">★ 自選股</a>
+  </div>
+  <div class="spacer"></div>
+  <div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div>
+    <div class="page-title">📊 法人買賣超排行</div>
+    <div class="page-desc">三大法人（外資、投信、自營商）每日個股買賣超排行，追蹤法人資金動向。</div>
+  </div>
+  <div class="summary-grid" id="summaryCards">
+    <div class="summary-card"><div class="summary-label">外資買超 Top 1</div><div class="summary-val" id="sumForeign">—</div></div>
+    <div class="summary-card"><div class="summary-label">投信買超 Top 1</div><div class="summary-val" id="sumTrust">—</div></div>
+    <div class="summary-card"><div class="summary-label">外資+投信同買</div><div class="summary-val" id="sumBoth">—</div></div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('foreign')">外資買超</button>
+    <button class="tab-btn" onclick="switchTab('foreign_sell')">外資賣超</button>
+    <button class="tab-btn" onclick="switchTab('trust')">投信買超</button>
+    <button class="tab-btn" onclick="switchTab('trust_sell')">投信賣超</button>
+    <button class="tab-btn" onclick="switchTab('both')">外資+投信同買</button>
+  </div>
+  <div id="app"><div class="loading">載入中...</div></div>
+</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="js/config.js"></script>
+<script src="js/auth.js"></script>
+<script>
+let allData=[], currentTab='foreign';
+
+function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function cls(v){return v>0?'up':v<0?'dn':'';}
+
+async function onAuthReady(){
+  if(!sb) return;
+  const {data}=await sb.from('stock_metrics')
+    .select('stock_id,name,close,change_pct,foreign_net_shares,foreign_consec_days,trust_net_shares,trust_consec_days')
+    .order('stock_id');
+  if(!data||!data.length){document.getElementById('app').innerHTML='<div class="loading">尚無資料，請等待每日更新後再查看。</div>';return;}
+  allData=data;
+
+  // summary cards
+  const topF=[...data].sort((a,b)=>(b.foreign_net_shares||0)-(a.foreign_net_shares||0))[0];
+  const topT=[...data].sort((a,b)=>(b.trust_net_shares||0)-(a.trust_net_shares||0))[0];
+  const bothCount=data.filter(r=>(r.foreign_net_shares||0)>0&&(r.trust_net_shares||0)>0).length;
+  document.getElementById('sumForeign').textContent=topF?`${topF.stock_id} ${topF.name}`:'—';
+  document.getElementById('sumTrust').textContent=topT?`${topT.stock_id} ${topT.name}`:'—';
+  document.getElementById('sumBoth').textContent=bothCount+'檔';
+
+  renderTable();
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    const tabs=['foreign','foreign_sell','trust','trust_sell','both'];
+    b.classList.toggle('active',tabs[i]===tab);
+  });
+  renderTable();
+}
+
+function renderTable(){
+  let sorted;
+  const hdr={foreign:'外資買超(張)',foreign_sell:'外資賣超(張)',trust:'投信買超(張)',trust_sell:'投信賣超(張)',both:'外資+投信合計(張)'};
+  if(currentTab==='foreign'){
+    sorted=[...allData].filter(r=>(r.foreign_net_shares||0)>0).sort((a,b)=>b.foreign_net_shares-a.foreign_net_shares);
+  }else if(currentTab==='foreign_sell'){
+    sorted=[...allData].filter(r=>(r.foreign_net_shares||0)<0).sort((a,b)=>a.foreign_net_shares-b.foreign_net_shares);
+  }else if(currentTab==='trust'){
+    sorted=[...allData].filter(r=>(r.trust_net_shares||0)>0).sort((a,b)=>b.trust_net_shares-a.trust_net_shares);
+  }else if(currentTab==='trust_sell'){
+    sorted=[...allData].filter(r=>(r.trust_net_shares||0)<0).sort((a,b)=>a.trust_net_shares-b.trust_net_shares);
+  }else{
+    sorted=[...allData].filter(r=>(r.foreign_net_shares||0)>0&&(r.trust_net_shares||0)>0)
+      .sort((a,b)=>(b.foreign_net_shares+b.trust_net_shares)-(a.foreign_net_shares+a.trust_net_shares));
+  }
+  const top50=sorted.slice(0,50);
+  const getVal=r=>{
+    if(currentTab==='both') return r.foreign_net_shares+r.trust_net_shares;
+    if(currentTab.startsWith('foreign')) return r.foreign_net_shares;
+    return r.trust_net_shares;
+  };
+  const consecKey=currentTab.startsWith('foreign')?'foreign_consec_days':'trust_consec_days';
+  document.getElementById('app').innerHTML=`<div class="module"><div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>代號</th><th>名稱</th><th>收盤</th><th>漲跌%</th><th>${hdr[currentTab]}</th><th>連買天</th><th>外資(張)</th><th>投信(張)</th></tr></thead>
+    <tbody>${top50.map((r,i)=>{
+      const v=getVal(r);
+      return `<tr onclick="location.href='stk.html#${r.stock_id}'">
+        <td>${i+1}</td><td>${r.stock_id}</td><td>${r.name||''}</td>
+        <td>${fmt(r.close)}</td><td class="${cls(r.change_pct)}">${r.change_pct>0?'+':''}${(r.change_pct||0).toFixed(2)}%</td>
+        <td class="${cls(v)}">${v>0?'+':''}${fmt(v)}</td>
+        <td>${r[consecKey]||0}</td>
+        <td class="${cls(r.foreign_net_shares)}">${fmt(r.foreign_net_shares||0)}</td>
+        <td class="${cls(r.trust_net_shares)}">${fmt(r.trust_net_shares||0)}</td>
+      </tr>`;
+    }).join('')}${top50.length===0?'<tr><td colspan="9" style="text-align:center;color:var(--text-secondary);padding:24px">無資料</td></tr>':''}</tbody>
+  </table></div></div>`;
+}
+</script>
