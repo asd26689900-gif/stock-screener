@@ -16,11 +16,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # 每6小時自動往回延伸 3 個月
-    - cron: '0 0 * * *'   # UTC 00:00 = 台北 08:00
-    - cron: '0 6 * * *'   # UTC 06:00 = 台北 14:00
-    - cron: '0 12 * * *'  # UTC 12:00 = 台北 20:00
-    - cron: '0 18 * * *'  # UTC 18:00 = 台北 02:00
+    # 每2小時跑一次，盡量吃滿流量
+    - cron: '0 */2 * * *'
   push:
     paths:
       - '.github/backfill-trigger'
@@ -46,7 +43,7 @@ jobs:
           elif [ "${{ github.event.inputs.extend }}" = "true" ]; then
             EXTEND_FLAG="--extend"
           fi
-          python -X utf8 backfill.py $EXTEND_FLAG --months ${{ github.event.inputs.months || '3' }} --offset ${{ matrix.batch }} --limit 600
+          python -X utf8 backfill.py $EXTEND_FLAG --months ${{ github.event.inputs.months || '6' }} --offset ${{ matrix.batch }} --limit 600
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
