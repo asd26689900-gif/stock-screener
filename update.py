@@ -1128,3 +1128,15 @@ print(f"   模組篩選: {total} 檔")
 print(f"   個股分析: {len(stk_analysis)} 檔")
 print(f"   產業熱力圖: {len(heatmap_data['industries'])} 產業")
 print(f"   選股策略: {strat_total} 檔")
+
+# ── 清理舊資料（節省 Supabase 容量）──
+# stock_prices, daily_stk 保留（K線圖 & 個股分析需要歷史）
+# 選股相關表只保留 30 天（選股模組只需往前翻1個月）
+cutoff = (today - timedelta(days=30)).strftime("%Y-%m-%d")
+print(f"\n🧹 清理 {cutoff} 之前的選股舊資料...")
+for tbl in ["daily_heatmap", "daily_modules", "daily_strategies"]:
+    try:
+        sb.table(tbl).delete().lt("date", cutoff).execute()
+        print(f"   {tbl}: 已清理")
+    except Exception as e:
+        print(f"   {tbl}: 清理失敗 ({e})")
