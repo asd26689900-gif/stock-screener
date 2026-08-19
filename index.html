@@ -67,6 +67,7 @@ tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px soli
 tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
 tbody tr:hover{background:var(--gold-soft)}
 tbody tr{cursor:pointer}
+tbody td:first-child{color:var(--gold);text-decoration:underline;text-underline-offset:2px}
 .up{color:var(--red)}.dn{color:var(--green)}
 .empty-row td{text-align:center!important;color:var(--text-secondary);font-family:var(--font-body);padding:24px 12px;font-style:italic}
 .footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
@@ -131,7 +132,7 @@ function render(filterEmpty){
     if(filterEmpty&&data.length===0) continue;
     const rows=data.length===0
       ?'<tr class="empty-row"><td colspan="'+meta.cols.length+'">今日無符合標的</td></tr>'
-      :data.map(row=>'<tr onclick="window.open(\'stk.html#'+row[0]+'\',\'_self\')">'+row.map((v,i)=>{
+      :data.map(row=>'<tr onclick="location.href=\'stk.html#'+row[0]+'\'">'+row.map((v,i)=>{
         if(i<=1) return '<td>'+v+'</td>';
         if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return '<td class="'+c+'">'+d+'</td>';}
         return '<td>'+fmt(v)+'</td>';
