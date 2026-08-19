@@ -73,6 +73,17 @@ tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--fon
 tbody tr:hover{background:var(--gold-soft)}
 .up{color:var(--red)}.dn{color:var(--green)}
 .footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+/* context menu */
+.ctx-menu{display:none;position:fixed;z-index:1000;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.18);min-width:200px;padding:6px 0;font-size:13px}
+.ctx-menu.show{display:block}
+.ctx-menu-title{padding:6px 14px;font-size:11px;color:var(--text-secondary);font-weight:600;letter-spacing:.03em}
+.ctx-menu-item{padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text)}
+.ctx-menu-item:hover{background:var(--gold-soft);color:var(--gold)}
+.ctx-menu-item .check{color:var(--green);font-size:14px;width:16px;text-align:center}
+.ctx-menu-sep{border-top:1px solid var(--border-light);margin:4px 0}
+.ctx-menu-input{display:flex;gap:4px;padding:4px 10px}
+.ctx-menu-input input{flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)}
+.ctx-menu-input button{font-size:11px;padding:4px 10px;border:none;border-radius:4px;background:var(--gold);color:#fff;cursor:pointer}
 @media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.treemap{aspect-ratio:4/3}.container{padding:16px 8px 60px}}
 </style>
 
@@ -110,6 +121,7 @@ tbody tr:hover{background:var(--gold-soft)}
 </div>
 <div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
 <div class="tooltip" id="tooltip"><div class="tt-name" id="ttName"></div><div class="tt-row"><span>漲跌幅</span><span id="ttChg"></span></div><div class="tt-row"><span>成交金額</span><span id="ttVol"></span></div></div>
+<div class="ctx-menu" id="ctxMenu"></div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
@@ -169,6 +181,7 @@ function renderTreemap(items){
     div.addEventListener('mousemove',moveTT);
     div.addEventListener('mouseleave',hideTT);
     if(r.onClick)div.addEventListener('click',r.onClick);
+    if(r.stockId)div.addEventListener('contextmenu',e=>showCtxMenu(e,r.stockId,r.stockName||''));
     treemapEl.appendChild(div);
   }
 }
@@ -185,7 +198,7 @@ function showIndustry(){
 function drillDown(ind){
   document.getElementById('breadcrumb').style.display='flex';
   document.getElementById('bcName').textContent=ind.name;
-  renderTreemap((ind.stocks||[]).map(s=>({label:s.id+' '+s.name,value:s.amount,chg:s.chg_pct,onClick:()=>{location.href='stk.html#'+s.id;}})));
+  renderTreemap((ind.stocks||[]).map(s=>({label:s.id+' '+s.name,value:s.amount,chg:s.chg_pct,stockId:s.id,stockName:s.name,onClick:()=>{location.href='stk.html#'+s.id;}})));
   const tw=document.getElementById('stkTable');tw.classList.add('show');
   document.getElementById('stkTableTitle').textContent=ind.name+' — 成分股明細';
   document.getElementById('stkTableBody').innerHTML=[...(ind.stocks||[])].sort((a,b)=>b.amount-a.amount).map(s=>`<tr><td>${s.id}</td><td>${s.name}</td><td>${s.close.toLocaleString()}</td><td class="${s.chg_pct>=0?'up':'dn'}">${s.chg_pct>=0?'+':''}${s.chg_pct.toFixed(2)}%</td><td>${(s.amount/1e6).toFixed(0)}</td></tr>`).join('');
@@ -201,4 +214,73 @@ async function loadHeatmap(){
 }
 function onAuthReady(){loadHeatmap();}
 window.addEventListener('resize',()=>{if(document.getElementById('breadcrumb').style.display==='none')showIndustry();});
+
+/* === 多清單自選股 + 右鍵選單 === */
+const WL_KEY='watchlists';
+function getWL(){
+  let w=JSON.parse(localStorage.getItem(WL_KEY)||'null');
+  if(!w){
+    // migrate from old flat array
+    const old=JSON.parse(localStorage.getItem('watchlist')||'[]');
+    w={'我的自選':old};
+    localStorage.setItem(WL_KEY,JSON.stringify(w));
+  }
+  return w;
+}
+function saveWL(w){localStorage.setItem(WL_KEY,JSON.stringify(w));
+  // keep old key in sync for watchlist.html backward compat
+  const all=[...new Set(Object.values(w).flat())];
+  localStorage.setItem('watchlist',JSON.stringify(all));
+}
+
+const ctxMenu=document.getElementById('ctxMenu');
+let ctxTarget=null; // {id,name}
+
+function showCtxMenu(e,sid,sname){
+  e.preventDefault(); hideTT();
+  ctxTarget={id:sid,name:sname};
+  const w=getWL(), lists=Object.keys(w);
+  let html=`<div class="ctx-menu-title">加入 ${sid} ${sname} 到自選股</div>`;
+  lists.forEach(ln=>{
+    const has=w[ln].includes(sid);
+    html+=`<div class="ctx-menu-item" onclick="toggleWL('${ln}','${sid}')"><span class="check">${has?'✓':''}</span>${ln}</div>`;
+  });
+  html+=`<div class="ctx-menu-sep"></div>`;
+  html+=`<div class="ctx-menu-item" onclick="showNewListInput()" id="ctxNewBtn">＋ 新增清單</div>`;
+  html+=`<div class="ctx-menu-input" id="ctxNewInput" style="display:none"><input id="ctxNewName" placeholder="清單名稱" maxlength="20"><button onclick="createList()">建立</button></div>`;
+  html+=`<div class="ctx-menu-sep"></div>`;
+  html+=`<div class="ctx-menu-item" onclick="location.href='stk.html#${sid}'">📊 開啟個股分析</div>`;
+  ctxMenu.innerHTML=html;
+  // position
+  const mx=e.clientX,my=e.clientY;
+  ctxMenu.style.left=Math.min(mx,window.innerWidth-220)+'px';
+  ctxMenu.style.top=Math.min(my,window.innerHeight-300)+'px';
+  ctxMenu.classList.add('show');
+}
+function hideCtxMenu(){ctxMenu.classList.remove('show');}
+document.addEventListener('click',hideCtxMenu);
+document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tm-cell'))hideCtxMenu();});
+
+function toggleWL(listName,sid){
+  const w=getWL();
+  const idx=w[listName].indexOf(sid);
+  if(idx>=0)w[listName].splice(idx,1); else w[listName].push(sid);
+  saveWL(w);
+  // refresh menu
+  if(ctxTarget) showCtxMenu({preventDefault:()=>{},clientX:parseInt(ctxMenu.style.left),clientY:parseInt(ctxMenu.style.top)},ctxTarget.id,ctxTarget.name);
+}
+function showNewListInput(){
+  document.getElementById('ctxNewBtn').style.display='none';
+  document.getElementById('ctxNewInput').style.display='flex';
+  document.getElementById('ctxNewName').focus();
+}
+function createList(){
+  const name=document.getElementById('ctxNewName').value.trim();
+  if(!name)return;
+  const w=getWL();
+  if(!w[name])w[name]=[];
+  if(ctxTarget&&!w[name].includes(ctxTarget.id))w[name].push(ctxTarget.id);
+  saveWL(w);
+  showCtxMenu({preventDefault:()=>{},clientX:parseInt(ctxMenu.style.left),clientY:parseInt(ctxMenu.style.top)},ctxTarget.id,ctxTarget.name);
+}
 </script>

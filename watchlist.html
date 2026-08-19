@@ -58,6 +58,13 @@ tbody tr{cursor:pointer}
 .btn-del{background:none;border:none;color:var(--text-secondary);cursor:pointer;font-size:16px;padding:2px 6px;border-radius:var(--radius)}
 .btn-del:hover{color:var(--red);background:rgba(192,84,79,0.1)}
 .empty-msg{text-align:center;padding:40px 20px;color:var(--text-secondary);font-size:14px}
+.wl-tabs{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.wl-tab{font-size:13px;padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--text-secondary);cursor:pointer;position:relative}
+.wl-tab.active{background:var(--gold);color:#fff;border-color:var(--gold)}
+.wl-tab .del{display:none;position:absolute;top:-6px;right:-6px;width:16px;height:16px;border-radius:50%;background:var(--red);color:#fff;font-size:10px;line-height:16px;text-align:center;cursor:pointer}
+.wl-tab:hover .del{display:block}
+.wl-add-tab{font-size:13px;padding:6px 10px;border:1px dashed var(--border);border-radius:var(--radius);background:transparent;color:var(--text-secondary);cursor:pointer}
+.wl-add-tab:hover{border-color:var(--gold);color:var(--gold)}
 .footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
 @media(max-width:640px){.topbar{padding:10px 12px;gap:8px}thead th,tbody td{padding:8px;font-size:11px}.container{padding:16px 8px 60px}}
 </style>
@@ -86,6 +93,7 @@ tbody tr{cursor:pointer}
     <h2>★ 自選股</h2>
     <p>加入常關注的股票，一頁查看最新數據。資料儲存在瀏覽器中，換裝置需重新加入。</p>
   </div>
+  <div class="wl-tabs" id="wlTabs"></div>
   <div class="add-bar">
     <input type="text" id="addInput" placeholder="輸入股號，如 2330" maxlength="10">
     <button onclick="addStock()">加入</button>
@@ -98,78 +106,101 @@ tbody tr{cursor:pointer}
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script>
-const LS_KEY = 'watchlist';
-function getList(){ return JSON.parse(localStorage.getItem(LS_KEY) || '[]'); }
-function saveList(list){ localStorage.setItem(LS_KEY, JSON.stringify(list)); }
+const WL_KEY='watchlists';
+let curList='我的自選';
+
+function getWL(){
+  let w=JSON.parse(localStorage.getItem(WL_KEY)||'null');
+  if(!w){const old=JSON.parse(localStorage.getItem('watchlist')||'[]');w={'我的自選':old};localStorage.setItem(WL_KEY,JSON.stringify(w));}
+  return w;
+}
+function saveWL(w){localStorage.setItem(WL_KEY,JSON.stringify(w));
+  const all=[...new Set(Object.values(w).flat())];
+  localStorage.setItem('watchlist',JSON.stringify(all));
+}
+function getList(){return getWL()[curList]||[];}
+
+function renderTabs(){
+  const w=getWL(), names=Object.keys(w);
+  document.getElementById('wlTabs').innerHTML=names.map(n=>{
+    const active=n===curList?' active':'';
+    const canDel=names.length>1?`<span class="del" onclick="event.stopPropagation();delList('${n.replace(/'/g,"\\'")}')">✕</span>`:'';
+    return `<button class="wl-tab${active}" onclick="switchList('${n.replace(/'/g,"\\'")}')">${n}${canDel}</button>`;
+  }).join('')+`<button class="wl-add-tab" onclick="newList()">＋ 新增清單</button>`;
+}
+function switchList(n){curList=n;renderTabs();loadWatchlist();}
+function newList(){
+  const name=prompt('輸入新清單名稱：');
+  if(!name||!name.trim())return;
+  const w=getWL();
+  if(!w[name.trim()])w[name.trim()]=[];
+  saveWL(w);curList=name.trim();renderTabs();loadWatchlist();
+}
+function delList(n){
+  if(!confirm(`確定刪除清單「${n}」？`))return;
+  const w=getWL();delete w[n];saveWL(w);
+  curList=Object.keys(w)[0]||'我的自選';
+  renderTabs();loadWatchlist();
+}
 
 function addStock(){
-  const input = document.getElementById('addInput');
-  const sid = input.value.trim().toUpperCase();
-  if(!sid) return;
-  const list = getList();
-  if(list.includes(sid)){ input.value=''; return; }
-  list.push(sid);
-  saveList(list);
-  input.value='';
-  loadWatchlist();
+  const input=document.getElementById('addInput');
+  const sid=input.value.trim().toUpperCase();
+  if(!sid)return;
+  const w=getWL();
+  if(!w[curList])w[curList]=[];
+  if(w[curList].includes(sid)){input.value='';return;}
+  w[curList].push(sid);
+  saveWL(w);input.value='';loadWatchlist();
 }
-document.getElementById('addInput').addEventListener('keydown', e => {
-  if(e.key==='Enter') addStock();
-});
+document.getElementById('addInput').addEventListener('keydown',e=>{if(e.key==='Enter')addStock();});
 
 function removeStock(sid){
-  const list = getList().filter(s => s !== sid);
-  saveList(list);
-  loadWatchlist();
+  const w=getWL();
+  w[curList]=(w[curList]||[]).filter(s=>s!==sid);
+  saveWL(w);loadWatchlist();
 }
 
-function fmt(v){ return typeof v==='number' ? v.toLocaleString('zh-TW') : v; }
+function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
 
 async function loadWatchlist(){
-  const list = getList();
-  const app = document.getElementById('app');
-  if(!list.length){ app.innerHTML='<div class="empty-msg">尚未加入自選股，在上方輸入股號加入</div>'; return; }
-  if(!sb){ app.innerHTML='<div class="empty-msg">系統載入中...</div>'; return; }
+  const list=getList();
+  const app=document.getElementById('app');
+  if(!list.length){app.innerHTML='<div class="empty-msg">尚未加入自選股，在上方輸入股號加入</div>';return;}
+  if(!sb){app.innerHTML='<div class="empty-msg">系統載入中...</div>';return;}
 
-  // 從 stock_metrics 撈最新數據
-  const { data, error } = await sb.from('stock_metrics')
+  const{data,error}=await sb.from('stock_metrics')
     .select('stock_id,name,date,close,change_pct,volume,ma5,ma20,ma60,rev_mom,rev_yoy,foreign_consec_days,trust_consec_days')
-    .in('stock_id', list);
+    .in('stock_id',list);
+  if(error||!data){app.innerHTML='<div class="empty-msg">⚠ 載入失敗</div>';return;}
 
-  if(error || !data){ app.innerHTML='<div class="empty-msg">⚠ 載入失敗</div>'; return; }
+  const map={};data.forEach(d=>{map[d.stock_id]=d;});
 
-  // 建 map 方便排序
-  const map = {};
-  data.forEach(d => { map[d.stock_id] = d; });
-
-  // 按原始加入順序排
-  const rows = list.map(sid => {
-    const d = map[sid];
-    if(!d) return `<tr><td>${sid}</td><td>—</td><td colspan="8" style="text-align:center;color:var(--text-secondary)">無資料</td><td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">✕</button></td></tr>`;
-    const cls = (d.change_pct||0) >= 0 ? 'up' : 'dn';
-    const chg = d.change_pct != null ? (d.change_pct >= 0 ? '+' : '') + d.change_pct.toFixed(2) + '%' : '—';
-    const fc = d.foreign_consec_days || 0;
-    const tc = d.trust_consec_days || 0;
-    const fcCls = fc > 0 ? 'up' : fc < 0 ? 'dn' : '';
-    const tcCls = tc > 0 ? 'up' : tc < 0 ? 'dn' : '';
-    return `<tr onclick="location.href='stk.html#${sid}'">
+  const rows=list.map(sid=>{
+    const d=map[sid];
+    if(!d)return`<tr><td>${sid}</td><td>—</td><td colspan="8" style="text-align:center;color:var(--text-secondary)">無資料</td><td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">✕</button></td></tr>`;
+    const cls=(d.change_pct||0)>=0?'up':'dn';
+    const chg=d.change_pct!=null?(d.change_pct>=0?'+':'')+d.change_pct.toFixed(2)+'%':'—';
+    const fc=d.foreign_consec_days||0,tc=d.trust_consec_days||0;
+    const fcCls=fc>0?'up':fc<0?'dn':'',tcCls=tc>0?'up':tc<0?'dn':'';
+    return`<tr onclick="location.href='stk.html#${sid}'">
       <td>${sid}</td><td>${d.name||'—'}</td>
-      <td>${d.close != null ? fmt(d.close) : '—'}</td>
+      <td>${d.close!=null?fmt(d.close):'—'}</td>
       <td class="${cls}">${chg}</td>
-      <td>${d.volume != null ? fmt(d.volume) : '—'}</td>
-      <td>${d.ma5 != null ? d.ma5.toFixed(1) : '—'}</td>
-      <td>${d.ma20 != null ? d.ma20.toFixed(1) : '—'}</td>
-      <td class="${fcCls}">${fc > 0 ? '連買'+fc+'日' : fc < 0 ? '連賣'+Math.abs(fc)+'日' : '—'}</td>
-      <td class="${tcCls}">${tc > 0 ? '連買'+tc+'日' : tc < 0 ? '連賣'+Math.abs(tc)+'日' : '—'}</td>
-      <td>${d.rev_yoy != null ? (d.rev_yoy >= 0 ? '+' : '') + d.rev_yoy.toFixed(1) + '%' : '—'}</td>
+      <td>${d.volume!=null?fmt(d.volume):'—'}</td>
+      <td>${d.ma5!=null?d.ma5.toFixed(1):'—'}</td>
+      <td>${d.ma20!=null?d.ma20.toFixed(1):'—'}</td>
+      <td class="${fcCls}">${fc>0?'連買'+fc+'日':fc<0?'連賣'+Math.abs(fc)+'日':'—'}</td>
+      <td class="${tcCls}">${tc>0?'連買'+tc+'日':tc<0?'連賣'+Math.abs(tc)+'日':'—'}</td>
+      <td>${d.rev_yoy!=null?(d.rev_yoy>=0?'+':'')+d.rev_yoy.toFixed(1)+'%':'—'}</td>
       <td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">✕</button></td>
     </tr>`;
   }).join('');
 
-  app.innerHTML = `<table>
+  app.innerHTML=`<table>
     <thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th><th>MA5</th><th>MA20</th><th>外資動向</th><th>投信動向</th><th>營收YoY</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 }
 
-function onAuthReady(){ loadWatchlist(); }
+function onAuthReady(){renderTabs();loadWatchlist();}
 </script>
