@@ -9,12 +9,15 @@ from collections import defaultdict
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 
+print("🔌 連接 Supabase...", flush=True)
 # supabase-py 可能裝不到就 fallback 到 REST
 try:
     from supabase import create_client
     sb = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
+    print(f"   Supabase {'✅ 已連接' if sb else '⚠ 未設定'}", flush=True)
 except ImportError:
     sb = None
+    print("   ⚠ supabase-py 未安裝，使用 REST fallback", flush=True)
 
 HEADERS = {"User-Agent": "Mozilla/5.0", "Accept-Language": "zh-TW,zh;q=0.9"}
 
@@ -370,7 +373,7 @@ def trading_days(n_calendar):
     return list(reversed(days))
 
 work_days = trading_days(FETCH_CALENDAR_DAYS)
-print(f"📅 抓取區間: {iso_date(work_days[0])} ~ {iso_date(work_days[-1])} ({len(work_days)} 個工作日)")
+print(f"📅 抓取區間: {iso_date(work_days[0])} ~ {iso_date(work_days[-1])} ({len(work_days)} 個工作日)", flush=True)
 
 # ── 1. 全市場每日行情（近60+交易日）──
 print("⏳ 抓取每日行情 (TWSE+TPEX)...")
