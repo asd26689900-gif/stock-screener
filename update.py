@@ -260,18 +260,24 @@ INDUSTRY_MAP = {
 }
 
 def fetch_industry_mapping():
-    """從 TWSE/TPEX Open API 抓股票→產業對照"""
+    """從 TWSE/TPEX Open API 抓股票→產業對照（含重試）"""
     result = {}
-    # TWSE 上市
-    try:
-        r = requests.get("https://openapi.twse.com.tw/v1/opendata/t187ap03_L",
-            headers=HEADERS, timeout=15)
-        for row in r.json():
-            sid = row.get("公司代號", "").strip()
-            code = row.get("產業別", "")
-            if sid and code:
-                result[sid] = INDUSTRY_MAP.get(code, "其他")
-    except: pass
+    # TWSE 上市（重試 3 次）
+    for attempt in range(3):
+        try:
+            r = requests.get("https://openapi.twse.com.tw/v1/opendata/t187ap03_L",
+                headers=HEADERS, timeout=20)
+            if r.status_code == 200:
+                for row in r.json():
+                    sid = row.get("公司代號", "").strip()
+                    code = row.get("產業別", "")
+                    if sid and code:
+                        result[sid] = INDUSTRY_MAP.get(code, "其他")
+                if result:
+                    break
+        except Exception as e:
+            print(f"   ⚠ TWSE 產業 API 第{attempt+1}次失敗: {e}")
+        time.sleep(3)
 
     # TPEX 上櫃
     try:
@@ -283,16 +289,16 @@ def fetch_industry_mapping():
                 break
         r2 = requests.get(
             f"https://www.tpex.org.tw/web/stock/aftertrading/otc_quotes_no1430/stk_wn1430_result.php?l=zh-tw&d={rd}&se=EW&o=json",
-            headers=HEADERS, timeout=15)
+            headers=HEADERS, timeout=20)
         d2 = r2.json()
-        # TPEX 沒直接給產業碼，用 category 欄位
         for t in d2.get("tables", []):
             cat = t.get("category", "上櫃")
             for row in t.get("data", []):
                 sid = str(row[0]).strip()
                 if sid not in result:
                     result[sid] = cat if cat and cat != "上櫃" else "上櫃其他"
-    except: pass
+    except Exception as e:
+        print(f"   ⚠ TPEX 產業 API 失敗: {e}")
 
     return result
 
@@ -910,8 +916,8 @@ for sid, data in stocks.items():
     if len(data) < 2: continue
     p = data[-1]
     prev = data[-2]
-    ind_name = sid_industry.get(sid, "其他")
-    if not ind_name or ind_name == "其他": continue
+    ind_name = sid_industry.get(sid, "")
+    if not ind_name: continue
     close = p["close"]
     chg_pct = change_pct(p, prev)
     amount = close * p["Trading_Volume"]
