@@ -98,6 +98,23 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .criteria .icon{flex-shrink:0;width:18px;text-align:center;font-size:14px}
 .pass .icon{color:var(--green)}.fail .icon{color:var(--red)}.fail{color:var(--text-secondary)}
 .up{color:var(--red)}.dn{color:var(--green)}
+/* ── 均線標籤 ── */
+.ma-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
+.ma-tag{font-size:11px;font-family:var(--font-mono);padding:3px 10px;border-radius:99px;font-weight:600}
+.ma-tag.above{background:rgba(74,139,110,.15);color:var(--green)}
+.ma-tag.below{background:rgba(192,84,79,.12);color:var(--red)}
+/* ── 技術指標卡片 ── */
+.ind-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
+.ind-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;text-align:center}
+.ind-card-label{font-size:11px;color:var(--text-secondary);margin-bottom:4px}
+.ind-card-val{font-family:var(--font-mono);font-size:22px;font-weight:700}
+.ind-card-sub{font-size:10px;color:var(--text-secondary);margin-top:4px;font-family:var(--font-mono)}
+/* ── 基本面 ── */
+.fund-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+/* ── 相關連結 ── */
+.ext-links{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.ext-links a{font-size:12px;color:var(--gold);text-decoration:none;padding:5px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
+.ext-links a:hover{background:var(--gold-soft)}
 /* ── 營收 ── */
 .rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 .rev-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
@@ -250,6 +267,59 @@ async function fetchMinuteData(tf){
   }catch(e){return [];}
 }
 
+// ── 均線狀態標籤 ──
+function renderMATags(d){
+  if(!d.ma||!d.ma.length) return '';
+  const price=d.close;
+  const tags=d.ma.map(m=>{
+    const above=price>=m.value;
+    return `<span class="ma-tag ${above?'above':'below'}">${above?'站上':'跌破'}${m.label}</span>`;
+  }).join('');
+  return `<div class="ma-tags">${tags}</div>`;
+}
+
+// ── 技術指標摘要卡片 ──
+function renderIndCards(d){
+  const data=getChartData();
+  if(data.length<15) return '';
+  const kd=calcKD(data), rsi6=calcRSI(data,6), rsi14=calcRSI(data,14), macd=calcMACD(data);
+  const last=data.length-1;
+  const kv=kd.k[last].toFixed(1), dv=kd.d[last].toFixed(1);
+  const r6=rsi6[last].toFixed(1), r14=rsi14[last].toFixed(1);
+  const m=macd.dif[last].toFixed(2), sig=macd.macd[last].toFixed(2);
+  const kdHint=kd.k[last]>80?'超買區':kd.k[last]<20?'超賣區':'中性';
+  const rsiHint=rsi6[last]>80?'超買':rsi6[last]<20?'超賣':'中性';
+  const macdHint=macd.dif[last]>macd.macd[last]?'多方動能':'空方動能';
+  return `<div class="ind-grid">
+    <div class="ind-card"><div class="ind-card-label">KD</div><div class="ind-card-val">${kv}</div><div class="ind-card-sub">D ${dv}・${kdHint}</div></div>
+    <div class="ind-card"><div class="ind-card-label">RSI(6)</div><div class="ind-card-val">${r6}</div><div class="ind-card-sub">RSI(14) ${r14}・${rsiHint}</div></div>
+    <div class="ind-card"><div class="ind-card-label">MACD</div><div class="ind-card-val">${m}</div><div class="ind-card-sub">Signal ${sig}・${macdHint}</div></div>
+  </div>`;
+}
+
+// ── 基本面卡片 ──
+function renderFundCards(d){
+  const f=d.fundamental;
+  if(!f||(!f.pe&&!f.pb&&!f.dividend_yield)) return '';
+  return `<div class="fund-grid">
+    <div class="ind-card"><div class="ind-card-label">本益比 PE</div><div class="ind-card-val">${f.pe?f.pe.toFixed(1):'—'}</div></div>
+    <div class="ind-card"><div class="ind-card-label">殖利率</div><div class="ind-card-val">${f.dividend_yield?f.dividend_yield.toFixed(2)+'%':'—'}</div></div>
+    <div class="ind-card"><div class="ind-card-label">股價淨值比 PB</div><div class="ind-card-val">${f.pb?f.pb.toFixed(2):'—'}</div></div>
+  </div>`;
+}
+
+// ── 相關連結 ──
+function renderExtLinks(sid,name){
+  const enc=encodeURIComponent(name+' '+sid);
+  return `<div class="ext-links">
+    <a href="https://tw.stock.yahoo.com/quote/${sid}" target="_blank">Yahoo 股市</a>
+    <a href="https://goodinfo.tw/tw/StockDetail.asp?STOCK_ID=${sid}" target="_blank">Goodinfo</a>
+    <a href="https://www.cnyes.com/twstock/${sid}" target="_blank">鉅亨網</a>
+    <a href="https://news.google.com/search?q=${enc}" target="_blank">Google 新聞</a>
+    <a href="https://www.ptt.cc/bbs/Stock/search?q=${sid}" target="_blank">PTT Stock</a>
+  </div>`;
+}
+
 function renderStock(sid,d){
   const chg=d.change||0,chgPct=d.change_pct||0,chgSign=chg>=0?'▲':'▼';
   const total=(d.scores.chip||0)+(d.scores.fundamental||0)+(d.scores.technical||0);
@@ -297,6 +367,9 @@ function renderStock(sid,d){
     </div>
     <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
   </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">📈 K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
+  ${renderMATags(d)}
+  ${renderIndCards(d)}
+  ${renderFundCards(d)}
   ${rev.length?`
   <div class="rev-grid">
     <div class="rev-card"><div class="rev-label">最新月營收</div><div class="rev-val">${latestRev?fmtRev(latestRev.rev):'—'}</div><div class="rev-sub">${latestRev?latestRev.m:''}</div></div>
@@ -306,6 +379,7 @@ function renderStock(sid,d){
     <div class="chart-toolbar"><span class="chart-label">📊 月營收走勢</span></div>
     <div class="rev-chart-wrap"><canvas id="revCanvas"></canvas></div>
   </div>`:''}
+  ${renderExtLinks(sid,d.name)}
   <div class="chip-grid">
     <div class="chip-card"><div class="chip-label">主力買賣超</div><div class="chip-val ${cls(d.chip.main_net)}">${sign(fmt(d.chip.main_net))}張</div></div>
     <div class="chip-card"><div class="chip-label">散戶買賣超</div><div class="chip-val ${cls(d.chip.retail_net)}">${sign(fmt(d.chip.retail_net))}張</div></div>

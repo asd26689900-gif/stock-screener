@@ -897,6 +897,7 @@ for sid in stocks:
                  "big_holder_pct": big_holder, "retail_holder_pct": retail_holder},
         "scores": {"chip": chip_score, "fundamental": fund_score, "technical": tech_score},
         "criteria": {"chip": chip_criteria, "fundamental": fund_criteria, "technical": tech_criteria},
+        "fundamental": {"pe": pe, "pb": pb, "dividend_yield": dy},
         "history": history,
         "revenue": rev_history,
     }
