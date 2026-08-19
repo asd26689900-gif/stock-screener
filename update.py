@@ -464,21 +464,27 @@ for i, d in enumerate(inst_days):
 print(f"\n   法人資料: {len(inst)} 檔")
 
 def get_inst_consecutive(sid, inst_type):
-    """算某法人連續買超天數 & 累計股數
-    inst_type: 'foreign', 'trust', 'dealer'
+    """算某法人連續買/賣超天數 & 當日淨買賣股數
+    回傳 (days, today_net)
+    days > 0 = 連買天, days < 0 = 連賣天
+    today_net = 最新一日淨買賣股數（正=買超, 負=賣超）
     """
     records = sorted(inst.get(sid, []), key=lambda x: x["date"], reverse=True)
     key = f"{inst_type}_net"
+    if not records:
+        return 0, 0
+    today_net = records[0].get(key, 0)
+    if today_net == 0:
+        return 0, 0
+    direction = 1 if today_net > 0 else -1
     days = 0
-    total = 0
     for r in records:
         net = r.get(key, 0)
-        if net > 0:
+        if (direction > 0 and net > 0) or (direction < 0 and net < 0):
             days += 1
-            total += net
         else:
             break
-    return days, total
+    return days * direction, today_net
 
 # ── 3. 月營收 ──
 print("⏳ 抓取月營收...")

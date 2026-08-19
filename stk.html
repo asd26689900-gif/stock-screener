@@ -1,4 +1,5 @@
 <title>個股分析 — 盤後精選模組</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="js/auth.css">
 <style>
 :root {
@@ -129,10 +130,13 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .rev-chart-wrap{overflow-x:auto}
 .footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
 @media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.chip-grid{grid-template-columns:1fr}.rev-grid{grid-template-columns:1fr}.price-big{font-size:24px}.stk-name{font-size:22px}.container{padding:16px 8px 60px}}
+.nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
+@media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
 </style>
 
 <div class="topbar">
   <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <button class="nav-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('show')" aria-label="選單">☰</button>
   <div class="nav-links">
     <a href="index.html">選股模組</a>
     <a href="stk.html" class="active">個股分析</a>
