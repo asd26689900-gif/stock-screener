@@ -1,0 +1,132 @@
+<title>融資融券 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root{--ink:#1C2127;--text:#3B3F45;--text-secondary:#6B7280;--surface:#F5F2EC;--card:#FFFFFF;--border:#DDD8D0;--border-light:#EBE7E0;--gold:#B8860B;--gold-soft:rgba(184,134,11,.10);--teal:#3A7D7B;--teal-soft:rgba(58,125,123,.08);--green:#4A8B6E;--red:#C0544F;--font-display:Georgia,'Times New Roman',serif;--font-body:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;--font-mono:'SF Mono','Cascadia Code','Consolas',monospace;--radius:6px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}}
+:root[data-theme="dark"]{--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-.02em;white-space:nowrap;text-decoration:none}.topbar .brand span{color:var(--gold)}.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.page-title{font-family:var(--font-display);font-size:22px;color:var(--ink)}.page-desc{font-size:13px;color:var(--text-secondary)}
+.tab-bar{display:flex;gap:8px;flex-wrap:wrap}
+.tab-btn{font-size:13px;padding:6px 16px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--text-secondary);cursor:pointer}.tab-btn.active{background:var(--gold);color:#fff;border-color:var(--gold)}
+.module{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border)}
+thead th:first-child,thead th:nth-child(2){text-align:left}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
+tbody td:first-child{color:var(--gold);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+tbody tr:hover{background:var(--gold-soft)}
+.up{color:var(--red)}.dn{color:var(--green)}
+.loading{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:15px}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.container{padding:16px 8px 60px}thead th,tbody td{padding:8px;font-size:11px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a>
+    <a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="institutional.html">法人買賣超</a>
+    <a href="margin.html" class="active">融資融券</a>
+    <a href="ipo.html">股票抽籤</a>
+    <a href="calendar.html">投資行事曆</a>
+    <a href="history.html">歷史漲跌幅</a>
+    <a href="tools.html">股票計算機</a>
+    <a href="watchlist.html">★ 自選股</a>
+  
+  </div>
+  <div class="spacer"></div><div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div>
+    <div class="page-title">💳 融資融券餘額</div>
+    <div class="page-desc">每日融資融券餘額變化，追蹤散戶槓桿動向。</div>
+  </div>
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('margin_buy')">融資增加</button>
+    <button class="tab-btn" onclick="switchTab('margin_sell')">融資減少</button>
+    <button class="tab-btn" onclick="switchTab('short_buy')">融券增加</button>
+    <button class="tab-btn" onclick="switchTab('short_sell')">融券減少</button>
+  </div>
+  <div id="app"><div class="loading">載入中...</div></div>
+</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
+
+<script>
+let marginData=[],currentTab='margin_buy';
+function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+
+async function loadData(){
+  try{
+    const r=await fetch('/api/twse-proxy?type=margin');
+    const j=await r.json();
+    if(j.stat!=='OK'||!j.data) throw new Error('no data');
+    // fields: 股票代號,名稱,融資買進,融資賣出,融資現金償還,融資前日餘額,融資今日餘額,融資限額
+    //         融券買進,融券賣出,融券現金償還,融券前日餘額,融券今日餘額,融券限額,資券互抵
+    marginData=j.data.map(row=>({
+      id:(row[0]||'').trim(), name:(row[1]||'').trim(),
+      m_buy:parseInt((row[2]||'0').replace(/,/g,''))||0,
+      m_sell:parseInt((row[3]||'0').replace(/,/g,''))||0,
+      m_prev:parseInt((row[5]||'0').replace(/,/g,''))||0,
+      m_today:parseInt((row[6]||'0').replace(/,/g,''))||0,
+      s_buy:parseInt((row[8]||'0').replace(/,/g,''))||0,
+      s_sell:parseInt((row[9]||'0').replace(/,/g,''))||0,
+      s_prev:parseInt((row[11]||'0').replace(/,/g,''))||0,
+      s_today:parseInt((row[12]||'0').replace(/,/g,''))||0,
+    })).filter(r=>r.id&&r.id.length<=6&&!r.id.startsWith('0'));
+    renderTable();
+  }catch(e){
+    document.getElementById('app').innerHTML='<div class="loading">暫無資料，請稍後再試</div>';
+  }
+}
+
+function switchTab(tab){
+  currentTab=tab;
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>{
+    const tabs=['margin_buy','margin_sell','short_buy','short_sell'];
+    b.classList.toggle('active',tabs[i]===tab);
+  });
+  renderTable();
+}
+
+function renderTable(){
+  let sorted,hdr;
+  const mChg=r=>r.m_today-r.m_prev, sChg=r=>r.s_today-r.s_prev;
+  if(currentTab==='margin_buy'){
+    sorted=[...marginData].filter(r=>mChg(r)>0).sort((a,b)=>mChg(b)-mChg(a));
+    hdr='融資增加(張)';
+  }else if(currentTab==='margin_sell'){
+    sorted=[...marginData].filter(r=>mChg(r)<0).sort((a,b)=>mChg(a)-mChg(b));
+    hdr='融資減少(張)';
+  }else if(currentTab==='short_buy'){
+    sorted=[...marginData].filter(r=>sChg(r)>0).sort((a,b)=>sChg(b)-sChg(a));
+    hdr='融券增加(張)';
+  }else{
+    sorted=[...marginData].filter(r=>sChg(r)<0).sort((a,b)=>sChg(a)-sChg(b));
+    hdr='融券減少(張)';
+  }
+  const top50=sorted.slice(0,50);
+  const isMargin=currentTab.startsWith('margin');
+  const getChg=r=>isMargin?mChg(r):sChg(r);
+  document.getElementById('app').innerHTML=`<div class="module"><div class="table-wrap"><table>
+    <thead><tr><th>代號</th><th>名稱</th><th>${hdr}</th><th>今日餘額</th><th>前日餘額</th></tr></thead>
+    <tbody>${top50.map(r=>{
+      const v=getChg(r),bal=isMargin?r.m_today:r.s_today,prev=isMargin?r.m_prev:r.s_prev;
+      return `<tr onclick="location.href='stk.html#${r.id}'">
+        <td>${r.id}</td><td>${r.name}</td>
+        <td class="${v>0?'up':'dn'}">${v>0?'+':''}${fmt(v)}</td>
+        <td>${fmt(bal)}</td><td>${fmt(prev)}</td></tr>`;
+    }).join('')}${!top50.length?'<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:24px">無資料</td></tr>':''}</tbody>
+  </table></div></div>`;
+}
+loadData();
+</script>

@@ -759,6 +759,8 @@ results["triple_signal"] = m9[:15]
 #  個股分析 — 三維評分
 # ══════════════════════════════════════
 print("\n🔍 產生個股分析資料...")
+sid_industry = fetch_industry_mapping()
+print(f"   產業分類: {len(sid_industry)} 檔")
 
 stk_analysis = {}
 
@@ -897,6 +899,7 @@ for sid in stocks:
                  "big_holder_pct": big_holder, "retail_holder_pct": retail_holder},
         "scores": {"chip": chip_score, "fundamental": fund_score, "technical": tech_score},
         "criteria": {"chip": chip_criteria, "fundamental": fund_criteria, "technical": tech_criteria},
+        "industry": sid_industry.get(sid, ""),
         "fundamental": {"pe": pe, "pb": pb, "dividend_yield": dy},
         "history": history,
         "revenue": rev_history,
@@ -908,8 +911,6 @@ print(f"   個股分析: {len(stk_analysis)} 檔")
 #  產業熱力圖
 # ══════════════════════════════════════
 print("\n🔍 產生產業熱力圖...")
-sid_industry = fetch_industry_mapping()
-print(f"   產業分類: {len(sid_industry)} 檔")
 
 ind_agg = defaultdict(lambda: {"stocks": [], "total_amount": 0, "sum_chg": 0, "count": 0})
 

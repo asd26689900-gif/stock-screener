@@ -1,0 +1,130 @@
+<title>歷史漲跌幅 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root{--ink:#1C2127;--text:#3B3F45;--text-secondary:#6B7280;--surface:#F5F2EC;--card:#FFFFFF;--border:#DDD8D0;--border-light:#EBE7E0;--gold:#B8860B;--gold-soft:rgba(184,134,11,.10);--teal:#3A7D7B;--teal-soft:rgba(58,125,123,.08);--green:#4A8B6E;--red:#C0544F;--font-display:Georgia,'Times New Roman',serif;--font-body:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;--font-mono:'SF Mono','Cascadia Code','Consolas',monospace;--radius:6px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}}
+:root[data-theme="dark"]{--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-.02em;white-space:nowrap;text-decoration:none}.topbar .brand span{color:var(--gold)}.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.page-title{font-family:var(--font-display);font-size:22px;color:var(--ink)}.page-desc{font-size:13px;color:var(--text-secondary)}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+.summary-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;text-align:center}
+.summary-label{font-size:11px;color:var(--text-secondary);margin-bottom:4px}
+.summary-val{font-family:var(--font-mono);font-size:18px;font-weight:700}
+.summary-sub{font-size:11px;color:var(--text-secondary);margin-top:2px}
+.month-nav{display:flex;align-items:center;gap:12px}
+.month-nav button{padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--text);cursor:pointer;font-size:13px}
+.month-nav button:hover{background:var(--gold-soft)}
+.month-label{font-family:var(--font-mono);font-size:15px;color:var(--ink);font-weight:600}
+.module{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border)}
+thead th:first-child{text-align:left}
+tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
+tbody td:first-child{text-align:left}
+.up{color:var(--red)}.dn{color:var(--green)}
+.loading{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:15px}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.container{padding:16px 8px 60px}thead th,tbody td{padding:8px;font-size:11px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a>
+    <a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="institutional.html">法人買賣超</a>
+    <a href="margin.html">融資融券</a>
+    <a href="ipo.html">股票抽籤</a>
+    <a href="calendar.html">投資行事曆</a>
+    <a href="history.html" class="active">歷史漲跌幅</a>
+    <a href="tools.html">股票計算機</a>
+    <a href="watchlist.html">★ 自選股</a>
+  
+  </div>
+  <div class="spacer"></div><div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div>
+    <div class="page-title">📅 加權指數歷史漲跌幅</div>
+    <div class="page-desc">台灣加權指數每月交易日統計，每日自動更新。</div>
+  </div>
+  <div class="summary-grid" id="summaryCards"></div>
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">◀ 上月</button>
+    <span class="month-label" id="monthLabel"></span>
+    <button onclick="changeMonth(1)">下月 ▶</button>
+  </div>
+  <div id="app"><div class="loading">載入中...</div></div>
+</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
+
+<script>
+let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
+function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW',{maximumFractionDigits:2}):v;}
+function pad(n){return String(n).padStart(2,'0');}
+
+function changeMonth(d){
+  curMonth+=d;
+  if(curMonth>12){curMonth=1;curYear++;}
+  if(curMonth<1){curMonth=12;curYear--;}
+  loadData();
+}
+
+async function loadData(){
+  const ym=`${curYear}${pad(curMonth)}`;
+  document.getElementById('monthLabel').textContent=`${curYear} 年 ${curMonth} 月`;
+  document.getElementById('app').innerHTML='<div class="loading">載入中...</div>';
+  try{
+    const r=await fetch(`/api/twse-proxy?type=index_daily&date=${ym}`);
+    const j=await r.json();
+    if(j.stat!=='OK'||!j.data||!j.data.length){
+      document.getElementById('app').innerHTML='<div class="loading">此月份無資料</div>';
+      document.getElementById('summaryCards').innerHTML='';
+      return;
+    }
+    // fields: 日期,成交股數,成交金額,成交筆數,發行量加權股價指數,漲跌點數,漲跌百分比
+    // Note: TWSE uses 民國年 dates like "115/08/01"
+    const rows=j.data.map(row=>{
+      const dParts=(row[0]||'').split('/');
+      const dateStr=dParts.length===3?`${parseInt(dParts[0])+1911}/${dParts[1]}/${dParts[2]}`:row[0];
+      const idx=parseFloat((row[4]||'0').replace(/,/g,''))||0;
+      const chgPt=parseFloat((row[5]||'0').replace(/,/g,''))||0;
+      const volume=parseFloat((row[1]||'0').replace(/,/g,''))||0;
+      const amount=parseFloat((row[2]||'0').replace(/,/g,''))||0;
+      return{date:dateStr,index:idx,chg_pt:chgPt,volume,amount};
+    });
+
+    // summary
+    const upDays=rows.filter(r=>r.chg_pt>0).length;
+    const dnDays=rows.filter(r=>r.chg_pt<0).length;
+    const totalChg=rows.reduce((s,r)=>s+r.chg_pt,0);
+    const maxUp=rows.reduce((m,r)=>r.chg_pt>m.chg_pt?r:m,rows[0]);
+    const maxDn=rows.reduce((m,r)=>r.chg_pt<m.chg_pt?r:m,rows[0]);
+    document.getElementById('summaryCards').innerHTML=`
+      <div class="summary-card"><div class="summary-label">交易日</div><div class="summary-val">${rows.length} 天</div><div class="summary-sub">上漲 ${upDays} / 下跌 ${dnDays}</div></div>
+      <div class="summary-card"><div class="summary-label">月漲跌</div><div class="summary-val ${totalChg>=0?'up':'dn'}">${totalChg>=0?'+':''}${fmt(totalChg)} 點</div></div>
+      <div class="summary-card"><div class="summary-label">最大漲幅日</div><div class="summary-val up">+${fmt(maxUp.chg_pt)}</div><div class="summary-sub">${maxUp.date}</div></div>
+      <div class="summary-card"><div class="summary-label">最大跌幅日</div><div class="summary-val dn">${fmt(maxDn.chg_pt)}</div><div class="summary-sub">${maxDn.date}</div></div>`;
+
+    document.getElementById('app').innerHTML=`<div class="module"><div class="table-wrap"><table>
+      <thead><tr><th>日期</th><th>加權指數</th><th>漲跌點數</th><th>成交金額(億)</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr>
+        <td>${r.date}</td><td>${fmt(r.index)}</td>
+        <td class="${r.chg_pt>=0?'up':'dn'}">${r.chg_pt>=0?'+':''}${fmt(r.chg_pt)}</td>
+        <td>${fmt(Math.round(r.amount/1e8))}</td>
+      </tr>`).join('')}</tbody>
+    </table></div></div>`;
+  }catch(e){
+    document.getElementById('app').innerHTML='<div class="loading">載入失敗，請稍後再試</div>';
+  }
+}
+loadData();
+</script>

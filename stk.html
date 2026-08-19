@@ -111,6 +111,11 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .ind-card-sub{font-size:10px;color:var(--text-secondary);margin-top:4px;font-family:var(--font-mono)}
 /* ── 基本面 ── */
 .fund-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+/* ── 個股簡介 ── */
+.stk-intro{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
+.stk-intro-industry{font-size:12px;color:var(--teal);font-weight:600;margin-bottom:6px}
+.stk-intro-name{font-family:var(--font-display);font-size:16px;color:var(--ink);margin-bottom:4px}
+.stk-intro-meta{font-size:12px;color:var(--text-secondary);line-height:1.7}
 /* ── 相關連結 ── */
 .ext-links{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
 .ext-links a{font-size:12px;color:var(--gold);text-decoration:none;padding:5px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
@@ -132,12 +137,14 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
     <a href="index.html">選股模組</a>
     <a href="stk.html" class="active">個股分析</a>
     <a href="heatmap.html">產業熱力圖</a>
-    <a href="concepts.html">題材概念</a>
-    <a href="strategy.html">選股策略</a>
-    <a href="filter.html">自訂篩選</a>
     <a href="institutional.html">法人買賣超</a>
+    <a href="margin.html">融資融券</a>
+    <a href="ipo.html">股票抽籤</a>
+    <a href="calendar.html">投資行事曆</a>
+    <a href="history.html">歷史漲跌幅</a>
     <a href="tools.html">股票計算機</a>
     <a href="watchlist.html">★ 自選股</a>
+  
   </div>
   <div class="spacer"></div>
   <div class="search-box">
@@ -269,6 +276,17 @@ async function fetchMinuteData(tf){
   }catch(e){return [];}
 }
 
+// ── 個股簡介 ──
+function renderIntro(sid,d){
+  const ind=d.industry||'';
+  const listing=sid.length<=4?'上市':'上櫃';
+  return `<div class="stk-intro">
+    ${ind?`<div class="stk-intro-industry">個股 ・ ${ind}</div>`:''}
+    <div class="stk-intro-name">${sid} ${d.name}</div>
+    <div class="stk-intro-meta">${listing} ・ 資料更新 ${d.date}</div>
+  </div>`;
+}
+
 // ── 均線狀態標籤 ──
 function renderMATags(d){
   if(!d.ma||!d.ma.length) return '';
@@ -344,6 +362,7 @@ function renderStock(sid,d){
       <div class="ohlcv-item"><div class="ohlcv-label">成交張</div><div class="ohlcv-val">${fmt(d.volume)}</div></div>
     </div>
   </div>
+  ${renderIntro(sid,d)}
   ${hasChart?`
   <div class="chart-box">
     <div class="chart-toolbar">

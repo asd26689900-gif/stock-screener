@@ -1,0 +1,177 @@
+<title>投資行事曆 — 盤後精選模組</title>
+<link rel="stylesheet" href="js/auth.css">
+<style>
+:root{--ink:#1C2127;--text:#3B3F45;--text-secondary:#6B7280;--surface:#F5F2EC;--card:#FFFFFF;--border:#DDD8D0;--border-light:#EBE7E0;--gold:#B8860B;--gold-soft:rgba(184,134,11,.10);--teal:#3A7D7B;--teal-soft:rgba(58,125,123,.08);--green:#4A8B6E;--red:#C0544F;--font-display:Georgia,'Times New Roman',serif;--font-body:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;--font-mono:'SF Mono','Cascadia Code','Consolas',monospace;--radius:6px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}}
+:root[data-theme="dark"]{--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55}
+.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
+.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-.02em;white-space:nowrap;text-decoration:none}.topbar .brand span{color:var(--gold)}.topbar .spacer{flex:1}
+.nav-links{display:flex;gap:12px}.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
+.page-title{font-family:var(--font-display);font-size:22px;color:var(--ink)}.page-desc{font-size:13px;color:var(--text-secondary)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
+.cal-hdr{font-size:11px;font-weight:600;color:var(--text-secondary);text-align:center;padding:8px 0}
+.cal-day{background:var(--card);border:1px solid var(--border-light);min-height:80px;padding:6px;border-radius:4px;font-size:12px;position:relative}
+.cal-day.today{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.cal-day.other{opacity:.4}
+.cal-num{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.cal-event{font-size:10px;padding:2px 4px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cal-event.dividend{background:rgba(74,139,110,.15);color:var(--green)}
+.cal-event.earnings{background:rgba(58,125,123,.12);color:var(--teal)}
+.cal-event.ipo{background:rgba(184,134,11,.12);color:var(--gold)}
+.month-nav{display:flex;align-items:center;gap:12px}
+.month-nav button{padding:6px 14px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);color:var(--text);cursor:pointer;font-size:13px}
+.month-nav button:hover{background:var(--gold-soft)}
+.month-label{font-family:var(--font-mono);font-size:15px;color:var(--ink);font-weight:600}
+.event-list{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+.ev-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;display:flex;gap:12px;align-items:center}
+.ev-date{font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);min-width:80px}
+.ev-type{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600}
+.ev-type.dividend{background:rgba(74,139,110,.15);color:var(--green)}
+.ev-type.earnings{background:rgba(58,125,123,.12);color:var(--teal)}
+.ev-body{flex:1;font-size:13px}
+.loading{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:15px}
+.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.container{padding:16px 8px 60px}.cal-day{min-height:60px;padding:4px}.cal-event{font-size:9px}}
+</style>
+
+<div class="topbar">
+  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+  <div class="nav-links">
+    <a href="index.html">選股模組</a>
+    <a href="stk.html">個股分析</a>
+    <a href="heatmap.html">產業熱力圖</a>
+    <a href="institutional.html">法人買賣超</a>
+    <a href="margin.html">融資融券</a>
+    <a href="ipo.html">股票抽籤</a>
+    <a href="calendar.html" class="active">投資行事曆</a>
+    <a href="history.html">歷史漲跌幅</a>
+    <a href="tools.html">股票計算機</a>
+    <a href="watchlist.html">★ 自選股</a>
+  
+  </div>
+  <div class="spacer"></div><div id="authArea"></div>
+</div>
+
+<div class="container">
+  <div>
+    <div class="page-title">📆 投資行事曆</div>
+    <div class="page-desc">除權息日程，一頁掌握重要事件。</div>
+  </div>
+  <div class="month-nav">
+    <button onclick="changeMonth(-1)">◀ 上月</button>
+    <span class="month-label" id="monthLabel"></span>
+    <button onclick="changeMonth(1)">下月 ▶</button>
+  </div>
+  <div id="calGrid"></div>
+  <div id="eventList"></div>
+</div>
+<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。</div>
+
+<script>
+let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
+let events=[];
+
+function pad(n){return String(n).padStart(2,'0');}
+function rocToAD(s){
+  if(!s)return'';const p=s.split('/');
+  return p.length===3?`${parseInt(p[0])+1911}-${p[1]}-${p[2]}`:s;
+}
+
+function changeMonth(d){
+  curMonth+=d;
+  if(curMonth>12){curMonth=1;curYear++;}
+  if(curMonth<1){curMonth=12;curYear--;}
+  loadData();
+}
+
+async function loadData(){
+  document.getElementById('monthLabel').textContent=`${curYear} 年 ${curMonth} 月`;
+  events=[];
+
+  // Fetch dividend data for this month (query range = whole month)
+  const startDate=`${curYear-1911}${pad(curMonth)}01`;
+  const daysInMonth=new Date(curYear,curMonth,0).getDate();
+  const endDate=`${curYear-1911}${pad(curMonth)}${pad(daysInMonth)}`;
+
+  try{
+    // TWSE 除權息公告 — query the whole month range
+    const url=`/api/twse-proxy?type=dividend&date=${curYear-1911}${pad(curMonth)}`;
+    const r=await fetch(url);
+    const j=await r.json();
+    if(j.data&&j.data.length){
+      j.data.forEach(row=>{
+        const dateStr=rocToAD(row[0]);
+        const id=(row[1]||'').trim();
+        const name=(row[2]||'').trim();
+        const type=(row[3]||'').includes('息')?'除息':'除權';
+        const detail=(row[4]||'').trim();
+        events.push({date:dateStr,id,name,type:'dividend',label:`${type} ${id} ${name} ${detail}`});
+      });
+    }
+  }catch(e){}
+
+  renderCalendar();
+  renderEventList();
+}
+
+function renderCalendar(){
+  const today=new Date().toISOString().slice(0,10);
+  const firstDay=new Date(curYear,curMonth-1,1).getDay();
+  const daysInMonth=new Date(curYear,curMonth,0).getDate();
+  const daysInPrev=new Date(curYear,curMonth-1,0).getDate();
+
+  const evByDate={};
+  events.forEach(e=>{if(e.date)evByDate[e.date]=(evByDate[e.date]||[]).concat(e);});
+
+  let html='<div class="cal-grid">';
+  ['日','一','二','三','四','五','六'].forEach(d=>html+=`<div class="cal-hdr">${d}</div>`);
+
+  // prev month padding
+  for(let i=firstDay-1;i>=0;i--){
+    const d=daysInPrev-i;
+    html+=`<div class="cal-day other"><div class="cal-num">${d}</div></div>`;
+  }
+
+  // this month
+  for(let d=1;d<=daysInMonth;d++){
+    const dateStr=`${curYear}-${pad(curMonth)}-${pad(d)}`;
+    const isToday=dateStr===today;
+    const dayEvents=evByDate[dateStr]||[];
+    html+=`<div class="cal-day${isToday?' today':''}"><div class="cal-num">${d}</div>`;
+    dayEvents.slice(0,3).forEach(e=>{
+      html+=`<div class="cal-event ${e.type}">${e.id} ${e.name}</div>`;
+    });
+    if(dayEvents.length>3) html+=`<div class="cal-event" style="color:var(--text-secondary)">+${dayEvents.length-3} 更多</div>`;
+    html+='</div>';
+  }
+
+  // next month padding
+  const totalCells=firstDay+daysInMonth;
+  const remaining=totalCells%7===0?0:7-totalCells%7;
+  for(let i=1;i<=remaining;i++){
+    html+=`<div class="cal-day other"><div class="cal-num">${i}</div></div>`;
+  }
+  html+='</div>';
+  document.getElementById('calGrid').innerHTML=html;
+}
+
+function renderEventList(){
+  if(!events.length){
+    document.getElementById('eventList').innerHTML='<div class="loading" style="padding:30px">本月尚無除權息資料</div>';
+    return;
+  }
+  const sorted=[...events].sort((a,b)=>a.date.localeCompare(b.date));
+  document.getElementById('eventList').innerHTML='<div class="event-list">'+sorted.map(e=>`
+    <div class="ev-card">
+      <span class="ev-date">${e.date}</span>
+      <span class="ev-type ${e.type}">除權息</span>
+      <span class="ev-body">${e.label}</span>
+    </div>
+  `).join('')+'</div>';
+}
+
+loadData();
+</script>
