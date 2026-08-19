@@ -143,6 +143,7 @@ if(location.hash){input.value=location.hash.slice(1);setTimeout(doSearch,600);}
 
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
 let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;
+let _chartRAF=0, _chartEventsAttached=false, _cachedMAs=null, _cachedMADataLen=0;
 const TF_MAP = {
   '5m':  {interval:'5m',  range:'1mo',  label:'5分'},
   '60m': {interval:'60m', range:'6mo', label:'60分'},
@@ -154,7 +155,7 @@ let minuteCache = {}; // {key: [{d,o,h,l,c,v}]}
 
 async function doSearch(){
   const sid=input.value.trim(); if(!sid)return;
-  location.hash=sid; currentSid=sid; minuteCache={}; currentTF='D'; chartZoom=1; chartPanIdx=0;
+  location.hash=sid; currentSid=sid; minuteCache={}; currentTF='D'; chartZoom=1; chartPanIdx=0; _chartEventsAttached=false; _cachedMAs=null;
   if(!sb){document.getElementById('app').innerHTML='<div class="empty-state">系統載入中...</div>';return;}
 
   // 同時抓分析資料和歷史K線
@@ -322,7 +323,7 @@ function renderStock(sid,d){
 }
 
 async function switchTF(tf){
-  currentTF=tf; chartZoom=1; chartPanIdx=0;
+  currentTF=tf; chartZoom=1; chartPanIdx=0; _cachedMAs=null;
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
   if(tf==='5m'||tf==='60m'){
     const bars=await fetchMinuteData(tf);
@@ -498,8 +499,9 @@ function drawChart(data){
     ctx.globalAlpha=1;
   });
 
-  // MA 均線（從全資料計算，只畫可見段）
-  const mas=MA_PERIODS.map(p=>calcMA(data,p));
+  // MA 均線（快取，只在資料變時重算）
+  if(!_cachedMAs||_cachedMADataLen!==data.length){_cachedMAs=MA_PERIODS.map(p=>calcMA(data,p));_cachedMADataLen=data.length;}
+  const mas=_cachedMAs;
   mas.forEach((maArr,mi)=>{
     ctx.strokeStyle=MA_COLORS[mi];ctx.lineWidth=1.5;
     ctx.beginPath();let started=false;
@@ -522,66 +524,66 @@ function drawChart(data){
     }).join('');
   }
 
-  // ── 事件：十字游標 + 縮放 + 拖曳 ──
-  setupChartEvents(canvas);
+  // ── 事件：只掛一次 ──
+  if(!_chartEventsAttached) setupChartEvents(canvas);
   drawIndicator(currentInd);
 }
 
-function setupChartEvents(canvas){
-  const container=canvas.parentElement;
-  const tooltip=document.getElementById('kTooltip');
-  const priceTag=document.getElementById('kPriceTag');
-  const overlay=document.getElementById('kOverlay');
-  if(!overlay)return;
+function scheduleChartRedraw(){
+  if(_chartRAF) return; // 已排程，跳過
+  _chartRAF=requestAnimationFrame(()=>{_chartRAF=0;drawChart(chartDataCache);});
+}
 
-  // 滾輪縮放
-  container.onwheel=e=>{
+function setupChartEvents(canvas){
+  _chartEventsAttached=true;
+  const container=canvas.parentElement;
+
+  // 滾輪縮放（RAF 節流）
+  container.addEventListener('wheel',e=>{
     e.preventDefault();
     const rect=canvas.getBoundingClientRect();
     const mx=e.clientX-rect.left;
-    // 計算滑鼠位置對應的 bar index（相對於可見範圍）
     const L=chartLayout;
+    if(!L.cw)return;
     const mouseBarFrac=(mx-L.padL)/L.cw;
     const oldZoom=chartZoom;
     const factor=e.deltaY>0?0.85:1.18;
     chartZoom=Math.max(0.5,Math.min(20,chartZoom*factor));
-    // 調整 pan 讓縮放中心不動
     const zoomRatio=chartZoom/oldZoom;
     chartPanIdx=chartPanIdx+mouseBarFrac*(1-1/zoomRatio);
-    drawChart(chartDataCache);
-  };
+    scheduleChartRedraw();
+  },{passive:false});
 
-  // 拖曳平移
-  container.onmousedown=e=>{
+  // 拖曳平移（RAF 節流）
+  container.addEventListener('mousedown',e=>{
     if(e.button!==0)return;
     chartIsDragging=true;chartDragStartX=e.clientX;chartDragStartPan=chartPanIdx;
     container.style.cursor='grabbing';
-  };
-  window._chartMouseMove=e=>{
+  });
+  document.addEventListener('mousemove',e=>{
     if(chartIsDragging){
       const dx=e.clientX-chartDragStartX;
-      const barsDelta=dx/chartLayout.cw;
-      chartPanIdx=chartDragStartPan-barsDelta;
-      drawChart(chartDataCache);
+      if(!chartLayout.cw)return;
+      chartPanIdx=chartDragStartPan-dx/chartLayout.cw;
+      scheduleChartRedraw();
       return;
     }
-    // 十字游標
     drawCrosshair(e);
-  };
-  window._chartMouseUp=e=>{
+  });
+  document.addEventListener('mouseup',()=>{
     if(chartIsDragging){chartIsDragging=false;container.style.cursor='crosshair';}
-  };
-  document.addEventListener('mousemove',window._chartMouseMove);
-  document.addEventListener('mouseup',window._chartMouseUp);
+  });
 
-  container.onmouseleave=()=>{
+  container.addEventListener('mouseleave',()=>{
     if(!chartIsDragging){
-      const octx=overlay.getContext('2d');
-      octx.clearRect(0,0,overlay.width,overlay.height);
-      tooltip.style.display='none';
+      const overlay=document.getElementById('kOverlay');
+      const tooltip=document.getElementById('kTooltip');
+      const priceTag=document.getElementById('kPriceTag');
+      if(overlay){const octx=overlay.getContext('2d');octx.clearRect(0,0,overlay.width,overlay.height);}
+      if(tooltip)tooltip.style.display='none';
       if(priceTag)priceTag.style.display='none';
     }
-  };
+  });
 }
 
 function drawCrosshair(e){
