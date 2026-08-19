@@ -76,8 +76,14 @@ let events=[];
 
 function pad(n){return String(n).padStart(2,'0');}
 function rocToAD(s){
-  if(!s)return'';const p=s.split('/');
-  return p.length===3?`${parseInt(p[0])+1911}-${p[1]}-${p[2]}`:s;
+  if(!s)return'';
+  // handle "115/08/01"
+  let p=s.split('/');
+  if(p.length===3) return `${parseInt(p[0])+1911}-${p[1]}-${p[2]}`;
+  // handle "115年08月20日"
+  const m=s.match(/(\d+)年(\d+)月(\d+)日/);
+  if(m) return `${parseInt(m[1])+1911}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  return s;
 }
 
 function changeMonth(d){
