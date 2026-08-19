@@ -65,9 +65,11 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .tf-btn,.ind-btn{padding:4px 12px;border:1px solid var(--border);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-secondary);font-family:var(--font-mono)}
 .tf-btn.active,.ind-btn.active{background:var(--gold-soft);color:var(--gold);border-color:var(--gold)}
 .ma-legend{display:flex;gap:12px;font-size:11px;font-family:var(--font-mono);flex-wrap:wrap}
-.chart-canvas{position:relative;overflow-x:auto;overflow-y:hidden}
+.chart-canvas{position:relative;overflow:hidden;cursor:crosshair}
 .chart-canvas canvas{display:block}
+.chart-overlay{position:absolute;top:0;left:0;pointer-events:none}
 .chart-tooltip{position:absolute;top:0;left:0;pointer-events:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:11px;font-family:var(--font-mono);line-height:1.6;white-space:nowrap;box-shadow:var(--shadow);z-index:10;display:none}
+.chart-price-tag{position:absolute;right:0;pointer-events:none;background:var(--gold);color:#fff;font-size:10px;font-family:var(--font-mono);padding:1px 6px;border-radius:2px;z-index:9;display:none}
 /* ── 籌碼 + 評分 ── */
 .chip-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
 .chip-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
@@ -140,9 +142,10 @@ input.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
 if(location.hash){input.value=location.hash.slice(1);setTimeout(doSearch,600);}
 
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
+let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;
 const TF_MAP = {
-  '5m':  {interval:'5m',  range:'5d',  label:'5分'},
-  '60m': {interval:'60m', range:'1mo', label:'60分'},
+  '5m':  {interval:'5m',  range:'1mo',  label:'5分'},
+  '60m': {interval:'60m', range:'6mo', label:'60分'},
   'D':   {interval:null,  range:null,  label:'日'},
   'W':   {interval:null,  range:null,  label:'週'},
   'M':   {interval:null,  range:null,  label:'月'},
@@ -151,13 +154,13 @@ let minuteCache = {}; // {key: [{d,o,h,l,c,v}]}
 
 async function doSearch(){
   const sid=input.value.trim(); if(!sid)return;
-  location.hash=sid; currentSid=sid; minuteCache={}; currentTF='D';
+  location.hash=sid; currentSid=sid; minuteCache={}; currentTF='D'; chartZoom=1; chartPanIdx=0;
   if(!sb){document.getElementById('app').innerHTML='<div class="empty-state">系統載入中...</div>';return;}
 
   // 同時抓分析資料和歷史K線
   const [stkRes, priceRes] = await Promise.all([
     sb.from('daily_stk').select('data').eq('stock_id',sid).order('date',{ascending:false}).limit(1).single(),
-    sb.from('stock_prices').select('*').eq('stock_id',sid).order('date',{ascending:true}).limit(500)
+    sb.from('stock_prices').select('*').eq('stock_id',sid).order('date',{ascending:true}).limit(2000)
   ]);
 
   if(stkRes.error||!stkRes.data){
@@ -281,7 +284,9 @@ function renderStock(sid,d){
     <div class="ma-legend" id="maLegend"></div>
     <div class="chart-canvas" id="chartCanvas">
       <canvas id="kCanvas"></canvas>
+      <canvas id="kOverlay" class="chart-overlay"></canvas>
       <div class="chart-tooltip" id="kTooltip"></div>
+      <div class="chart-price-tag" id="kPriceTag"></div>
     </div>
     <div class="chart-toolbar" style="margin-top:8px;margin-bottom:0">
       <span class="chart-label" style="font-size:13px">技術指標</span>
@@ -317,7 +322,7 @@ function renderStock(sid,d){
 }
 
 async function switchTF(tf){
-  currentTF=tf;
+  currentTF=tf; chartZoom=1; chartPanIdx=0;
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
   if(tf==='5m'||tf==='60m'){
     const bars=await fetchMinuteData(tf);
@@ -384,6 +389,9 @@ function calcMACD(data){
   return{dif,macd,osc};
 }
 
+// ── 圖表佈局參數（drawChart / crosshair 共用）──
+let chartLayout = {};
+
 function drawChart(data){
   chartDataCache=data;
   const canvas=document.getElementById('kCanvas');
@@ -397,26 +405,48 @@ function drawChart(data){
 
   const dpr=window.devicePixelRatio||1;
   const n=data.length;
-  const cw=Math.max(8,Math.min(18,700/n));
-  const W=Math.max(n*cw+80,400);
+  const containerW = canvas.parentElement.clientWidth || 700;
+  // 縮放：zoom=1 顯示全部，zoom>1 放大（看較少根）
+  const baseCw = containerW / n;
+  const cw = Math.max(4, Math.min(40, baseCw * chartZoom));
+  const totalW = n * cw + 72;
+  const W = Math.max(totalW, containerW);
   const priceH=280,volH=80,gap=8,padL=60,padR=12,padT=8,padB=24;
   const H=priceH+gap+volH+padT+padB;
 
-  canvas.width=W*dpr;canvas.height=H*dpr;
-  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  // 計算可見範圍
+  const visibleBars = Math.min(n, Math.ceil((containerW - padL - padR) / cw));
+  chartPanIdx = Math.max(0, Math.min(chartPanIdx, n - visibleBars));
+  const vStart = Math.floor(chartPanIdx);
+  const vEnd = Math.min(n, vStart + visibleBars + 1);
+  const visData = data.slice(vStart, vEnd);
+
+  // 固定 canvas 寬度 = 容器寬度（不用捲動，用 pan 平移）
+  const drawW = containerW;
+  canvas.width=drawW*dpr;canvas.height=H*dpr;
+  canvas.style.width=drawW+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');
   ctx.scale(dpr,dpr);
-  ctx.clearRect(0,0,W,H);
+  ctx.clearRect(0,0,drawW,H);
 
-  const prices=data.flatMap(d=>[d.h,d.l]);
+  // overlay canvas 同步大小
+  const overlay=document.getElementById('kOverlay');
+  if(overlay){
+    overlay.width=drawW*dpr;overlay.height=H*dpr;
+    overlay.style.width=drawW+'px';overlay.style.height=H+'px';
+  }
+
+  const prices=visData.flatMap(d=>[d.h,d.l]);
   const pMin=Math.min(...prices),pMax=Math.max(...prices);
   const pMargin=(pMax-pMin)*0.05||1;
   const pLo=pMin-pMargin,pHi=pMax+pMargin;
   const yP=v=>padT+(1-(v-pLo)/(pHi-pLo))*priceH;
 
-  const vMax=Math.max(...data.map(d=>d.v))||1;
+  const vMax=Math.max(...visData.map(d=>d.v))||1;
   const volTop=padT+priceH+gap;
-  const yV=v=>volTop+volH*(1-v/vMax);
+
+  // 保存佈局給 crosshair 用
+  chartLayout = {drawW,H,padL,padR,padT,padB,priceH,volH,gap,cw,vStart,vEnd,n:visData.length,pLo,pHi,vMax,yP,volTop,data:visData,allData:data,cUp,cDn,cGrid,cText};
 
   // 網格 + Y 軸
   ctx.font='10px monospace';ctx.textAlign='right';
@@ -424,35 +454,32 @@ function drawChart(data){
     const pv=pLo+(pHi-pLo)*i/5;
     const yy=yP(pv);
     ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
-    ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(drawW-padR,yy);ctx.stroke();
     ctx.fillStyle=cText;
     ctx.fillText(pv>=100?pv.toFixed(0):pv.toFixed(1),padL-4,yy+3);
   }
-  // 成交量Y軸
   ctx.fillStyle=cText;ctx.fillText(Math.round(vMax)+'張',padL-4,volTop+10);
 
   // X 軸日期
   ctx.textAlign='center';
-  const dateStep=Math.max(1,Math.floor(n/8));
-  for(let i=0;i<n;i+=dateStep){
+  const dateStep=Math.max(1,Math.floor(visData.length/8));
+  for(let i=0;i<visData.length;i+=dateStep){
     const x=padL+i*cw+cw/2;
     ctx.fillStyle=cText;
-    const lbl=data[i].d.length>5?data[i].d.slice(5):data[i].d;
+    const lbl=visData[i].d.length>5?visData[i].d.slice(5):visData[i].d;
     ctx.fillText(lbl,x,padT+priceH+gap+volH+14);
   }
 
   // K 棒 + 成交量
-  data.forEach((d,i)=>{
+  visData.forEach((d,i)=>{
     const x=padL+i*cw+cw/2;
     const up=d.c>=d.o;
     const color=up?cUp:cDn;
     const bw2=Math.max(1,cw*0.35);
 
-    // 上下影線
     ctx.strokeStyle=color;ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(x,yP(d.h));ctx.lineTo(x,yP(d.l));ctx.stroke();
 
-    // 實體
     const top=yP(Math.max(d.o,d.c));
     const bot=yP(Math.min(d.o,d.c));
     const bh=Math.max(bot-top,1);
@@ -465,24 +492,24 @@ function drawChart(data){
       ctx.fillRect(x-bw2,top,bw2*2,bh);
     }
 
-    // 成交量柱
     const vh=d.v/vMax*volH;
     ctx.fillStyle=color;ctx.globalAlpha=0.4;
     ctx.fillRect(x-bw2,volTop+volH-vh,bw2*2,vh);
     ctx.globalAlpha=1;
   });
 
-  // MA 均線
+  // MA 均線（從全資料計算，只畫可見段）
   const mas=MA_PERIODS.map(p=>calcMA(data,p));
   mas.forEach((maArr,mi)=>{
     ctx.strokeStyle=MA_COLORS[mi];ctx.lineWidth=1.5;
     ctx.beginPath();let started=false;
-    maArr.forEach((v,i)=>{
-      if(v===null)return;
-      const x=padL+i*cw+cw/2;
+    for(let gi=vStart;gi<vEnd;gi++){
+      const v=maArr[gi];
+      if(v===null)continue;
+      const x=padL+(gi-vStart)*cw+cw/2;
       if(!started){ctx.moveTo(x,yP(v));started=true;}
       else ctx.lineTo(x,yP(v));
-    });
+    }
     ctx.stroke();
   });
 
@@ -495,29 +522,132 @@ function drawChart(data){
     }).join('');
   }
 
-  // Tooltip
+  // ── 事件：十字游標 + 縮放 + 拖曳 ──
+  setupChartEvents(canvas);
+  drawIndicator(currentInd);
+}
+
+function setupChartEvents(canvas){
+  const container=canvas.parentElement;
   const tooltip=document.getElementById('kTooltip');
-  canvas.onmousemove=e=>{
+  const priceTag=document.getElementById('kPriceTag');
+  const overlay=document.getElementById('kOverlay');
+  if(!overlay)return;
+
+  // 滾輪縮放
+  container.onwheel=e=>{
+    e.preventDefault();
     const rect=canvas.getBoundingClientRect();
-    const mx=(e.clientX-rect.left)*(W/rect.width);
-    const idx=Math.floor((mx-padL)/cw);
-    if(idx<0||idx>=n){tooltip.style.display='none';return;}
-    const d=data[idx];
-    const chg=idx>0?(d.c-data[idx-1].c):0;
-    const chgP=idx>0&&data[idx-1].c?(chg/data[idx-1].c*100):0;
-    const c=chg>=0?cUp:cDn;
+    const mx=e.clientX-rect.left;
+    // 計算滑鼠位置對應的 bar index（相對於可見範圍）
+    const L=chartLayout;
+    const mouseBarFrac=(mx-L.padL)/L.cw;
+    const oldZoom=chartZoom;
+    const factor=e.deltaY>0?0.85:1.18;
+    chartZoom=Math.max(0.5,Math.min(20,chartZoom*factor));
+    // 調整 pan 讓縮放中心不動
+    const zoomRatio=chartZoom/oldZoom;
+    chartPanIdx=chartPanIdx+mouseBarFrac*(1-1/zoomRatio);
+    drawChart(chartDataCache);
+  };
+
+  // 拖曳平移
+  container.onmousedown=e=>{
+    if(e.button!==0)return;
+    chartIsDragging=true;chartDragStartX=e.clientX;chartDragStartPan=chartPanIdx;
+    container.style.cursor='grabbing';
+  };
+  window._chartMouseMove=e=>{
+    if(chartIsDragging){
+      const dx=e.clientX-chartDragStartX;
+      const barsDelta=dx/chartLayout.cw;
+      chartPanIdx=chartDragStartPan-barsDelta;
+      drawChart(chartDataCache);
+      return;
+    }
+    // 十字游標
+    drawCrosshair(e);
+  };
+  window._chartMouseUp=e=>{
+    if(chartIsDragging){chartIsDragging=false;container.style.cursor='crosshair';}
+  };
+  document.addEventListener('mousemove',window._chartMouseMove);
+  document.addEventListener('mouseup',window._chartMouseUp);
+
+  container.onmouseleave=()=>{
+    if(!chartIsDragging){
+      const octx=overlay.getContext('2d');
+      octx.clearRect(0,0,overlay.width,overlay.height);
+      tooltip.style.display='none';
+      if(priceTag)priceTag.style.display='none';
+    }
+  };
+}
+
+function drawCrosshair(e){
+  const overlay=document.getElementById('kOverlay');
+  const tooltip=document.getElementById('kTooltip');
+  const priceTag=document.getElementById('kPriceTag');
+  const canvas=document.getElementById('kCanvas');
+  if(!overlay||!canvas||!chartLayout.data)return;
+
+  const L=chartLayout;
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left;
+  const my=e.clientY-rect.top;
+  if(mx<0||mx>L.drawW||my<0||my>L.H){
+    const octx=overlay.getContext('2d');
+    octx.clearRect(0,0,overlay.width,overlay.height);
+    tooltip.style.display='none';
+    if(priceTag)priceTag.style.display='none';
+    return;
+  }
+
+  const dpr=window.devicePixelRatio||1;
+  const octx=overlay.getContext('2d');
+  octx.setTransform(dpr,0,0,dpr,0,0);
+  octx.clearRect(0,0,L.drawW,L.H);
+
+  // 對應 bar index
+  const idx=Math.floor((mx-L.padL)/L.cw);
+
+  // 虛線十字
+  octx.strokeStyle=L.cText;octx.lineWidth=0.8;
+  octx.setLineDash([4,3]);
+  // 水平線
+  octx.beginPath();octx.moveTo(L.padL,my);octx.lineTo(L.drawW-L.padR,my);octx.stroke();
+  // 垂直線
+  if(idx>=0&&idx<L.n){
+    const cx=L.padL+idx*L.cw+L.cw/2;
+    octx.beginPath();octx.moveTo(cx,L.padT);octx.lineTo(cx,L.padT+L.priceH+L.gap+L.volH);octx.stroke();
+  }
+  octx.setLineDash([]);
+
+  // 右側價格標籤
+  if(my>=L.padT&&my<=L.padT+L.priceH&&priceTag){
+    const price=L.pLo+(1-(my-L.padT)/L.priceH)*(L.pHi-L.pLo);
+    priceTag.style.display='block';
+    priceTag.style.top=my-8+'px';
+    priceTag.textContent=price>=100?price.toFixed(0):price.toFixed(2);
+  }else if(priceTag){priceTag.style.display='none';}
+
+  // Tooltip
+  if(idx>=0&&idx<L.n){
+    const d=L.data[idx];
+    const globalIdx=L.vStart+idx;
+    const prev=globalIdx>0?L.allData[globalIdx-1]:null;
+    const chg=prev?(d.c-prev.c):0;
+    const chgP=prev&&prev.c?(chg/prev.c*100):0;
+    const c=chg>=0?L.cUp:L.cDn;
     tooltip.style.display='block';
-    tooltip.style.left=Math.min(e.clientX-rect.left+12,rect.width-180)+'px';
+    tooltip.style.left=Math.min(mx+16,rect.width-180)+'px';
     tooltip.style.top='8px';
     tooltip.innerHTML=`<div style="margin-bottom:3px;font-weight:600">${d.d}</div>
       開 <span style="color:${c}">${d.o}</span>　高 <span style="color:${c}">${d.h}</span><br>
       低 <span style="color:${c}">${d.l}</span>　收 <span style="color:${c}">${d.c}</span><br>
       量 ${fmt(d.v)}張<br>
       漲跌 <span style="color:${c}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgP>=0?'+':''}${chgP.toFixed(2)}%)</span>`;
-  };
-  canvas.onmouseleave=()=>{tooltip.style.display='none';};
-
-  drawIndicator(currentInd);
+  }else{tooltip.style.display='none';}
 }
 
 function switchInd(ind){
@@ -528,8 +658,9 @@ function switchInd(ind){
 
 function drawIndicator(ind){
   const canvas=document.getElementById('indCanvas');
-  if(!canvas||!chartDataCache.length)return;
-  const data=chartDataCache;
+  if(!canvas||!chartDataCache.length||!chartLayout.data)return;
+  const allData=chartDataCache;
+  const L=chartLayout;
   const cs=getComputedStyle(document.documentElement);
   const cGrid=cs.getPropertyValue('--border-light').trim()||'#EBE7E0';
   const cText=cs.getPropertyValue('--text-secondary').trim()||'#6B7280';
@@ -537,72 +668,75 @@ function drawIndicator(ind){
   const cDn=cs.getPropertyValue('--green').trim()||'#4A8B6E';
 
   const dpr=window.devicePixelRatio||1;
-  const n=data.length;
-  const cw=Math.max(8,Math.min(18,700/n));
-  const W=Math.max(n*cw+80,400);
+  const cw=L.cw;
+  const drawW=L.drawW;
   const H=120;
-  const padL=60,padR=12,padT=6,padB=4;
+  const padL=L.padL,padR=L.padR,padT=6,padB=4;
 
-  canvas.width=W*dpr;canvas.height=H*dpr;
-  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  canvas.width=drawW*dpr;canvas.height=H*dpr;
+  canvas.style.width=drawW+'px';canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');
   ctx.scale(dpr,dpr);
-  ctx.clearRect(0,0,W,H);
+  ctx.clearRect(0,0,drawW,H);
 
   const plotH=H-padT-padB;
   ctx.font='9px monospace';ctx.textAlign='right';
 
+  // 用全資料算指標，只畫可見段
+  const vS=L.vStart,vE=L.vEnd;
+
   if(ind==='kd'){
-    const{k,d:dArr}=calcKD(data);
+    const{k,d:dArr}=calcKD(allData);
     const yy=v=>padT+(1-v/100)*plotH;
     [20,50,80].forEach(v=>{
       ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;ctx.setLineDash([3,3]);
-      ctx.beginPath();ctx.moveTo(padL,yy(v));ctx.lineTo(W-padR,yy(v));ctx.stroke();
+      ctx.beginPath();ctx.moveTo(padL,yy(v));ctx.lineTo(drawW-padR,yy(v));ctx.stroke();
       ctx.setLineDash([]);ctx.fillStyle=cText;ctx.fillText(v,padL-4,yy(v)+3);
     });
     ctx.strokeStyle='#D4A840';ctx.lineWidth=1.5;ctx.beginPath();
-    k.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
+    for(let gi=vS;gi<vE;gi++){const x=padL+(gi-vS)*cw+cw/2;gi===vS?ctx.moveTo(x,yy(k[gi])):ctx.lineTo(x,yy(k[gi]));}
     ctx.stroke();
     ctx.strokeStyle='#5AADAB';ctx.lineWidth=1.5;ctx.beginPath();
-    dArr.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
+    for(let gi=vS;gi<vE;gi++){const x=padL+(gi-vS)*cw+cw/2;gi===vS?ctx.moveTo(x,yy(dArr[gi])):ctx.lineTo(x,yy(dArr[gi]));}
     ctx.stroke();
-    ctx.fillStyle='#D4A840';ctx.textAlign='left';ctx.fillText('K '+k[k.length-1].toFixed(1),padL+4,padT+10);
-    ctx.fillStyle='#5AADAB';ctx.fillText('D '+dArr[dArr.length-1].toFixed(1),padL+60,padT+10);
+    ctx.fillStyle='#D4A840';ctx.textAlign='left';ctx.fillText('K '+k[vE-1].toFixed(1),padL+4,padT+10);
+    ctx.fillStyle='#5AADAB';ctx.fillText('D '+dArr[vE-1].toFixed(1),padL+60,padT+10);
   }else if(ind==='rsi'){
-    const rsi=calcRSI(data,14);
+    const rsi=calcRSI(allData,14);
     const yy=v=>padT+(1-v/100)*plotH;
     [30,50,70].forEach(v=>{
       ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;ctx.setLineDash([3,3]);
-      ctx.beginPath();ctx.moveTo(padL,yy(v));ctx.lineTo(W-padR,yy(v));ctx.stroke();
+      ctx.beginPath();ctx.moveTo(padL,yy(v));ctx.lineTo(drawW-padR,yy(v));ctx.stroke();
       ctx.setLineDash([]);ctx.fillStyle=cText;ctx.fillText(v,padL-4,yy(v)+3);
     });
     ctx.strokeStyle='#D4A840';ctx.lineWidth=1.5;ctx.beginPath();
-    rsi.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
+    for(let gi=vS;gi<vE;gi++){const x=padL+(gi-vS)*cw+cw/2;gi===vS?ctx.moveTo(x,yy(rsi[gi])):ctx.lineTo(x,yy(rsi[gi]));}
     ctx.stroke();
-    ctx.fillStyle='#D4A840';ctx.textAlign='left';ctx.fillText('RSI14 '+rsi[rsi.length-1].toFixed(1),padL+4,padT+10);
+    ctx.fillStyle='#D4A840';ctx.textAlign='left';ctx.fillText('RSI14 '+rsi[vE-1].toFixed(1),padL+4,padT+10);
   }else if(ind==='macd'){
-    const{dif,macd:sig,osc}=calcMACD(data);
-    const allV=[...dif,...sig,...osc];
+    const{dif,macd:sig,osc}=calcMACD(allData);
+    const visOsc=osc.slice(vS,vE),visDif=dif.slice(vS,vE),visSig=sig.slice(vS,vE);
+    const allV=[...visDif,...visSig,...visOsc];
     const vMax=Math.max(...allV.map(Math.abs))||1;
     const yy=v=>padT+plotH/2-v/vMax*(plotH/2);
     ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
-    ctx.beginPath();ctx.moveTo(padL,yy(0));ctx.lineTo(W-padR,yy(0));ctx.stroke();
+    ctx.beginPath();ctx.moveTo(padL,yy(0));ctx.lineTo(drawW-padR,yy(0));ctx.stroke();
     ctx.fillStyle=cText;ctx.textAlign='right';ctx.fillText('0',padL-4,yy(0)+3);
-    osc.forEach((v,i)=>{
+    visOsc.forEach((v,i)=>{
       const x=padL+i*cw+cw/2;const bw2=Math.max(1,cw*0.3);
       ctx.fillStyle=v>=0?cUp:cDn;ctx.globalAlpha=0.5;
       const top=v>=0?yy(v):yy(0);const h=Math.abs(yy(v)-yy(0));
       ctx.fillRect(x-bw2,top,bw2*2,h||1);ctx.globalAlpha=1;
     });
     ctx.strokeStyle='#D4A840';ctx.lineWidth=1.5;ctx.beginPath();
-    dif.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
+    visDif.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
     ctx.stroke();
     ctx.strokeStyle='#5AADAB';ctx.lineWidth=1.5;ctx.beginPath();
-    sig.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
+    visSig.forEach((v,i)=>{const x=padL+i*cw+cw/2;i===0?ctx.moveTo(x,yy(v)):ctx.lineTo(x,yy(v));});
     ctx.stroke();
     ctx.textAlign='left';
-    ctx.fillStyle='#D4A840';ctx.fillText('DIF '+dif[dif.length-1].toFixed(2),padL+4,padT+10);
-    ctx.fillStyle='#5AADAB';ctx.fillText('MACD '+sig[sig.length-1].toFixed(2),padL+80,padT+10);
+    ctx.fillStyle='#D4A840';ctx.fillText('DIF '+dif[vE-1].toFixed(2),padL+4,padT+10);
+    ctx.fillStyle='#5AADAB';ctx.fillText('MACD '+sig[vE-1].toFixed(2),padL+80,padT+10);
   }
 }
 
