@@ -69,20 +69,18 @@ async function loadData(){
   try{
     const r=await fetch('/api/twse-proxy?type=margin');
     const j=await r.json();
-    if(j.stat!=='OK'||!j.data) throw new Error('no data');
-    // fields: 股票代號,名稱,融資買進,融資賣出,融資現金償還,融資前日餘額,融資今日餘額,融資限額
-    //         融券買進,融券賣出,融券現金償還,融券前日餘額,融券今日餘額,融券限額,資券互抵
-    marginData=j.data.map(row=>({
+    if(j.stat!=='OK'||!j.tables) throw new Error('no data');
+    const tbl=j.tables.find(t=>t.data&&t.data.length);
+    if(!tbl) throw new Error('no table');
+    // fields: 代號,名稱,買進,賣出,現金償還,前日餘額,今日餘額,限額, 買進,賣出,現券償還,前日餘額,今日餘額,限額,資券互抵,註記
+    const p=s=>parseInt((s||'0').replace(/,/g,'').trim())||0;
+    marginData=tbl.data.map(row=>({
       id:(row[0]||'').trim(), name:(row[1]||'').trim(),
-      m_buy:parseInt((row[2]||'0').replace(/,/g,''))||0,
-      m_sell:parseInt((row[3]||'0').replace(/,/g,''))||0,
-      m_prev:parseInt((row[5]||'0').replace(/,/g,''))||0,
-      m_today:parseInt((row[6]||'0').replace(/,/g,''))||0,
-      s_buy:parseInt((row[8]||'0').replace(/,/g,''))||0,
-      s_sell:parseInt((row[9]||'0').replace(/,/g,''))||0,
-      s_prev:parseInt((row[11]||'0').replace(/,/g,''))||0,
-      s_today:parseInt((row[12]||'0').replace(/,/g,''))||0,
-    })).filter(r=>r.id&&r.id.length<=6&&!r.id.startsWith('0'));
+      m_buy:p(row[2]), m_sell:p(row[3]),
+      m_prev:p(row[5]), m_today:p(row[6]),
+      s_buy:p(row[8]), s_sell:p(row[9]),
+      s_prev:p(row[11]), s_today:p(row[12]),
+    })).filter(r=>r.id&&r.id.length<=6&&/^\d/.test(r.id)&&r.id!=='合計');
     renderTable();
   }catch(e){
     document.getElementById('app').innerHTML='<div class="loading">暫無資料，請稍後再試</div>';
