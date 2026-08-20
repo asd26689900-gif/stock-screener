@@ -66,6 +66,9 @@ tbody tr{cursor:pointer}
 .wl-tab:hover .del{display:block}
 .wl-add-tab{font-size:13px;padding:6px 10px;border:1px dashed var(--border);border-radius:var(--radius);background:transparent;color:var(--text-secondary);cursor:pointer}
 .wl-add-tab:hover{border-color:var(--gold);color:var(--gold)}
+.evt-badge{display:inline-block;background:var(--gold-soft);color:var(--gold);font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px;vertical-align:middle;font-family:var(--font-body)}
+.evt-alert-bar{background:var(--gold-soft);border:1px solid var(--gold);border-radius:var(--radius);padding:10px 14px;font-size:13px;color:var(--ink);margin-bottom:12px;line-height:1.7}
+.evt-alert-bar strong{color:var(--gold)}
 .footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
 @media(max-width:640px){.topbar{padding:10px 12px;gap:8px}thead th,tbody td{padding:8px;font-size:11px}.container{padding:16px 8px 60px}}
 .nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
@@ -167,28 +170,79 @@ function removeStock(sid){
 
 function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
 
+// 事件提示：抓除權息資料，比對自選股
+let eventMap={}; // stock_id → [{type,date,detail}]
+async function fetchEvents(){
+  eventMap={};
+  try{
+    const now=new Date();
+    const rocY=now.getFullYear()-1911;
+    const mm=String(now.getMonth()+1).padStart(2,'0');
+    // 抓本月+下月除權息
+    const months=[`${rocY}${mm}`];
+    const nm=now.getMonth()+2;
+    if(nm<=12) months.push(`${rocY}${String(nm).padStart(2,'0')}`);
+    else months.push(`${rocY+1}01`);
+
+    for(const ym of months){
+      const r=await fetch(`/api/twse-proxy?type=dividend&date=${ym}`);
+      const j=await r.json();
+      if(j.data&&j.data.length){
+        j.data.forEach(row=>{
+          const sid=(row[0]||'').trim();
+          const name=(row[1]||'').trim();
+          const dateStr=(row[5]||row[2]||'').trim(); // 除權息日期
+          const detail=row[6]?`配息${row[6]}元`:(row[7]?`配股${row[7]}`:name);
+          if(!sid)return;
+          if(!eventMap[sid])eventMap[sid]=[];
+          eventMap[sid].push({type:'除權息',date:dateStr,detail});
+        });
+      }
+    }
+  }catch(e){/* silent */}
+}
+
+function eventBadges(sid){
+  const evts=eventMap[sid];
+  if(!evts||!evts.length)return'';
+  return evts.map(e=>`<span class="evt-badge" title="${e.date} ${e.detail}">📅 ${e.type}</span>`).join('');
+}
+
 async function loadWatchlist(){
   const list=getList();
   const app=document.getElementById('app');
   if(!list.length){app.innerHTML='<div class="empty-msg">尚未加入自選股，在上方輸入股號加入</div>';return;}
   if(!sb){app.innerHTML='<div class="empty-msg">系統載入中...</div>';return;}
 
-  const{data,error}=await sb.from('stock_metrics')
-    .select('stock_id,name,date,close,change_pct,volume,ma5,ma20,ma60,rev_mom,rev_yoy,foreign_consec_days,trust_consec_days')
-    .in('stock_id',list);
+  // 同時抓股票資料和事件
+  const [metricsRes]=await Promise.all([
+    sb.from('stock_metrics')
+      .select('stock_id,name,date,close,change_pct,volume,ma5,ma20,ma60,rev_mom,rev_yoy,foreign_consec_days,trust_consec_days')
+      .in('stock_id',list),
+    Object.keys(eventMap).length?Promise.resolve():fetchEvents()
+  ]);
+  const{data,error}=metricsRes;
   if(error||!data){app.innerHTML='<div class="empty-msg">⚠ 載入失敗</div>';return;}
 
   const map={};data.forEach(d=>{map[d.stock_id]=d;});
 
+  // 事件提示橫幅
+  const alerts=list.filter(sid=>eventMap[sid]&&eventMap[sid].length);
+  const alertHtml=alerts.length?`<div class="evt-alert-bar">📢 近期事件：${alerts.map(sid=>{
+    const d=map[sid];const name=d?d.name:sid;
+    return eventMap[sid].map(e=>`<strong>${sid} ${name}</strong> ${e.type}(${e.date} ${e.detail})`).join('、');
+  }).join('；')}</div>`:'';
+
   const rows=list.map(sid=>{
     const d=map[sid];
-    if(!d)return`<tr><td>${sid}</td><td>—</td><td colspan="8" style="text-align:center;color:var(--text-secondary)">無資料</td><td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">✕</button></td></tr>`;
+    if(!d)return`<tr><td>${sid}</td><td>—</td><td colspan="9" style="text-align:center;color:var(--text-secondary)">無資料</td><td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">✕</button></td></tr>`;
     const cls=(d.change_pct||0)>=0?'up':'dn';
     const chg=d.change_pct!=null?(d.change_pct>=0?'+':'')+d.change_pct.toFixed(2)+'%':'—';
     const fc=d.foreign_consec_days||0,tc=d.trust_consec_days||0;
     const fcCls=fc>0?'up':fc<0?'dn':'',tcCls=tc>0?'up':tc<0?'dn':'';
+    const badges=eventBadges(sid);
     return`<tr onclick="location.href='stk.html#${sid}'">
-      <td>${sid}</td><td>${d.name||'—'}</td>
+      <td>${sid}</td><td>${d.name||'—'}${badges?' '+badges:''}</td>
       <td>${d.close!=null?fmt(d.close):'—'}</td>
       <td class="${cls}">${chg}</td>
       <td>${d.volume!=null?fmt(d.volume):'—'}</td>
@@ -201,7 +255,7 @@ async function loadWatchlist(){
     </tr>`;
   }).join('');
 
-  app.innerHTML=`<table>
+  app.innerHTML=alertHtml+`<table>
     <thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th><th>MA5</th><th>MA20</th><th>外資動向</th><th>投信動向</th><th>營收YoY</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table>`;
 }

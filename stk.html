@@ -417,20 +417,32 @@ function renderStock(sid,d){
     ${renderDim('基本面',d.scores.fundamental,d.criteria.fundamental)}
     ${renderDim('技術面',d.scores.technical,d.criteria.technical)}
   </div>`;
-  if(hasChart) drawChart(chartData);
+  if(hasChart){
+    // 預設顯示最近60根，pan到最新
+    const VISIBLE_DEFAULT=60;
+    if(chartData.length>VISIBLE_DEFAULT){
+      chartZoom=chartData.length/VISIBLE_DEFAULT;
+      chartPanIdx=chartData.length-VISIBLE_DEFAULT;
+    }
+    drawChart(chartData);
+  }
   if(rev.length>1) drawRevChart(rev);
 }
 
 async function switchTF(tf){
-  currentTF=tf; chartZoom=1; chartPanIdx=0; _cachedMAs=null;
+  currentTF=tf; _cachedMAs=null;
   document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
+  let bars;
   if(tf==='5m'||tf==='60m'){
-    const bars=await fetchMinuteData(tf);
-    if(bars.length>2){drawChart(bars);return;}
-    // 無資料 fallback
+    bars=await fetchMinuteData(tf);
+  } else {
+    bars=getChartData();
   }
-  const data=getChartData();
-  if(data.length>2) drawChart(data);
+  if(!bars||bars.length<=2) return;
+  const VIS=60;
+  if(bars.length>VIS){chartZoom=bars.length/VIS;chartPanIdx=bars.length-VIS;}
+  else{chartZoom=1;chartPanIdx=0;}
+  drawChart(bars);
 }
 
 // ══════════════════════════════════════
@@ -683,6 +695,20 @@ function setupChartEvents(canvas){
       if(priceTag)priceTag.style.display='none';
     }
   });
+
+  // 觸控拖曳平移
+  let touchStartX=0,touchStartPan=0;
+  container.addEventListener('touchstart',e=>{
+    if(e.touches.length===1){touchStartX=e.touches[0].clientX;touchStartPan=chartPanIdx;}
+  },{passive:true});
+  container.addEventListener('touchmove',e=>{
+    if(e.touches.length===1&&chartLayout.cw){
+      e.preventDefault();
+      const dx=e.touches[0].clientX-touchStartX;
+      chartPanIdx=touchStartPan-dx/chartLayout.cw;
+      scheduleChartRedraw();
+    }
+  },{passive:false});
 }
 
 function drawCrosshair(e){

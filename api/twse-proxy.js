@@ -37,9 +37,22 @@ export default async function handler(req, res) {
     }
 
     if (type === 'dividend') {
-      // 除權息公告
-      const d = date || new Date().toISOString().slice(0,10).replace(/-/g,'');
-      const url = `https://www.twse.com.tw/rwd/zh/exRight/TWT49U?response=json&startDate=${d}&endDate=${d}`;
+      // 除權息公告 — date 可以是 YYYYMM(月查詢) 或 YYYYMMDD(日查詢)
+      // 民國年: 11508 → startDate=11508/01, endDate=11508/31
+      const d = date || '';
+      let startDate, endDate;
+      if (d.length <= 5) {
+        // 月查詢: 11508 → 整月
+        startDate = d + '01';
+        const rocY = parseInt(d.slice(0,3));
+        const mm = parseInt(d.slice(3));
+        const daysInMonth = new Date(rocY + 1911, mm, 0).getDate();
+        endDate = d + String(daysInMonth).padStart(2, '0');
+      } else {
+        startDate = d;
+        endDate = d;
+      }
+      const url = `https://www.twse.com.tw/rwd/zh/exRight/TWT49U?response=json&startDate=${startDate}&endDate=${endDate}`;
       const r = await fetch(url, { headers: { 'User-Agent': UA } });
       const j = await r.json();
       return res.json(j);

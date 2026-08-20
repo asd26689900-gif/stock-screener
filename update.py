@@ -262,8 +262,10 @@ INDUSTRY_MAP = {
     "91": "存託憑證",
 }
 
+sid_shares = {}  # stock_id → 發行股數 (用於算市值)
+
 def fetch_industry_mapping():
-    """從 TWSE/TPEX Open API 抓股票→產業對照（含重試）"""
+    """從 TWSE/TPEX Open API 抓股票→產業對照 + 發行股數（含重試）"""
     result = {}
     # TWSE 上市（重試 3 次）
     for attempt in range(3):
@@ -276,6 +278,10 @@ def fetch_industry_mapping():
                     code = row.get("產業別", "")
                     if sid and code:
                         result[sid] = INDUSTRY_MAP.get(code, "其他")
+                    # 實收資本額(元) / 10 = 發行股數
+                    cap = parse_num(row.get("實收資本額(元)", "0"))
+                    if sid and cap > 0:
+                        sid_shares[sid] = int(cap / 10)
                 if result:
                     break
         except Exception as e:
@@ -921,7 +927,7 @@ print(f"   個股分析: {len(stk_analysis)} 檔")
 # ══════════════════════════════════════
 print("\n🔍 產生產業熱力圖...")
 
-ind_agg = defaultdict(lambda: {"stocks": [], "total_amount": 0, "sum_chg": 0, "count": 0})
+ind_agg = defaultdict(lambda: {"stocks": [], "total_mcap": 0, "sum_chg": 0, "count": 0})
 
 for sid, data in stocks.items():
     if len(data) < 2: continue
@@ -931,13 +937,15 @@ for sid, data in stocks.items():
     if not ind_name: continue
     close = p["close"]
     chg_pct = change_pct(p, prev)
-    amount = close * p["Trading_Volume"]
-    if amount <= 0: continue
+    # 市值 = 收盤價 × 發行股數；沒有股數資料就 fallback 成交金額
+    shares = sid_shares.get(sid, 0)
+    mcap = close * shares if shares > 0 else close * p["Trading_Volume"]
+    if mcap <= 0: continue
     ind_agg[ind_name]["stocks"].append({
         "id": sid, "name": name_map.get(sid, sid),
-        "close": close, "chg_pct": chg_pct, "amount": amount,
+        "close": close, "chg_pct": chg_pct, "amount": mcap,
     })
-    ind_agg[ind_name]["total_amount"] += amount
+    ind_agg[ind_name]["total_mcap"] += mcap
     ind_agg[ind_name]["sum_chg"] += chg_pct
     ind_agg[ind_name]["count"] += 1
 
@@ -946,7 +954,7 @@ for ind_name, agg in ind_agg.items():
     if agg["count"] == 0: continue
     agg["stocks"].sort(key=lambda x: x["amount"], reverse=True)
     heatmap_industries.append({
-        "name": ind_name, "total_amount": agg["total_amount"],
+        "name": ind_name, "total_amount": agg["total_mcap"],
         "avg_chg": round(agg["sum_chg"] / agg["count"], 2),
         "stocks": agg["stocks"][:20],
     })
