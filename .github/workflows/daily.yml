@@ -5,12 +5,19 @@ on:
     - cron: '0 7 * * 1-5'
     # 融資融券 ~21:30 更新 → 22:00 台北 = 14:00 UTC（二次更新）
     - cron: '0 14 * * 1-5'
-  workflow_dispatch: # 手動觸發
+  workflow_dispatch:
+    inputs:
+      fetch_days:
+        description: '行情抓取天數 (每日30, 首次回補用365)'
+        default: '30'
+      rev_months:
+        description: '營收抓取月數 (每日2, 回補用12)'
+        default: '2'
 
 jobs:
   update:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -22,3 +29,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           PYTHONUNBUFFERED: "1"
+          FETCH_DAYS: ${{ github.event.inputs.fetch_days || '30' }}
+          REV_MONTHS: ${{ github.event.inputs.rev_months || '2' }}

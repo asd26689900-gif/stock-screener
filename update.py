@@ -495,8 +495,9 @@ def get_inst_consecutive(sid, inst_type):
 # ── 3. 月營收 ──
 print("⏳ 抓取月營收...")
 rev = defaultdict(list)
-# 抓近 2 個月（加速：MoM/YoY 只需最新+上月）
-for months_ago in range(2):
+REV_MONTHS = int(os.environ.get("REV_MONTHS", "2"))
+print(f"   營收月數: {REV_MONTHS}")
+for months_ago in range(REV_MONTHS):
     d = today.replace(day=1) - timedelta(days=months_ago * 30)
     y, m = d.year, d.month
     for market in ("sii", "otc"):
