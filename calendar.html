@@ -28,6 +28,7 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .month-label{font-family:var(--font-mono);font-size:15px;color:var(--ink);font-weight:600}
 .event-list{display:flex;flex-direction:column;gap:8px;margin-top:16px}
 .ev-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px;display:flex;gap:12px;align-items:center}
+.ev-card.today{border-color:var(--gold);background:var(--gold-soft)}
 .ev-date{font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);min-width:80px}
 .ev-type{font-size:10px;padding:2px 8px;border-radius:99px;font-weight:600}
 .ev-type.dividend{background:rgba(74,139,110,.15);color:var(--green)}
@@ -97,19 +98,10 @@ function changeMonth(d){
   loadData();
 }
 
-async function loadData(){
-  document.getElementById('monthLabel').textContent=`${curYear} 年 ${curMonth} 月`;
-  events=[];
-
-  // Fetch dividend data for this month (query range = whole month)
-  const startDate=`${curYear-1911}${pad(curMonth)}01`;
-  const daysInMonth=new Date(curYear,curMonth,0).getDate();
-  const endDate=`${curYear-1911}${pad(curMonth)}${pad(daysInMonth)}`;
-
+async function fetchMonth(year, month){
+  const ym=`${year-1911}${pad(month)}`;
   try{
-    // TWSE 除權息公告 — query the whole month range
-    const url=`/api/twse-proxy?type=dividend&date=${curYear-1911}${pad(curMonth)}`;
-    const r=await fetch(url);
+    const r=await fetch(`/api/twse-proxy?type=dividend&date=${ym}`);
     const j=await r.json();
     if(j.data&&j.data.length){
       j.data.forEach(row=>{
@@ -122,6 +114,25 @@ async function loadData(){
       });
     }
   }catch(e){}
+}
+
+async function loadData(){
+  document.getElementById('monthLabel').textContent=`${curYear} 年 ${curMonth} 月`;
+  events=[];
+
+  // 抓當月 + 前後月，確保 ±7 天跨月也有資料
+  const months=[];
+  for(let off=-1;off<=1;off++){
+    let y=curYear, m=curMonth+off;
+    if(m<1){m=12;y--;}
+    if(m>12){m=1;y++;}
+    months.push([y,m]);
+  }
+  await Promise.all(months.map(([y,m])=>fetchMonth(y,m)));
+
+  // 去重（同 date+id）
+  const seen=new Set();
+  events=events.filter(e=>{const k=e.date+e.id;if(seen.has(k))return false;seen.add(k);return true;});
 
   renderCalendar();
   renderEventList();
@@ -173,14 +184,37 @@ function renderEventList(){
     document.getElementById('eventList').innerHTML='<div class="loading" style="padding:30px">本月尚無除權息資料</div>';
     return;
   }
+  const today=new Date().toISOString().slice(0,10);
+  const d7ago=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
+  const d7later=new Date(Date.now()+7*864e5).toISOString().slice(0,10);
   const sorted=[...events].sort((a,b)=>a.date.localeCompare(b.date));
-  document.getElementById('eventList').innerHTML='<div class="event-list">'+sorted.map(e=>`
-    <div class="ev-card">
-      <span class="ev-date">${e.date}</span>
-      <span class="ev-type ${e.type}">除權息</span>
-      <span class="ev-body">${e.label}</span>
-    </div>
-  `).join('')+'</div>';
+  const nearby=sorted.filter(e=>e.date>=d7ago&&e.date<=d7later);
+  const rest=sorted.filter(e=>e.date<d7ago||e.date>d7later);
+
+  let html='';
+  if(nearby.length){
+    html+=`<div style="font-weight:600;color:var(--gold);margin-bottom:8px">📌 前後 7 天 (${d7ago.slice(5)} ~ ${d7later.slice(5)})</div>`;
+    html+='<div class="event-list">'+nearby.map(e=>{
+      const isToday=e.date===today;
+      return `<div class="ev-card${isToday?' today':''}">
+        <span class="ev-date">${e.date}</span>
+        <span class="ev-type ${e.type}">除權息</span>
+        <span class="ev-body">${e.label}</span>
+      </div>`;
+    }).join('')+'</div>';
+  }
+  if(rest.length){
+    html+=`<div style="font-weight:600;color:var(--text-secondary);margin:16px 0 8px">📅 本月其他</div>`;
+    html+='<div class="event-list">'+rest.map(e=>`
+      <div class="ev-card">
+        <span class="ev-date">${e.date}</span>
+        <span class="ev-type ${e.type}">除權息</span>
+        <span class="ev-body">${e.label}</span>
+      </div>
+    `).join('')+'</div>';
+  }
+  if(!html) html='<div class="loading" style="padding:30px">前後7天無除權息資料</div>';
+  document.getElementById('eventList').innerHTML=html;
 }
 
 loadData();
