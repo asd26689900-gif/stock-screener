@@ -426,7 +426,7 @@ function renderStock(sid,d){
     const VISIBLE_DEFAULT=60;
     if(chartData.length>VISIBLE_DEFAULT){
       chartZoom=chartData.length/VISIBLE_DEFAULT;
-      chartPanIdx=chartData.length-VISIBLE_DEFAULT;
+      chartPanIdx=chartData.length; // drawChart 內部會 clamp 到最末段
     }
     drawChart(chartData);
   }
@@ -444,7 +444,7 @@ async function switchTF(tf){
   }
   if(!bars||bars.length<=2) return;
   const VIS=60;
-  if(bars.length>VIS){chartZoom=bars.length/VIS;chartPanIdx=bars.length-VIS;}
+  if(bars.length>VIS){chartZoom=bars.length/VIS;chartPanIdx=bars.length;}
   else{chartZoom=1;chartPanIdx=0;}
   drawChart(bars);
 }
