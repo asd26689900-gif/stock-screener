@@ -74,6 +74,7 @@ def fetch_twse_prices(date_dt):
                 "close": parse_num(line[8]),
                 "change": parse_num(line[9]),
                 "Trading_Volume": parse_num(line[3]),
+                "market_type": "twse",
             })
         except: continue
     return rows
@@ -105,6 +106,7 @@ def fetch_tpex_prices(date_dt):
                 "close": close,
                 "change": chg,
                 "Trading_Volume": parse_num(line[7]),
+                "market_type": "tpex",
             })
     return rows
 
@@ -385,14 +387,17 @@ if fetched_days < 3:
     print("❌ 行情資料不足（可能是假日），結束")
     sys.exit(1)
 
-# 按 stock_id 分組，按日期排序
+# 按 stock_id 分組，按日期排序；同時記錄上市/上櫃
 stocks = defaultdict(list)
 name_map = {}
+sid_market = {}  # {stock_id: "twse" | "tpex"}
 for row in all_prices:
     sid = row["stock_id"]
     stocks[sid].append(row)
     if row.get("name"):
         name_map[sid] = row["name"]
+    if row.get("market_type"):
+        sid_market[sid] = row["market_type"]
 for sid in stocks:
     stocks[sid].sort(key=lambda x: x["date"])
 
@@ -925,7 +930,7 @@ print(f"   個股分析: {len(stk_analysis)} 檔")
 # ══════════════════════════════════════
 print("\n🔍 產生產業熱力圖...")
 
-ind_agg = defaultdict(lambda: {"stocks": [], "total_mcap": 0, "sum_chg": 0, "count": 0})
+ind_agg = defaultdict(lambda: {"stocks": [], "total_mcap": 0, "total_vol": 0, "sum_chg": 0, "count": 0})
 
 for sid, data in stocks.items():
     if len(data) < 2: continue
@@ -938,12 +943,15 @@ for sid, data in stocks.items():
     # 市值 = 收盤價 × 發行股數；沒有股數資料就 fallback 成交金額
     shares = sid_shares.get(sid, 0)
     mcap = close * shares if shares > 0 else close * p["Trading_Volume"]
+    vol_amt = close * p["Trading_Volume"]  # 成交金額
     if mcap <= 0: continue
+    mkt = sid_market.get(sid, "twse")
     ind_agg[ind_name]["stocks"].append({
         "id": sid, "name": name_map.get(sid, sid),
-        "close": close, "chg_pct": chg_pct, "amount": mcap,
+        "close": close, "chg_pct": chg_pct, "amount": mcap, "vol": vol_amt, "m": mkt,
     })
     ind_agg[ind_name]["total_mcap"] += mcap
+    ind_agg[ind_name]["total_vol"] += vol_amt
     ind_agg[ind_name]["sum_chg"] += chg_pct
     ind_agg[ind_name]["count"] += 1
 
@@ -953,8 +961,9 @@ for ind_name, agg in ind_agg.items():
     agg["stocks"].sort(key=lambda x: x["amount"], reverse=True)
     heatmap_industries.append({
         "name": ind_name, "total_amount": agg["total_mcap"],
+        "total_vol": agg["total_vol"],
         "avg_chg": round(agg["sum_chg"] / agg["count"], 2),
-        "stocks": agg["stocks"][:20],
+        "stocks": agg["stocks"][:30],
     })
 heatmap_industries.sort(key=lambda x: x["total_amount"], reverse=True)
 heatmap_data = {"industries": heatmap_industries[:30]}
@@ -1119,6 +1128,9 @@ else:
             "trust_consec_days": td,
             "trust_net_shares": int(tt / 1000),
             "dealer_consec_days": dd,
+            "dealer_net_shares": int(dt / 1000),
+            "market_type": sid_market.get(sid, "twse"),
+            "industry": sid_industry.get(sid, ""),
             "rev_mom": ri["mom"] if ri else 0,
             "rev_yoy": ri["yoy"] if ri else 0,
             "rev_consec_grow": ri["consec_grow"] if ri else 0,

@@ -42,9 +42,19 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
 .nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
 .date-label{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);white-space:nowrap}
-.container{max-width:1100px;margin:0 auto;padding:24px 16px 80px}
-h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom:8px}
-.subtitle{font-size:13px;color:var(--text-secondary);margin-bottom:20px}
+.container{max-width:1200px;margin:0 auto;padding:24px 16px 80px}
+h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom:4px}
+.subtitle{font-size:13px;color:var(--text-secondary);margin-bottom:16px}
+
+/* ─── 控制列 ─── */
+.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.toggle-group{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.toggle-group button{font-size:13px;padding:6px 16px;border:none;background:var(--card);color:var(--text-secondary);cursor:pointer;transition:all .15s;white-space:nowrap}
+.toggle-group button.active{background:var(--gold);color:#fff}
+.toggle-group button:not(:last-child){border-right:1px solid var(--border)}
+.controls-spacer{flex:1}
+
+/* ─── Treemap ─── */
 .treemap-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:24px}
 .treemap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:4px}
 .tm-cell{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.15);cursor:pointer;overflow:hidden;transition:opacity .15s}
@@ -52,16 +62,19 @@ h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom
 .tm-label{font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:95%;pointer-events:none}
 .tm-val{font-size:10px;font-family:var(--font-mono);color:rgba(255,255,255,0.85);text-shadow:0 1px 2px rgba(0,0,0,0.5);pointer-events:none}
 .tm-cell.small .tm-label{font-size:9px}.tm-cell.tiny .tm-label,.tm-cell.tiny .tm-val{display:none}
-.tooltip{display:none;position:fixed;z-index:999;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:12px 16px;font-size:13px;pointer-events:none;max-width:260px}
+.tooltip{display:none;position:fixed;z-index:999;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:12px 16px;font-size:13px;pointer-events:none;max-width:280px}
 .tooltip.show{display:block}
-.tooltip .tt-name{font-weight:700;color:var(--ink);margin-bottom:4px}
-.tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;font-family:var(--font-mono);font-size:12px}
+.tooltip .tt-name{font-weight:700;color:var(--ink);margin-bottom:6px;font-size:14px}
+.tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;font-family:var(--font-mono);font-size:12px;margin-bottom:2px}
+.tooltip .tt-label{color:var(--text-secondary)}
 .legend{display:flex;align-items:center;gap:4px;margin-top:12px;justify-content:center;flex-wrap:wrap}
 .legend-bar{width:200px;height:12px;border-radius:6px;background:linear-gradient(to right,#2d8f4e,#4a8b6e,#888,#c07050,#c0544f)}
 .legend-label{font-size:11px;color:var(--text-secondary);font-family:var(--font-mono)}
 .breadcrumb{font-size:13px;color:var(--text-secondary);margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .breadcrumb a{color:var(--gold);cursor:pointer;text-decoration:none}
 .breadcrumb a:hover{text-decoration:underline}
+
+/* ─── 成分股表格 ─── */
 .stk-table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px;display:none}
 .stk-table-wrap.show{display:block}
 .stk-table-title{padding:14px 20px;font-family:var(--font-display);font-size:16px;color:var(--ink);border-bottom:1px solid var(--border-light)}
@@ -85,7 +98,7 @@ tbody tr:hover{background:var(--gold-soft)}
 .ctx-menu-input{display:flex;gap:4px;padding:4px 10px}
 .ctx-menu-input input{flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)}
 .ctx-menu-input button{font-size:11px;padding:4px 10px;border:none;border-radius:4px;background:var(--gold);color:#fff;cursor:pointer}
-@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.treemap{aspect-ratio:4/3}.container{padding:16px 8px 60px}}
+@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.treemap{aspect-ratio:4/3}.container{padding:16px 8px 60px}.controls{gap:6px}.toggle-group button{padding:5px 10px;font-size:12px}}
 .nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
 @media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
 </style>
@@ -104,7 +117,7 @@ tbody tr:hover{background:var(--gold-soft)}
     <a href="history.html">歷史漲跌幅</a>
     <a href="tools.html">股票計算機</a>
     <a href="watchlist.html">★ 自選股</a>
-  
+
   </div>
   <div class="spacer"></div>
   <span class="date-label" id="dateLabel">載入中...</span>
@@ -113,25 +126,48 @@ tbody tr:hover{background:var(--gold-soft)}
 
 <div class="container">
   <h2>產業熱力圖</h2>
-  <p class="subtitle">色塊面積 = 成交金額，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
-  <div class="breadcrumb" id="breadcrumb" style="display:none"><a onclick="showIndustry()">全部產業</a> <span>›</span> <span id="bcName"></span></div>
+  <p class="subtitle">面積 = 市值或成交額，顏色 = 漲跌幅。點擊可展開成分股。</p>
+
+  <!-- ─── Fugle 風格控制列 ─── -->
+  <div class="controls">
+    <div class="toggle-group" id="marketToggle">
+      <button class="active" onclick="setMarket('all')">全部</button>
+      <button onclick="setMarket('twse')">上市</button>
+      <button onclick="setMarket('tpex')">上櫃</button>
+    </div>
+    <div class="toggle-group" id="viewToggle">
+      <button class="active" onclick="setView('industry')">產業</button>
+      <button onclick="setView('stock')">個股</button>
+    </div>
+    <div class="toggle-group" id="sizeToggle">
+      <button class="active" onclick="setSize('mcap')">市值</button>
+      <button onclick="setSize('vol')">成交額</button>
+    </div>
+  </div>
+
+  <div class="breadcrumb" id="breadcrumb" style="display:none"><a onclick="backToAll()">全部產業</a> <span>›</span> <span id="bcName"></span></div>
   <div class="treemap-wrap"><div class="treemap" id="treemap"></div>
     <div class="legend"><span class="legend-label">-5%</span><div class="legend-bar"></div><span class="legend-label">+5%</span></div>
   </div>
   <div class="stk-table-wrap" id="stkTable">
     <div class="stk-table-title" id="stkTableTitle"></div>
-    <div class="table-wrap"><table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交金額(百萬)</th></tr></thead><tbody id="stkTableBody"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>市值(百萬)</th><th>成交額(百萬)</th></tr></thead><tbody id="stkTableBody"></tbody></table></div>
   </div>
 </div>
 <div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）</div>
-<div class="tooltip" id="tooltip"><div class="tt-name" id="ttName"></div><div class="tt-row"><span>漲跌幅</span><span id="ttChg"></span></div><div class="tt-row"><span>成交金額</span><span id="ttVol"></span></div></div>
+<div class="tooltip" id="tooltip">
+  <div class="tt-name" id="ttName"></div>
+  <div class="tt-row"><span class="tt-label">漲跌幅</span><span id="ttChg"></span></div>
+  <div class="tt-row"><span class="tt-label">市值</span><span id="ttMcap"></span></div>
+  <div class="tt-row"><span class="tt-label">成交額</span><span id="ttVol"></span></div>
+</div>
 <div class="ctx-menu" id="ctxMenu"></div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/auth.js"></script>
 <script>
-let hmData={};
+let hmData={}, curMarket='all', curView='industry', curSize='mcap', drillInd=null;
 const treemapEl=document.getElementById('treemap');
 const tooltip=document.getElementById('tooltip');
 
@@ -173,7 +209,7 @@ function worstR(row,rv,side,total,fs){
 
 function renderTreemap(items){
   const rect=treemapEl.getBoundingClientRect(),W=rect.width||800,H=rect.height||450;
-  const sorted=[...items].sort((a,b)=>b.value-a.value);
+  const sorted=[...items].filter(i=>i.value>0).sort((a,b)=>b.value-a.value);
   const rects=squarify(sorted,0,0,W,H);
   treemapEl.innerHTML='';
   for(const r of rects){
@@ -189,24 +225,127 @@ function renderTreemap(items){
     treemapEl.appendChild(div);
   }
 }
-function showTT(e,r){document.getElementById('ttName').textContent=r.label;const el=document.getElementById('ttChg');el.textContent=(r.chg>=0?'+':'')+r.chg.toFixed(2)+'%';el.className=r.chg>=0?'up':'dn';document.getElementById('ttVol').textContent=(r.value/1e6).toFixed(0)+' 百萬';tooltip.classList.add('show');moveTT(e);}
-function moveTT(e){tooltip.style.left=(e.clientX+12)+'px';tooltip.style.top=(e.clientY-40)+'px';}
+function showTT(e,r){
+  document.getElementById('ttName').textContent=r.label;
+  const el=document.getElementById('ttChg');
+  el.textContent=(r.chg>=0?'+':'')+r.chg.toFixed(2)+'%';
+  el.className=r.chg>=0?'up':'dn';
+  document.getElementById('ttMcap').textContent=fmtAmt(r.mcap||r.value);
+  document.getElementById('ttVol').textContent=fmtAmt(r.vol||0);
+  tooltip.classList.add('show');moveTT(e);
+}
+function fmtAmt(v){
+  if(v>=1e12)return(v/1e12).toFixed(1)+'兆';
+  if(v>=1e8)return(v/1e8).toFixed(0)+'億';
+  if(v>=1e6)return(v/1e6).toFixed(0)+'百萬';
+  return v.toLocaleString();
+}
+function moveTT(e){tooltip.style.left=Math.min(e.clientX+12,window.innerWidth-280)+'px';tooltip.style.top=(e.clientY-40)+'px';}
 function hideTT(){tooltip.classList.remove('show');}
 
-function showIndustry(){
-  document.getElementById('breadcrumb').style.display='none';
-  document.getElementById('stkTable').classList.remove('show');
-  const items=(hmData.industries||[]).map(ind=>({label:ind.name,value:ind.total_amount,chg:ind.avg_chg,onClick:()=>drillDown(ind)}));
-  renderTreemap(items);
+// ─── 篩選資料 ───
+function filterStocks(stocks){
+  if(curMarket==='all') return stocks;
+  return stocks.filter(s=>(s.m||'twse')===curMarket);
 }
-function drillDown(ind){
+
+function getIndustries(){
+  return (hmData.industries||[]).map(ind=>{
+    const filtered=filterStocks(ind.stocks||[]);
+    if(!filtered.length) return null;
+    const totalMcap=filtered.reduce((s,st)=>s+st.amount,0);
+    const totalVol=filtered.reduce((s,st)=>s+(st.vol||st.amount),0);
+    const avgChg=filtered.reduce((s,st)=>s+st.chg_pct,0)/filtered.length;
+    return {...ind, stocks:filtered, total_amount:totalMcap, total_vol:totalVol, avg_chg:Math.round(avgChg*100)/100};
+  }).filter(Boolean);
+}
+
+function getAllStocks(){
+  const all=[];
+  (hmData.industries||[]).forEach(ind=>{
+    (ind.stocks||[]).forEach(s=>{
+      all.push({...s, industry: ind.name});
+    });
+  });
+  return filterStocks(all);
+}
+
+// ─── 渲染 ───
+function refresh(){
+  document.getElementById('stkTable').classList.remove('show');
+  if(drillInd){
+    showDrillDown(drillInd);
+    return;
+  }
+  document.getElementById('breadcrumb').style.display='none';
+  if(curView==='industry'){
+    const inds=getIndustries();
+    const sizeKey=curSize==='mcap'?'total_amount':'total_vol';
+    renderTreemap(inds.map(ind=>({
+      label:ind.name,
+      value:ind[sizeKey],
+      chg:ind.avg_chg,
+      mcap:ind.total_amount,
+      vol:ind.total_vol,
+      onClick:()=>{drillInd=ind.name;showDrillDown(ind.name);}
+    })));
+  }else{
+    // 個股模式
+    const all=getAllStocks();
+    const sizeKey=curSize==='mcap'?'amount':'vol';
+    const top=all.sort((a,b)=>(b[sizeKey]||0)-(a[sizeKey]||0)).slice(0,120);
+    renderTreemap(top.map(s=>({
+      label:s.name||s.id,
+      value:s[sizeKey]||s.amount,
+      chg:s.chg_pct,
+      mcap:s.amount,
+      vol:s.vol||s.amount,
+      stockId:s.id,
+      stockName:s.name,
+      onClick:()=>{location.href='stk.html#'+s.id;}
+    })));
+  }
+}
+
+function showDrillDown(indName){
+  const inds=getIndustries();
+  const ind=inds.find(i=>i.name===indName);
+  if(!ind){drillInd=null;refresh();return;}
   document.getElementById('breadcrumb').style.display='flex';
   document.getElementById('bcName').textContent=ind.name;
-  renderTreemap((ind.stocks||[]).map(s=>({label:s.id+' '+s.name,value:s.amount,chg:s.chg_pct,stockId:s.id,stockName:s.name,onClick:()=>{location.href='stk.html#'+s.id;}})));
+  const sizeKey=curSize==='mcap'?'amount':'vol';
+  renderTreemap(ind.stocks.map(s=>({
+    label:s.id+' '+s.name,
+    value:s[sizeKey]||s.amount,
+    chg:s.chg_pct,
+    mcap:s.amount,
+    vol:s.vol||s.amount,
+    stockId:s.id,
+    stockName:s.name,
+    onClick:()=>{location.href='stk.html#'+s.id;}
+  })));
+  // 成分股表格
   const tw=document.getElementById('stkTable');tw.classList.add('show');
   document.getElementById('stkTableTitle').textContent=ind.name+' — 成分股明細';
-  document.getElementById('stkTableBody').innerHTML=[...(ind.stocks||[])].sort((a,b)=>b.amount-a.amount).map(s=>`<tr><td>${s.id}</td><td>${s.name}</td><td>${s.close.toLocaleString()}</td><td class="${s.chg_pct>=0?'up':'dn'}">${s.chg_pct>=0?'+':''}${s.chg_pct.toFixed(2)}%</td><td>${(s.amount/1e6).toFixed(0)}</td></tr>`).join('');
+  document.getElementById('stkTableBody').innerHTML=[...ind.stocks].sort((a,b)=>b.amount-a.amount).map(s=>`<tr onclick="location.href='stk.html#${s.id}'" style="cursor:pointer"><td>${s.id}</td><td>${s.name}</td><td>${s.close.toLocaleString()}</td><td class="${s.chg_pct>=0?'up':'dn'}">${s.chg_pct>=0?'+':''}${s.chg_pct.toFixed(2)}%</td><td>${(s.amount/1e6).toFixed(0)}</td><td>${((s.vol||s.amount)/1e6).toFixed(0)}</td></tr>`).join('');
 }
+
+function backToAll(){drillInd=null;refresh();}
+
+// ─── 控制列 ───
+function setToggle(groupId,val,setter){
+  setter(val);
+  document.getElementById(groupId).querySelectorAll('button').forEach(b=>{
+    const vals={marketToggle:['all','twse','tpex'],viewToggle:['industry','stock'],sizeToggle:['mcap','vol']};
+    const idx=[...document.getElementById(groupId).querySelectorAll('button')].indexOf(b);
+    b.classList.toggle('active',vals[groupId][idx]===val);
+  });
+  drillInd=null;
+  refresh();
+}
+function setMarket(v){setToggle('marketToggle',v,x=>curMarket=x);}
+function setView(v){setToggle('viewToggle',v,x=>curView=x);}
+function setSize(v){setToggle('sizeToggle',v,x=>curSize=x);}
 
 async function loadHeatmap(){
   if(!sb)return;
@@ -214,31 +353,25 @@ async function loadHeatmap(){
   if(!data)return;
   document.getElementById('dateLabel').textContent='📅 '+data.date;
   hmData=data.data||{};
-  showIndustry();
+  refresh();
 }
 function onAuthReady(){loadHeatmap();}
-window.addEventListener('resize',()=>{if(document.getElementById('breadcrumb').style.display==='none')showIndustry();});
+window.addEventListener('resize',()=>refresh());
 
 /* === 多清單自選股 + 右鍵選單 === */
 const WL_KEY='watchlists';
 function getWL(){
   let w=JSON.parse(localStorage.getItem(WL_KEY)||'null');
-  if(!w){
-    // migrate from old flat array
-    const old=JSON.parse(localStorage.getItem('watchlist')||'[]');
-    w={'我的自選':old};
-    localStorage.setItem(WL_KEY,JSON.stringify(w));
-  }
+  if(!w){const old=JSON.parse(localStorage.getItem('watchlist')||'[]');w={'我的自選':old};localStorage.setItem(WL_KEY,JSON.stringify(w));}
   return w;
 }
 function saveWL(w){localStorage.setItem(WL_KEY,JSON.stringify(w));
-  // keep old key in sync for watchlist.html backward compat
   const all=[...new Set(Object.values(w).flat())];
   localStorage.setItem('watchlist',JSON.stringify(all));
 }
 
 const ctxMenu=document.getElementById('ctxMenu');
-let ctxTarget=null; // {id,name}
+let ctxTarget=null;
 
 function showCtxMenu(e,sid,sname){
   e.preventDefault(); hideTT();
@@ -255,10 +388,8 @@ function showCtxMenu(e,sid,sname){
   html+=`<div class="ctx-menu-sep"></div>`;
   html+=`<div class="ctx-menu-item" onclick="location.href='stk.html#${sid}'">📊 開啟個股分析</div>`;
   ctxMenu.innerHTML=html;
-  // position
-  const mx=e.clientX,my=e.clientY;
-  ctxMenu.style.left=Math.min(mx,window.innerWidth-220)+'px';
-  ctxMenu.style.top=Math.min(my,window.innerHeight-300)+'px';
+  ctxMenu.style.left=Math.min(e.clientX,window.innerWidth-220)+'px';
+  ctxMenu.style.top=Math.min(e.clientY,window.innerHeight-300)+'px';
   ctxMenu.classList.add('show');
 }
 function hideCtxMenu(){ctxMenu.classList.remove('show');}
@@ -266,11 +397,9 @@ document.addEventListener('click',hideCtxMenu);
 document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tm-cell'))hideCtxMenu();});
 
 function toggleWL(listName,sid){
-  const w=getWL();
-  const idx=w[listName].indexOf(sid);
+  const w=getWL();const idx=w[listName].indexOf(sid);
   if(idx>=0)w[listName].splice(idx,1); else w[listName].push(sid);
   saveWL(w);
-  // refresh menu
   if(ctxTarget) showCtxMenu({preventDefault:()=>{},clientX:parseInt(ctxMenu.style.left),clientY:parseInt(ctxMenu.style.top)},ctxTarget.id,ctxTarget.name);
 }
 function showNewListInput(){
@@ -281,8 +410,7 @@ function showNewListInput(){
 function createList(){
   const name=document.getElementById('ctxNewName').value.trim();
   if(!name)return;
-  const w=getWL();
-  if(!w[name])w[name]=[];
+  const w=getWL();if(!w[name])w[name]=[];
   if(ctxTarget&&!w[name].includes(ctxTarget.id))w[name].push(ctxTarget.id);
   saveWL(w);
   showCtxMenu({preventDefault:()=>{},clientX:parseInt(ctxMenu.style.left),clientY:parseInt(ctxMenu.style.top)},ctxTarget.id,ctxTarget.name);
