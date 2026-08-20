@@ -113,18 +113,18 @@ tbody tr:hover{background:var(--gold-soft)}
 
 <div class="container">
   <h2>產業熱力圖</h2>
-  <p class="subtitle">色塊面積 = 成交金額，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
+  <p class="subtitle">色塊面積 = 市值，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
   <div class="breadcrumb" id="breadcrumb" style="display:none"><a onclick="showIndustry()">全部產業</a> <span>›</span> <span id="bcName"></span></div>
   <div class="treemap-wrap"><div class="treemap" id="treemap"></div>
     <div class="legend"><span class="legend-label">-5%</span><div class="legend-bar"></div><span class="legend-label">+5%</span></div>
   </div>
   <div class="stk-table-wrap" id="stkTable">
     <div class="stk-table-title" id="stkTableTitle"></div>
-    <div class="table-wrap"><table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交金額(百萬)</th></tr></thead><tbody id="stkTableBody"></tbody></table></div>
+    <div class="table-wrap"><table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>市值</th><th>成交額</th></tr></thead><tbody id="stkTableBody"></tbody></table></div>
   </div>
 </div>
 <div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）</div>
-<div class="tooltip" id="tooltip"><div class="tt-name" id="ttName"></div><div class="tt-row"><span>漲跌幅</span><span id="ttChg"></span></div><div class="tt-row"><span>成交金額</span><span id="ttVol"></span></div></div>
+<div class="tooltip" id="tooltip"><div class="tt-name" id="ttName"></div><div class="tt-row"><span>漲跌幅</span><span id="ttChg"></span></div><div class="tt-row"><span>市值</span><span id="ttMcap"></span></div><div class="tt-row"><span>成交額</span><span id="ttVol"></span></div></div>
 <div class="ctx-menu" id="ctxMenu"></div>
 
 <script src="js/supabase.min.js"></script>
@@ -189,23 +189,24 @@ function renderTreemap(items){
     treemapEl.appendChild(div);
   }
 }
-function showTT(e,r){document.getElementById('ttName').textContent=r.label;const el=document.getElementById('ttChg');el.textContent=(r.chg>=0?'+':'')+r.chg.toFixed(2)+'%';el.className=r.chg>=0?'up':'dn';document.getElementById('ttVol').textContent=(r.value/1e6).toFixed(0)+' 百萬';tooltip.classList.add('show');moveTT(e);}
+function fmtAmt(v){if(!v)return'—';if(v>=1e8)return(v/1e8).toFixed(0)+'億';if(v>=1e6)return(v/1e6).toFixed(0)+'百萬';return Math.round(v).toLocaleString();}
+function showTT(e,r){document.getElementById('ttName').textContent=r.label;const el=document.getElementById('ttChg');el.textContent=(r.chg>=0?'+':'')+r.chg.toFixed(2)+'%';el.className=r.chg>=0?'up':'dn';document.getElementById('ttMcap').textContent=fmtAmt(r.mcap);document.getElementById('ttVol').textContent=fmtAmt(r.amount);tooltip.classList.add('show');moveTT(e);}
 function moveTT(e){tooltip.style.left=(e.clientX+12)+'px';tooltip.style.top=(e.clientY-40)+'px';}
 function hideTT(){tooltip.classList.remove('show');}
 
 function showIndustry(){
   document.getElementById('breadcrumb').style.display='none';
   document.getElementById('stkTable').classList.remove('show');
-  const items=(hmData.industries||[]).map(ind=>({label:ind.name,value:ind.total_amount,chg:ind.avg_chg,onClick:()=>drillDown(ind)}));
+  const items=(hmData.industries||[]).map(ind=>({label:ind.name,value:ind.total_amount,chg:ind.avg_chg,mcap:ind.total_amount,amount:ind.total_amount,onClick:()=>drillDown(ind)}));
   renderTreemap(items);
 }
 function drillDown(ind){
   document.getElementById('breadcrumb').style.display='flex';
   document.getElementById('bcName').textContent=ind.name;
-  renderTreemap((ind.stocks||[]).map(s=>({label:s.id+' '+s.name,value:s.amount,chg:s.chg_pct,stockId:s.id,stockName:s.name,onClick:()=>{location.href='stk.html#'+s.id;}})));
+  renderTreemap((ind.stocks||[]).map(s=>({label:s.id+' '+s.name,value:s.mcap||s.amount,chg:s.chg_pct,mcap:s.mcap,amount:s.amount,stockId:s.id,stockName:s.name,onClick:()=>{location.href='stk.html#'+s.id;}})));
   const tw=document.getElementById('stkTable');tw.classList.add('show');
   document.getElementById('stkTableTitle').textContent=ind.name+' — 成分股明細';
-  document.getElementById('stkTableBody').innerHTML=[...(ind.stocks||[])].sort((a,b)=>b.amount-a.amount).map(s=>`<tr><td>${s.id}</td><td>${s.name}</td><td>${s.close.toLocaleString()}</td><td class="${s.chg_pct>=0?'up':'dn'}">${s.chg_pct>=0?'+':''}${s.chg_pct.toFixed(2)}%</td><td>${(s.amount/1e6).toFixed(0)}</td></tr>`).join('');
+  document.getElementById('stkTableBody').innerHTML=[...(ind.stocks||[])].sort((a,b)=>(b.mcap||b.amount)-(a.mcap||a.amount)).map(s=>`<tr><td>${s.id}</td><td>${s.name}</td><td>${s.close.toLocaleString()}</td><td class="${s.chg_pct>=0?'up':'dn'}">${s.chg_pct>=0?'+':''}${s.chg_pct.toFixed(2)}%</td><td>${fmtAmt(s.mcap)}</td><td>${fmtAmt(s.amount)}</td></tr>`).join('');
 }
 
 async function loadHeatmap(){

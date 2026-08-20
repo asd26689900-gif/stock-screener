@@ -937,20 +937,22 @@ for sid, data in stocks.items():
     chg_pct = change_pct(p, prev)
     # 市值 = 收盤價 × 發行股數；沒有股數資料就 fallback 成交金額
     shares = sid_shares.get(sid, 0)
-    mcap = close * shares if shares > 0 else close * p["Trading_Volume"]
-    if mcap <= 0: continue
+    mcap = close * shares if shares > 0 else 0
+    amount = close * p["Trading_Volume"]  # 成交額
+    size = mcap if mcap > 0 else amount   # 區塊大小優先用市值
+    if size <= 0: continue
     ind_agg[ind_name]["stocks"].append({
         "id": sid, "name": name_map.get(sid, sid),
-        "close": close, "chg_pct": chg_pct, "amount": mcap,
+        "close": close, "chg_pct": chg_pct, "amount": amount, "mcap": mcap,
     })
-    ind_agg[ind_name]["total_mcap"] += mcap
+    ind_agg[ind_name]["total_mcap"] += size
     ind_agg[ind_name]["sum_chg"] += chg_pct
     ind_agg[ind_name]["count"] += 1
 
 heatmap_industries = []
 for ind_name, agg in ind_agg.items():
     if agg["count"] == 0: continue
-    agg["stocks"].sort(key=lambda x: x["amount"], reverse=True)
+    agg["stocks"].sort(key=lambda x: x.get("mcap", 0) or x["amount"], reverse=True)
     heatmap_industries.append({
         "name": ind_name, "total_amount": agg["total_mcap"],
         "avg_chg": round(agg["sum_chg"] / agg["count"], 2),
