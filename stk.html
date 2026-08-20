@@ -259,9 +259,13 @@ function getChartData(){
   if(currentTF==='5m'||currentTF==='60m'){
     return minuteCache[currentTF]||[];
   }
-  // 日K以上用 stock_prices
-  let src = rawDaily.length>2 ? rawDaily.map(r=>({d:r.date,o:r.open,h:r.high,l:r.low,c:r.close,v:r.volume||0}))
-    : (currentAnalysis.history||[]);
+  // 日K：合併 stock_prices + daily_stk.history，去重取最新
+  const fromDB = rawDaily.map(r=>({d:r.date,o:r.open,h:r.high,l:r.low,c:r.close,v:r.volume||0}));
+  const fromAnalysis = (currentAnalysis.history||[]).map(r=>({d:r.d||r.date,o:r.o??r.open,h:r.h??r.high,l:r.l??r.low,c:r.c??r.close,v:r.v??r.volume??0}));
+  const dateMap = {};
+  fromAnalysis.forEach(r=>{ dateMap[r.d]=r; });
+  fromDB.forEach(r=>{ dateMap[r.d]=r; }); // DB 覆蓋同日
+  let src = Object.values(dateMap).sort((a,b)=>a.d.localeCompare(b.d));
   if(!src.length) return [];
   if(currentTF==='W') return aggregateWeekly(src);
   if(currentTF==='M') return aggregateMonthly(src);
