@@ -66,7 +66,7 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .tf-btn,.ind-btn{padding:4px 12px;border:1px solid var(--border);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-secondary);font-family:var(--font-mono)}
 .tf-btn.active,.ind-btn.active{background:var(--gold-soft);color:var(--gold);border-color:var(--gold)}
 .ma-legend{display:flex;gap:12px;font-size:11px;font-family:var(--font-mono);flex-wrap:wrap}
-.chart-canvas{position:relative;overflow:hidden;cursor:crosshair}
+.chart-canvas{position:relative;overflow:hidden;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:none}
 .chart-canvas canvas{display:block}
 .chart-overlay{position:absolute;top:0;left:0;pointer-events:none}
 .chart-tooltip{position:absolute;top:0;left:0;pointer-events:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:11px;font-family:var(--font-mono);line-height:1.6;white-space:nowrap;box-shadow:var(--shadow);z-index:10;display:none}
@@ -672,6 +672,7 @@ function setupChartEvents(canvas){
   // 拖曳平移（RAF 節流）
   container.addEventListener('mousedown',e=>{
     if(e.button!==0)return;
+    e.preventDefault(); // 防止瀏覽器文字選取搶走拖曳
     chartIsDragging=true;chartDragStartX=e.clientX;chartDragStartPan=chartPanIdx;
     container.style.cursor='grabbing';
   });
