@@ -206,23 +206,7 @@ def fetch_monthly_revenue(year, month, market="sii"):
                 return result
     except: pass
 
-    # 方式3: cloudscraper (如果有安裝)
-    try:
-        import cloudscraper
-        scraper = cloudscraper.create_scraper()
-        r = scraper.post("https://mops.twse.com.tw/mops/web/ajax_t21sc03",
-            data={"encodeURIComponent": "1", "step": "1", "firstin": "1",
-                  "off": "1", "TYPEK": market, "year": str(roc_y), "month": f"{month:02d}"},
-            timeout=30)
-        r.encoding = "utf-8"
-        if len(r.text) > 2000 and "<table" in r.text:
-            result = _parse_mops_html(r.text)
-            if result:
-                print(f"     MOPS cloudscraper: {market} {year}/{month} → {len(result)} 檔")
-                return result
-    except ImportError: pass
-    except: pass
-
+    # 方式3 跳過 cloudscraper（加速：通常方式1/2已夠）
     return []
 
 def _parse_mops_html(text):
@@ -286,7 +270,7 @@ def fetch_industry_mapping():
                     break
         except Exception as e:
             print(f"   ⚠ TWSE 產業 API 第{attempt+1}次失敗: {e}")
-        time.sleep(3)
+        time.sleep(1)
 
     # TPEX 上櫃
     try:
@@ -368,7 +352,7 @@ end_str = iso_date(today)
 
 # 產生過去 N 天的工作日列表
 # 環境變數 FETCH_DAYS 可控制回溯天數（預設 90，本地測試可設 10）
-FETCH_CALENDAR_DAYS = int(os.environ.get("FETCH_DAYS", "90"))
+FETCH_CALENDAR_DAYS = int(os.environ.get("FETCH_DAYS", "30"))  # ponytail: 30天夠算MA20+策略
 
 def trading_days(n_calendar):
     days = []
@@ -393,7 +377,7 @@ for i, d in enumerate(work_days):
         print(f"   {iso_date(d)}: {len(rows)} 檔", end="\r")
     # 禮貌等待，避免被擋
     if i < len(work_days) - 1:
-        time.sleep(3)
+        time.sleep(1.5)
 
 print(f"\n   共取得 {fetched_days} 個交易日行情")
 
@@ -446,7 +430,7 @@ if sb:
         page = 0
         while True:
             resp = sb.table("stock_prices").select("stock_id,date,open,high,low,close,volume,change") \
-                .gte("date", (today - timedelta(days=120)).strftime("%Y-%m-%d")) \
+                .gte("date", (today - timedelta(days=90)).strftime("%Y-%m-%d")) \
                 .order("date", desc=False) \
                 .range(page*1000, (page+1)*1000-1).execute()
             if not resp.data: break
@@ -458,9 +442,22 @@ if sb:
     except Exception as e:
         print(f"   ⚠ stock_prices 讀取失敗（可能表不存在）: {e}")
 
+# ── 1d. 合併 stock_prices 歷史 → stocks（讓 MA60 等指標有足夠資料）──
+for sid, hist in price_history.items():
+    existing_dates = {r["date"] for r in stocks.get(sid, [])}
+    for h in hist:
+        if h["date"] not in existing_dates:
+            stocks[sid].append({"stock_id": sid, "date": h["date"], "close": h["close"],
+                "open": h.get("open", h["close"]), "high": h.get("high", h["close"]),
+                "low": h.get("low", h["close"]), "Trading_Volume": h.get("volume", 0) * 1000,
+                "change": h.get("change", 0)})
+    if sid in stocks:
+        stocks[sid].sort(key=lambda x: x["date"])
+print(f"   合併後總股票數: {len(stocks)}")
+
 # ── 2. 三大法人買賣超（近 20 交易日）──
 print("⏳ 抓取法人買賣超 (TWSE+TPEX)...")
-inst_days = work_days[-25:]  # 最近 25 個工作日
+inst_days = work_days[-15:]  # 最近 15 個工作日（加速）
 inst = defaultdict(list)  # {stock_id: [{date, foreign_net, trust_net, dealer_net}]}
 for i, d in enumerate(inst_days):
     rows = fetch_twse_inst(d) + fetch_tpex_inst(d)
@@ -469,7 +466,7 @@ for i, d in enumerate(inst_days):
             inst[r["stock_id"]].append(r)
         print(f"   {iso_date(d)}: {len(rows)} 檔", end="\r")
     if i < len(inst_days) - 1:
-        time.sleep(3)
+        time.sleep(1.5)
 print(f"\n   法人資料: {len(inst)} 檔")
 
 def get_inst_consecutive(sid, inst_type):
@@ -498,15 +495,15 @@ def get_inst_consecutive(sid, inst_type):
 # ── 3. 月營收 ──
 print("⏳ 抓取月營收...")
 rev = defaultdict(list)
-# 抓近 6 個月
-for months_ago in range(6):
+# 抓近 2 個月（加速：MoM/YoY 只需最新+上月）
+for months_ago in range(2):
     d = today.replace(day=1) - timedelta(days=months_ago * 30)
     y, m = d.year, d.month
     for market in ("sii", "otc"):
         rows = fetch_monthly_revenue(y, m, market)
         for r in rows:
             rev[r["stock_id"]].append(r)
-        time.sleep(2)
+        time.sleep(1)
 print(f"   月營收: {len(rev)} 檔")
 
 for sid in rev:
