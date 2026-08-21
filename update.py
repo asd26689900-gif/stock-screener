@@ -1141,10 +1141,10 @@ print(f"   產業熱力圖: {len(heatmap_data['industries'])} 產業")
 print(f"   選股策略: {strat_total} 檔")
 
 # ── 清理舊資料（節省 Supabase 容量）──
-# stock_prices: 保留近2年（清除更早的垃圾資料）
+# stock_prices: 保留近10年
 # daily_stk: 保留（個股分析需要）
 # 選股相關表只保留 30 天
-price_cutoff = (today - timedelta(days=730)).strftime("%Y-%m-%d")
+price_cutoff = (today - timedelta(days=3650)).strftime("%Y-%m-%d")
 try:
     sb.table("stock_prices").delete().lt("date", price_cutoff).execute()
     print(f"   stock_prices: 已清理 {price_cutoff} 之前的舊資料")
