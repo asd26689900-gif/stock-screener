@@ -191,7 +191,7 @@ async function doSearch(){
   // 同時抓分析資料和歷史K線
   const [stkRes, priceRes] = await Promise.all([
     sb.from('daily_stk').select('data').eq('stock_id',sid).order('date',{ascending:false}).limit(1).single(),
-    sb.from('stock_prices').select('*').eq('stock_id',sid).order('date',{ascending:true}).limit(2000)
+    sb.from('stock_prices').select('*').eq('stock_id',sid).order('date',{ascending:true}).limit(2600)
   ]);
 
   if(stkRes.error||!stkRes.data){
