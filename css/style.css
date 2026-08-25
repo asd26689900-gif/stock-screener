@@ -303,6 +303,9 @@ tbody tr:hover{background:var(--hover)}
 .ipo-meta-item{background:var(--surface);border:1px solid var(--border-light);border-radius:var(--radius);padding:6px 10px;font-size:12px}
 .ipo-meta-label{color:var(--text-secondary);font-size:10.5px;display:block}
 .ipo-meta-val{font-family:var(--font-mono);font-weight:700;color:var(--ink)}
+.ipo-market{font-size:11px;font-weight:600;color:var(--text-secondary);background:var(--surface);border:1px solid var(--border-light);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+.ipo-tag{font-size:11px;font-weight:600;color:var(--red);background:var(--surface);border:1px solid var(--red);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:2px}
+.ipo-card.ipo-cancelled{opacity:.55}
 
 /* ─── 概念股 ─── */
 .concept-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}

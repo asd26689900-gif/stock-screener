@@ -30,7 +30,8 @@ export default async function handler(req, res) {
 
     if (type === 'ipo') {
       // 公開申購 — TWSE 抽籤資訊
-      const url = 'https://www.twse.com.tw/rwd/zh/announcement/publicLottery?response=json';
+      // TWSE 已將 publicLottery 改版為 publicForm（公開申購公告-抽籤日程表）
+      const url = 'https://www.twse.com.tw/rwd/zh/announcement/publicForm?response=json';
       const r = await fetch(url, { headers: { 'User-Agent': UA } });
       const j = await r.json();
       return res.json(j);

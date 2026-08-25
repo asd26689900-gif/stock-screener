@@ -506,6 +506,8 @@ for months_ago in range(REV_MONTHS):
             rev[r["stock_id"]].append(r)
         time.sleep(1)
 print(f"   月營收: {len(rev)} 檔")
+if not rev:
+    print("   ⚠ 警告：月營收抓取為 0 檔（MOPS 可能被 WAF 擋住），營收圖與營收條件會缺資料，建議稍後重試", flush=True)
 
 for sid in rev:
     rev[sid].sort(key=lambda x: (x.get("revenue", 0)), reverse=False)  # ponytail: 粗排

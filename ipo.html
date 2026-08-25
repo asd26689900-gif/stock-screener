@@ -32,26 +32,33 @@ async function loadData(){
       document.getElementById('app').innerHTML='<div class="loading">目前無公開申購資訊</div>';
       return;
     }
-    // TWSE publicLottery fields vary; common:
-    // 0:抽籤日期 1:申購開始日 2:申購結束日 3:撥券日期 4:股票代號 5:股票名稱
-    // 6:申購股數 7:承銷價 8:實際承銷股數 9:中籤率
+    // TWSE publicForm 欄位：
+    // 0:序號 1:抽籤日期 2:證券名稱 3:證券代號 4:發行市場
+    // 5:申購開始日 6:申購結束日 7:承銷股數 8:實際承銷股數 9:承銷價(元)
+    // 10:實際承銷價 11:撥券日期 12:主辦券商 13:申購股數 14:總承銷金額
+    // 15:總合格件 16:中籤率(%) 17:取消公開抽籤
     const cards=j.data.map(row=>{
-      const id=(row[4]||'').trim();
-      const name=(row[5]||'').trim();
-      const subPrice=parseFloat((row[7]||'0').replace(/,/g,''))||0;
-      const drawDate=rocToAD(row[0]);
-      const startDate=rocToAD(row[1]);
-      const endDate=rocToAD(row[2]);
-      const settleDate=rocToAD(row[3]);
-      const rate=(row[9]||'').trim();
-      return{id,name,subPrice,drawDate,startDate,endDate,settleDate,rate};
-    });
+      const id=(row[3]||'').trim();
+      const name=(row[2]||'').trim();
+      const market=(row[4]||'').trim();
+      const subPriceTxt=(row[9]||'').trim().replace(/,/g,'');
+      const subPrice=parseFloat(subPriceTxt);
+      const drawDate=rocToAD(row[1]);
+      const startDate=rocToAD(row[5]);
+      const endDate=rocToAD(row[6]);
+      const settleDate=rocToAD(row[11]);
+      const rate=(row[16]||'').trim();
+      const cancelled=(row[17]||'').trim();
+      return{id,name,market,subPrice:isFinite(subPrice)?subPrice:null,drawDate,startDate,endDate,settleDate,rate,cancelled};
+    })
+      // 過濾非股票（央債等中央登錄公債），頁面聚焦股票公開申購
+      .filter(c=>c.id && !/^A/i.test(c.id));
 
     document.getElementById('app').innerHTML=cards.map(c=>`
-      <div class="ipo-card">
-        <h3>🎯 ${c.id} ${c.name}</h3>
+      <div class="ipo-card${c.cancelled?' ipo-cancelled':''}">
+        <h3>🎯 ${c.id} ${c.name} ${c.market?`<span class="ipo-market">${c.market}</span>`:''}${c.cancelled?`<span class="ipo-tag">${c.cancelled}</span>`:''}</h3>
         <div class="ipo-meta">
-          <div class="ipo-meta-item"><span class="ipo-meta-label">承銷價</span><span class="ipo-meta-val">${fmt(c.subPrice)} 元</span></div>
+          <div class="ipo-meta-item"><span class="ipo-meta-label">承銷價</span><span class="ipo-meta-val">${c.subPrice!=null?fmt(c.subPrice)+' 元':'—'}</span></div>
           <div class="ipo-meta-item"><span class="ipo-meta-label">申購期間</span><span class="ipo-meta-val">${c.startDate} ~ ${c.endDate}</span></div>
           <div class="ipo-meta-item"><span class="ipo-meta-label">抽籤日期</span><span class="ipo-meta-val">${c.drawDate}</span></div>
           <div class="ipo-meta-item"><span class="ipo-meta-label">撥券日期</span><span class="ipo-meta-val">${c.settleDate}</span></div>

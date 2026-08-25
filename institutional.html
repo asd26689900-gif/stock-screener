@@ -70,7 +70,7 @@ function cls(v){return v>0?'up':v<0?'dn':'';}
 async function onAuthReady(){
   if(!sb) return;
   const {data}=await sb.from('stock_metrics')
-    .select('stock_id,name,close,change_pct,volume,foreign_net_shares,foreign_consec_days,trust_net_shares,trust_consec_days,dealer_consec_days,dealer_net_shares,market_type,industry')
+    .select('stock_id,name,date,close,change_pct,volume,foreign_net_shares,foreign_consec_days,trust_net_shares,trust_consec_days,dealer_consec_days,dealer_net_shares,market_type,industry')
     .order('stock_id');
   if(!data||!data.length){document.getElementById('buyBody').innerHTML='<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-secondary)">尚無資料</td></tr>';return;}
   allData=data;

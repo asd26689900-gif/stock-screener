@@ -177,7 +177,8 @@ function toggleStar(btn, sid) {
 const sparkCache = {};
 async function fetchSpark(sid) {
   if (sparkCache[sid]) return sparkCache[sid];
-  if (!window.sb) return [];
+  // sb 是 auth.js 頂層 let（全域 lexical），不會掛到 window，需用 typeof 判斷
+  if (typeof sb === 'undefined' || !sb) return [];
   try {
     const { data } = await sb.from('stock_prices')
       .select('close').eq('stock_id', sid).order('date', { ascending: false }).limit(30);
