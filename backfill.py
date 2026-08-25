@@ -140,6 +140,46 @@ def classify_market():
 # ═══════════════════════════════════════
 #  月營收歷史 (histock 個股頁, 補 12 個月給營收圖)
 # ═══════════════════════════════════════
+def fetch_finmind_revenue(sid, months=12):
+    """FinMind 月營收歷史（元→千元），回傳 [{m:'YYYY/MM', rev, mom, yoy}, ...] 由舊到新"""
+    end = datetime.now()
+    start = end - timedelta(days=months * 35)
+    url = "https://api.finmindtrade.com/api/v4/data"
+    params = {
+        "dataset": "TaiwanStockMonthRevenue",
+        "data_id": sid,
+        "start_date": start.strftime("%Y-%m-%d"),
+        "end_date": end.strftime("%Y-%m-%d"),
+    }
+    try:
+        r = requests.get(url, params=params, headers=HEADERS, timeout=20)
+        j = r.json()
+        if j.get("msg") != "success" or not j.get("data"):
+            return []
+        rows = []
+        for d in j["data"]:
+            try:
+                m = f"{int(d['revenue_year'])}/{int(d['revenue_month']):02d}"
+            except Exception:
+                continue
+            rev = parse_num(d.get("revenue")) / 1000
+            if not rev:
+                continue
+            rows.append({"m": m, "rev": rev, "mom": 0, "yoy": 0})
+        rows.sort(key=lambda x: x["m"])
+        rev_by_m = {r["m"]: r["rev"] for r in rows}
+        for r in rows:
+            y, mm = int(r["m"][:4]), int(r["m"][5:7])
+            prev_m = f"{y-1 if mm == 1 else y}/{12 if mm == 1 else mm-1:02d}"
+            yoy_m = f"{y-1}/{mm:02d}"
+            if prev_m in rev_by_m and rev_by_m[prev_m]:
+                r["mom"] = round((r["rev"] - rev_by_m[prev_m]) / rev_by_m[prev_m] * 100, 2)
+            if yoy_m in rev_by_m and rev_by_m[yoy_m]:
+                r["yoy"] = round((r["rev"] - rev_by_m[yoy_m]) / rev_by_m[yoy_m] * 100, 2)
+        return rows[-months:]
+    except Exception:
+        return []
+
 def fetch_histock_revenue(sid, months=12):
     """回傳 [{m:'YYYY/MM', rev(千元), mom, yoy}, ...] 由舊到新"""
     import re
@@ -219,15 +259,17 @@ if __name__ == "__main__":
 
     # ── revenue 模式：補月營收歷史到 daily_stk 最新 row ──
     if args.revenue:
-        print(f"📈 營收歷史回填 (histock): {len(stock_list)} 檔")
+        print(f"📈 營收歷史回填 (FinMind 主來源): {len(stock_list)} 檔")
         done = 0
         errors = 0
         for idx, sid in enumerate(stock_list):
-            hist = fetch_histock_revenue(sid)
+            hist = fetch_finmind_revenue(sid)
+            if not hist:
+                hist = fetch_histock_revenue(sid)
             if not hist:
                 errors += 1
-                print(f"   ❌ {sid}: histock 無資料", end="\r")
-                time.sleep(0.8)
+                print(f"   ❌ {sid}: 營收來源無資料", end="\r")
+                time.sleep(0.5)
                 continue
             try:
                 resp = sb.table("daily_stk").select("date,data").eq("stock_id", sid) \
@@ -247,7 +289,7 @@ if __name__ == "__main__":
             except Exception as e:
                 errors += 1
                 print(f"   ❌ {sid} upsert error: {e}")
-            time.sleep(0.6)
+            time.sleep(0.5)
             if (idx + 1) % 25 == 0 or idx == len(stock_list) - 1:
                 print(f"   [{idx+1}/{len(stock_list)}] 成功 {done} / 失敗 {errors}")
         print(f"\n✅ 營收回填完成: 成功 {done} / 失敗 {errors}")
