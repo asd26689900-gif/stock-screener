@@ -57,7 +57,7 @@ h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom
 .tooltip .tt-name{font-weight:700;color:var(--ink);margin-bottom:4px}
 .tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;font-family:var(--font-mono);font-size:12px}
 .legend{display:flex;align-items:center;gap:4px;margin-top:12px;justify-content:center;flex-wrap:wrap}
-.legend-bar{width:200px;height:12px;border-radius:6px;background:linear-gradient(to right,#2d8f4e,#4a8b6e,#888,#c07050,#c0544f)}
+.legend-bar{width:200px;height:12px;border-radius:6px;background:linear-gradient(to right,#1ea04b,#808080,#c8372d)}
 .legend-label{font-size:11px;color:var(--text-secondary);font-family:var(--font-mono)}
 .breadcrumb{font-size:13px;color:var(--text-secondary);margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .breadcrumb a{color:var(--gold);cursor:pointer;text-decoration:none}
@@ -136,11 +136,10 @@ const treemapEl=document.getElementById('treemap');
 const tooltip=document.getElementById('tooltip');
 
 function chgColor(pct){
-  const c=Math.max(-5,Math.min(5,pct)),t=(c+5)/10;
-  let r,g,b;
-  if(t<.5){const s=t/.5;r=Math.round(45+s*91);g=Math.round(143-s*7);b=Math.round(78+s*58);}
-  else{const s=(t-.5)/.5;r=Math.round(136+s*56);g=Math.round(136-s*52);b=Math.round(136-s*57);}
-  return`rgb(${r},${g},${b})`;
+  // ponytail: power curve (0.45) amplifies small changes so ±0.5% is already visibly red/green
+  const c=Math.max(-5,Math.min(5,pct)),abs=Math.abs(c)/5,s=Math.pow(abs,0.45);
+  if(c>=0)return`rgb(${Math.round(128+72*s)},${Math.round(128-73*s)},${Math.round(128-83*s)})`;
+  return`rgb(${Math.round(128-98*s)},${Math.round(128+32*s)},${Math.round(128-53*s)})`;
 }
 
 function squarify(items,x,y,w,h){
