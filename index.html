@@ -1,101 +1,9 @@
 <title>盤後精選模組 — 多因子選股系統</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="js/auth.css">
-<style>
-:root {
-  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
-  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
-  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
-  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
-  --green: #4A8B6E; --red: #C0544F;
-  --mask-bg: rgba(60,60,60,0.06);
-  --font-display: Georgia, 'Times New Roman', serif;
-  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-  --radius: 6px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-    --green: #6BB88E; --red: #E07070; --mask-bg: rgba(200,200,200,0.06);
-    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  }
-}
-:root[data-theme="dark"] {
-  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-  --green: #6BB88E; --red: #E07070; --mask-bg: rgba(200,200,200,0.06);
-  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
-.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
-.topbar .brand span{color:var(--gold)}
-.topbar .spacer{flex:1}
-.nav-links{display:flex;gap:12px}
-.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
-.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
-.date-label{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);white-space:nowrap}
-.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
-.loading{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:15px}
-.controls{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
-.controls label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);cursor:pointer;white-space:nowrap}
-.controls input[type="checkbox"]{accent-color:var(--gold)}
-.controls select{font-family:var(--font-mono);font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);cursor:pointer}
-.module{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-.module-header{display:flex;align-items:center;gap:12px;padding:16px 20px 12px;cursor:pointer;user-select:none}
-.module-header:hover{background:var(--gold-soft)}
-.module-header .arrow{font-size:10px;color:var(--text-secondary);transition:transform .2s;flex-shrink:0}
-.module.open .module-header .arrow{transform:rotate(90deg)}
-.module-title{font-family:var(--font-display);font-size:17px;color:var(--ink);letter-spacing:-0.01em}
-.badge-count{font-size:11px;padding:2px 8px;border-radius:99px;font-weight:600;background:var(--teal-soft);color:var(--teal);white-space:nowrap}
-.module-desc{display:none;padding:0 20px 14px;font-size:13px;color:var(--text-secondary);line-height:1.7;border-bottom:1px solid var(--border-light)}
-.module.open .module-desc{display:block}
-.module-meta{padding:8px 20px;font-size:11px;color:var(--text-secondary);background:var(--teal-soft);display:flex;gap:20px;flex-wrap:wrap}
-.module-meta span::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:5px;vertical-align:middle}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em}
-thead th:first-child,thead th:nth-child(2){text-align:left}
-tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
-tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
-tbody tr:hover{background:var(--gold-soft)}
-tbody tr{cursor:pointer}
-tbody td:first-child{color:var(--gold);text-decoration:underline;text-underline-offset:2px}
-.up{color:var(--red)}.dn{color:var(--green)}
-.empty-row td{text-align:center!important;color:var(--text-secondary);font-family:var(--font-body);padding:24px 12px;font-style:italic}
-.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
-@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.module-header{padding:14px 14px 10px}.module-title{font-size:15px}thead th,tbody td{padding:8px;font-size:11px}.container{padding:16px 8px 60px}}
-.nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
-@media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
-</style>
-
-<div class="topbar">
-  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-  <button class="nav-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('show')" aria-label="選單">☰</button>
-  <div class="nav-links">
-    <a href="index.html" class="active">選股模組</a>
-    <a href="stk.html">個股分析</a>
-    <a href="heatmap.html">產業熱力圖</a>
-    <a href="institutional.html">法人買賣超</a>
-    <a href="margin.html">融資融券</a>
-    <a href="ipo.html">股票抽籤</a>
-    <a href="calendar.html">投資行事曆</a>
-    <a href="history.html">歷史漲跌幅</a>
-    <a href="tools.html">股票計算機</a>
-    <a href="watchlist.html">★ 自選股</a>
-  
-  </div>
-  <div class="spacer"></div>
-  <div id="authArea"></div>
-</div>
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<div id="topbar"></div>
 
 <div class="container">
   <div class="controls">
@@ -103,16 +11,14 @@ tbody td:first-child{color:var(--gold);text-decoration:underline;text-underline-
     <select id="datePicker"></select>
     <label><input type="checkbox" id="filterEmpty" checked> 僅顯示有標的</label>
   </div>
-  <div id="app"><div class="loading">⏳ 正在載入選股資料...</div></div>
+  <div id="app"><div class="loading">正在載入選股資料...</div></div>
 </div>
 
-<div class="footer">
-  盤後精選模組 — 多因子交叉驗證數據篩選<br>
-  本站僅整理公開資訊，不構成投資建議，亦非投顧服務。投資有風險，請自行判斷。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）
-</div>
+<div id="footer"></div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/auth.js"></script>
 <script>
 const MODULE_META = {
@@ -139,26 +45,31 @@ function render(filterEmpty){
     const meta=MODULE_META[key]; const data=allModules[key]||[];
     if(filterEmpty&&data.length===0) continue;
     const rows=data.length===0
-      ?'<tr class="empty-row"><td colspan="'+meta.cols.length+'">今日無符合標的</td></tr>'
+      ?'<tr class="empty-row"><td colspan="'+(meta.cols.length+1)+'">今日無符合標的</td></tr>'
       :data.map(row=>'<tr onclick="location.href=\'stk.html#'+row[0]+'\'">'+row.map((v,i)=>{
         if(i<=1) return '<td>'+v+'</td>';
         if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return '<td class="'+c+'">'+d+'</td>';}
         return '<td>'+fmt(v)+'</td>';
-      }).join('')+'</tr>').join('');
-    html+=`<div class="module open"><div class="module-header" onclick="this.parentElement.classList.toggle('open')"><span class="arrow">▶</span><span class="module-title">${meta.title}</span><span class="badge-count">${data.length} 檔</span></div><div class="module-desc">${meta.desc}</div><div class="module-meta">${meta.rules.map(r=>'<span>'+r+'</span>').join('')}</div><div class="table-wrap"><table><thead><tr>${meta.cols.map(c=>'<th>'+c+'</th>').join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
+      }).join('')+'<td>'+starBtn(row[0])+'</td></tr>').join('');
+    html+=`<div class="module open"><div class="module-header" onclick="this.parentElement.classList.toggle('open')"><span class="arrow">${I('chev', 11)}</span><span class="module-title">${meta.title}</span><span class="badge-count">${data.length} 檔</span></div><div class="module-desc">${meta.desc}</div><div class="module-meta">${meta.rules.map(r=>'<span>'+r+'</span>').join('')}</div><div class="table-wrap"><table><thead><tr>${meta.cols.map(c=>'<th>'+c+'</th>').join('')}<th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
   }
   app.innerHTML=html||'<div class="loading">今日無任何模組有符合標的</div>';
 }
 
 async function loadData(date){
   if(!sb) return;
-  let query = sb.from('daily_modules').select('module_key,data');
+  let query = sb.from('daily_modules').select('module_key,data,date');
   if(date) query = query.eq('date', date);
-  else query = query.order('date',{ascending:false}).limit(9);
+  else {
+    // 先取最新日期，避免模組缺資料時跨日混搭
+    const { data: latest } = await sb.from('daily_modules').select('date').order('date',{ascending:false}).limit(1);
+    if (!latest || !latest.length) { app.innerHTML=errorBox('無法載入資料'); return; }
+    query = query.eq('date', latest[0].date);
+  }
 
   const {data,error} = await query;
   if(error||!data||!data.length){
-    app.innerHTML='<div class="loading">⚠ 無法載入資料</div>'; return;
+    app.innerHTML=errorBox('無法載入資料','loadData('+(date?JSON.stringify(date):'')+')'); return;
   }
   allModules={};
   data.forEach(r=>{ allModules[r.module_key]=r.data; });
@@ -174,11 +85,11 @@ async function loadDates(){
   const picker=document.getElementById('datePicker');
   picker.innerHTML=dates.map(d=>'<option value="'+d+'">'+d+'</option>').join('');
   picker.addEventListener('change',()=>{
-    document.getElementById('dateLabel').textContent='📅 '+picker.value;
+    document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+picker.value;
     loadData(picker.value);
   });
   if(dates.length){
-    document.getElementById('dateLabel').textContent='📅 '+dates[0];
+    document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+dates[0];
   }
 }
 

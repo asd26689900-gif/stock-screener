@@ -1,58 +1,9 @@
 <title>股票抽籤 — 盤後精選模組</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="js/auth.css">
-<style>
-:root{--ink:#1C2127;--text:#3B3F45;--text-secondary:#6B7280;--surface:#F5F2EC;--card:#FFFFFF;--border:#DDD8D0;--border-light:#EBE7E0;--gold:#B8860B;--gold-soft:rgba(184,134,11,.10);--teal:#3A7D7B;--teal-soft:rgba(58,125,123,.08);--green:#4A8B6E;--red:#C0544F;--font-display:Georgia,'Times New Roman',serif;--font-body:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;--font-mono:'SF Mono','Cascadia Code','Consolas',monospace;--radius:6px;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
-@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}}
-:root[data-theme="dark"]{--ink:#E8E4DC;--text:#C8C4BC;--text-secondary:#8B8780;--surface:#141618;--card:#1E2024;--border:#2E3036;--border-light:#252830;--gold:#D4A840;--gold-soft:rgba(212,168,64,.12);--teal:#5AADAB;--teal-soft:rgba(90,173,171,.10);--green:#6BB88E;--red:#E07070;--shadow:0 1px 3px rgba(0,0,0,.3),0 1px 2px rgba(0,0,0,.2)}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55}
-.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
-.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-.02em;white-space:nowrap;text-decoration:none}.topbar .brand span{color:var(--gold)}.topbar .spacer{flex:1}
-.nav-links{display:flex;gap:12px}.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
-.container{max-width:960px;margin:0 auto;padding:24px 16px 80px;display:flex;flex-direction:column;gap:20px}
-.page-title{font-family:var(--font-display);font-size:22px;color:var(--ink)}.page-desc{font-size:13px;color:var(--text-secondary)}
-.module{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border)}
-thead th:first-child,thead th:nth-child(2){text-align:left}
-tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
-tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
-tbody tr:hover{background:var(--gold-soft)}
-.up{color:var(--red)}.dn{color:var(--green)}
-.ipo-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
-.ipo-card h3{font-family:var(--font-display);font-size:16px;color:var(--ink);margin-bottom:8px}
-.ipo-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;font-size:13px}
-.ipo-meta-item{display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid var(--border-light)}
-.ipo-meta-label{color:var(--text-secondary)}
-.ipo-meta-val{font-family:var(--font-mono);font-weight:600}
-.spread{color:var(--green);font-weight:700}
-.loading{text-align:center;padding:60px 20px;color:var(--text-secondary);font-size:15px}
-.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
-@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.container{padding:16px 8px 60px}thead th,tbody td{padding:8px;font-size:11px}}
-.nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
-@media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
-</style>
-
-<div class="topbar">
-  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-  <button class="nav-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('show')" aria-label="選單">☰</button>
-  <div class="nav-links">
-    <a href="index.html">選股模組</a>
-    <a href="stk.html">個股分析</a>
-    <a href="heatmap.html">產業熱力圖</a>
-    <a href="institutional.html">法人買賣超</a>
-    <a href="margin.html">融資融券</a>
-    <a href="ipo.html" class="active">股票抽籤</a>
-    <a href="calendar.html">投資行事曆</a>
-    <a href="history.html">歷史漲跌幅</a>
-    <a href="tools.html">股票計算機</a>
-    <a href="watchlist.html">★ 自選股</a>
-  
-  </div>
-  <div class="spacer"></div><div id="authArea"></div>
-</div>
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<div id="topbar"></div>
 
 <div class="container">
   <div>
@@ -61,8 +12,9 @@ tbody tr:hover{background:var(--gold-soft)}
   </div>
   <div id="app"><div class="loading">載入中...</div></div>
 </div>
-<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）</div>
+<div id="footer"></div>
 
+<script src="js/ui.js"></script>
 <script>
 function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
 function rocToAD(s){

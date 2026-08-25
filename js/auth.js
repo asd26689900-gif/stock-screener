@@ -79,14 +79,16 @@ function showAuthModal(mode) {
     modal.id = 'authModal';
     modal.innerHTML = `
       <div class="auth-overlay" onclick="hideAuthModal()"></div>
-      <div class="auth-box">
+      <div class="auth-box" role="dialog" aria-modal="true" aria-label="登入">
         <div class="auth-tabs">
           <button class="auth-tab active" data-mode="login" onclick="switchAuthTab('login')">登入</button>
           <button class="auth-tab" data-mode="signup" onclick="switchAuthTab('signup')">註冊</button>
         </div>
-        <div id="authMsg" class="auth-msg"></div>
-        <input type="email" id="authEmail" placeholder="Email" autocomplete="email">
-        <input type="password" id="authPwd" placeholder="密碼（至少6位）" autocomplete="current-password">
+        <div id="authMsg" class="auth-msg" role="status" aria-live="polite"></div>
+        <label for="authEmail">Email</label>
+        <input type="email" id="authEmail" placeholder="you@example.com" autocomplete="email">
+        <label for="authPwd">密碼（至少 6 位）</label>
+        <input type="password" id="authPwd" placeholder="••••••" autocomplete="current-password">
         <button class="auth-submit" id="authSubmitBtn" onclick="doAuth()">登入</button>
         <button class="auth-close" onclick="hideAuthModal()">關閉</button>
       </div>`;
@@ -94,11 +96,22 @@ function showAuthModal(mode) {
   }
   modal.classList.add('show');
   switchAuthTab(mode || 'login');
+  document.getElementById('authEmail').focus();
+  document.addEventListener('keydown', authKeyHandler);
 }
 
 function hideAuthModal() {
   const m = document.getElementById('authModal');
   if (m) m.classList.remove('show');
+  document.removeEventListener('keydown', authKeyHandler);
+}
+
+function authKeyHandler(e){
+  if (e.key === 'Escape') hideAuthModal();
+  else if (e.key === 'Enter' && e.target.closest && e.target.closest('.auth-box')) {
+    e.preventDefault();
+    doAuth();
+  }
 }
 
 function switchAuthTab(mode) {

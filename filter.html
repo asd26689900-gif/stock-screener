@@ -1,106 +1,9 @@
 <title>自訂篩選 — 盤後精選模組</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="js/auth.css">
-<style>
-:root {
-  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
-  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
-  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
-  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
-  --green: #4A8B6E; --red: #C0544F;
-  --font-display: Georgia, 'Times New Roman', serif;
-  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-  --radius: 6px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-    --green: #6BB88E; --red: #E07070;
-    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  }
-}
-:root[data-theme="dark"] {
-  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-  --green: #6BB88E; --red: #E07070;
-  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
-.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
-.topbar .brand span{color:var(--gold)}
-.topbar .spacer{flex:1}
-.nav-links{display:flex;gap:12px}
-.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
-.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
-
-.container{max-width:1000px;margin:0 auto;padding:24px 16px 80px}
-h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom:4px}
-.subtitle{font-size:13px;color:var(--text-secondary);margin-bottom:20px}
-
-/* Filter panel */
-.filter-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;margin-bottom:20px}
-.filter-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
-.filter-group label{display:block;font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:.03em;margin-bottom:4px}
-.filter-row{display:flex;gap:6px;align-items:center}
-.filter-row input{width:80px;padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius);font-family:var(--font-mono);font-size:13px;background:var(--surface);color:var(--text);text-align:center}
-.filter-row span{font-size:12px;color:var(--text-secondary)}
-.filter-actions{margin-top:16px;display:flex;gap:10px;align-items:center}
-.btn-filter{padding:8px 24px;background:var(--gold);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer}
-.btn-filter:hover{opacity:.85}
-.btn-reset{padding:8px 16px;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:13px;color:var(--text-secondary);cursor:pointer}
-.btn-reset:hover{border-color:var(--red);color:var(--red)}
-.result-count{font-size:13px;color:var(--text-secondary);margin-left:auto}
-
-/* Results table */
-.results{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-thead th{position:sticky;top:0;background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em;cursor:pointer;user-select:none}
-thead th:first-child,thead th:nth-child(2){text-align:left}
-thead th:hover{color:var(--gold)}
-thead th.sorted{color:var(--gold)}
-thead th .sort-arrow{font-size:10px;margin-left:3px}
-tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
-tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
-tbody tr:hover{background:var(--gold-soft)}
-tbody tr{cursor:pointer}
-.up{color:var(--red)}.dn{color:var(--green)}
-.empty-msg{text-align:center;padding:40px;color:var(--text-secondary);font-style:italic}
-
-.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
-@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.filter-grid{grid-template-columns:1fr 1fr}.container{padding:16px 8px 60px}thead th,tbody td{padding:8px;font-size:11px}}
-.nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
-@media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
-</style>
-
-<div class="topbar">
-  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-  <button class="nav-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('show')" aria-label="選單">☰</button>
-  <div class="nav-links">
-    <a href="index.html">選股模組</a>
-    <a href="stk.html">個股分析</a>
-    <a href="heatmap.html">產業熱力圖</a>
-    <a href="institutional.html">法人買賣超</a>
-    <a href="margin.html">融資融券</a>
-    <a href="ipo.html">股票抽籤</a>
-    <a href="calendar.html">投資行事曆</a>
-    <a href="history.html">歷史漲跌幅</a>
-    <a href="tools.html">股票計算機</a>
-    <a href="watchlist.html">★ 自選股</a>
-  
-  </div>
-  <div class="spacer"></div>
-  <div id="authArea"></div>
-</div>
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<div id="topbar"></div>
 
 <div class="container">
   <h2>自訂篩選</h2>
@@ -156,10 +59,11 @@ tbody tr{cursor:pointer}
     <div class="empty-msg">設定條件後按「篩選」</div>
   </div>
 </div>
-<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）</div>
+<div id="footer"></div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/auth.js"></script>
 <script>
 const COLS = [
@@ -179,13 +83,14 @@ const COLS = [
 let sortCol = 'volume';
 let sortAsc = false;
 let lastData = [];
+let limit = 200;
 
 function getVal(id){ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); }
 
 async function doFilter(){
   if(!sb){document.getElementById('results').innerHTML='<div class="empty-msg">系統載入中...</div>';return;}
 
-  let q = sb.from('stock_metrics').select('*').order(sortCol,{ascending:sortAsc}).limit(200);
+  let q = sb.from('stock_metrics').select('*').order(sortCol,{ascending:sortAsc}).limit(limit);
 
   const fns = [
     ['f_close_min','close','gte'], ['f_close_max','close','lte'],
@@ -234,10 +139,16 @@ function renderTable(){
       }
       if(typeof v==='number') return '<td>'+v.toLocaleString()+'</td>';
       return '<td>'+(v||'-')+'</td>';
-    }).join('') + '</tr>';
+    }).join('') + '<td>'+starBtn(row.stock_id)+'</td></tr>';
   }).join('');
 
-  document.getElementById('results').innerHTML = `<div class="table-wrap"><table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table></div>`;
+  const more = lastData.length >= limit ? `<div class="load-more-wrap"><button class="btn" onclick="loadMore()">載入更多</button></div>` : '';
+  document.getElementById('results').innerHTML = `<div class="table-wrap"><table><thead><tr>${ths}<th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
+}
+
+function loadMore(){
+  limit += 200;
+  doFilter();
 }
 
 function changeSort(col){
@@ -248,6 +159,7 @@ function changeSort(col){
 
 function resetFilters(){
   document.querySelectorAll('.filter-panel input').forEach(i=>i.value='');
+  limit = 200;
   document.getElementById('results').innerHTML='<div class="empty-msg">設定條件後按「篩選」</div>';
   document.getElementById('resultCount').textContent='';
 }

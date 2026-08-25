@@ -912,6 +912,18 @@ for sid in stocks:
                  "big_holder_pct": big_holder, "retail_holder_pct": retail_holder},
         "scores": {"chip": chip_score, "fundamental": fund_score, "technical": tech_score},
         "criteria": {"chip": chip_criteria, "fundamental": fund_criteria, "technical": tech_criteria},
+        # 評分原始值：前端「評分設定」可依此重算與自訂權重（舊資料無此欄位時自動沿用伺服器 pass）
+        "raw": {
+            "dd": dd, "fd": fd, "td": td,
+            "main_net": main_net, "retail_net": retail_net,
+            "vol": vol, "avg_vol5": avg_vol(sid, 5),
+            "pe": pe, "pb": pb, "dy": dy,
+            "yoy": (ri.get("yoy", 0) if ri else 0),
+            "mom": (ri.get("mom", 0) if ri else 0),
+            "consec_up": consec_up, "d3_chg": round(d3_chg, 2), "rsv": round(rsv, 2),
+            "ma5": ma5, "ma10": ma10, "ma20": ma20, "ma60": ma60,
+            "close": close,
+        },
         "industry": sid_industry.get(sid, ""),
         "fundamental": {"pe": pe, "pb": pb, "dividend_yield": dy},
         "history": history,

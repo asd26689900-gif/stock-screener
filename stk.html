@@ -1,179 +1,39 @@
 <title>個股分析 — 盤後精選模組</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="js/auth.css">
-<style>
-:root {
-  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
-  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
-  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
-  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
-  --green: #4A8B6E; --red: #C0544F;
-  --font-display: Georgia, 'Times New Roman', serif;
-  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-  --radius: 6px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-    --green: #6BB88E; --red: #E07070;
-    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  }
-}
-:root[data-theme="dark"] {
-  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-  --green: #6BB88E; --red: #E07070;
-  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
-.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
-.topbar .brand span{color:var(--gold)}
-.topbar .spacer{flex:1}
-.nav-links{display:flex;gap:12px;flex-wrap:wrap}
-.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
-.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
-.search-box{display:flex;gap:8px;align-items:center}
-.search-box input{font-family:var(--font-mono);font-size:14px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);width:140px}
-.search-box input::placeholder{color:var(--text-secondary)}
-.search-box button{padding:7px 16px;background:var(--gold);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer}
-.container{max-width:900px;margin:0 auto;padding:24px 16px 80px}
-.empty-state{text-align:center;padding:80px 20px;color:var(--text-secondary);font-size:15px}
-.empty-state code{background:var(--gold-soft);padding:2px 6px;border-radius:3px;font-family:var(--font-mono);font-size:13px}
-.stk-header{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:24px;margin-bottom:16px}
-.stk-id{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);letter-spacing:.05em}
-.stk-name{font-family:var(--font-display);font-size:28px;color:var(--ink);margin:4px 0 16px}
-.price-row{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
-.price-big{font-family:var(--font-mono);font-size:32px;font-weight:700;letter-spacing:-.02em}
-.price-change{font-family:var(--font-mono);font-size:16px;font-weight:600}
-.price-date{font-size:12px;color:var(--text-secondary);margin-left:auto}
-.ohlcv{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:12px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border-light)}
-.ohlcv-item{text-align:center}
-.ohlcv-label{font-size:11px;color:var(--text-secondary);letter-spacing:.04em;margin-bottom:2px}
-.ohlcv-val{font-family:var(--font-mono);font-size:15px;color:var(--ink)}
-/* ── K線圖區 ── */
-.chart-box{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 16px 12px;margin-bottom:16px;position:relative}
-.chart-toolbar{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
-.chart-toolbar .chart-label{font-family:var(--font-display);font-size:15px;color:var(--ink);margin-right:auto}
-.tf-btn,.ind-btn{padding:4px 12px;border:1px solid var(--border);border-radius:99px;font-size:11px;cursor:pointer;background:var(--surface);color:var(--text-secondary);font-family:var(--font-mono)}
-.tf-btn.active,.ind-btn.active{background:var(--gold-soft);color:var(--gold);border-color:var(--gold)}
-.ma-legend{display:flex;gap:12px;font-size:11px;font-family:var(--font-mono);flex-wrap:wrap}
-.chart-canvas{position:relative;overflow:hidden;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:none}
-.chart-canvas canvas{display:block}
-.chart-overlay{position:absolute;top:0;left:0;pointer-events:none}
-.chart-tooltip{position:absolute;top:0;left:0;pointer-events:none;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:11px;font-family:var(--font-mono);line-height:1.6;white-space:nowrap;box-shadow:var(--shadow);z-index:10;display:none}
-.chart-price-tag{position:absolute;right:0;pointer-events:none;background:var(--gold);color:#fff;font-size:10px;font-family:var(--font-mono);padding:1px 6px;border-radius:2px;z-index:9;display:none}
-/* ── 籌碼 + 評分 ── */
-.chip-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.chip-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
-.chip-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px}
-.chip-val{font-family:var(--font-mono);font-size:20px;font-weight:700;color:var(--ink)}
-.chip-sub{font-size:12px;color:var(--text-secondary);margin-top:4px;font-family:var(--font-mono)}
-.score-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:16px}
-.score-total{padding:20px 24px;display:flex;align-items:center;gap:16px;border-bottom:1px solid var(--border)}
-.score-ring{width:72px;height:72px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:22px;font-weight:700;color:#fff;flex-shrink:0}
-.score-total-label{font-family:var(--font-display);font-size:18px;color:var(--ink)}
-.score-total-comment{font-size:13px;color:var(--text-secondary);margin-top:4px}
-.score-dim{border-bottom:1px solid var(--border-light)}
-.score-dim:last-child{border-bottom:none}
-.score-dim-header{padding:14px 24px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
-.score-dim-header:hover{background:var(--gold-soft)}
-.score-dim-title{font-family:var(--font-display);font-size:15px;color:var(--ink);flex:1}
-.score-dim-badge{font-family:var(--font-mono);font-size:13px;font-weight:700;padding:2px 10px;border-radius:99px}
-.badge-high{background:rgba(74,139,110,.15);color:var(--green)}
-.badge-mid{background:var(--gold-soft);color:var(--gold)}
-.badge-low{background:rgba(192,84,79,.12);color:var(--red)}
-.score-dim-arrow{font-size:10px;color:var(--text-secondary);transition:transform .2s}
-.score-dim.open .score-dim-arrow{transform:rotate(90deg)}
-.score-dim-list{display:none;padding:0 24px 14px}
-.score-dim.open .score-dim-list{display:block}
-.criteria{display:flex;align-items:flex-start;gap:8px;padding:6px 0;font-size:13px;color:var(--text)}
-.criteria .icon{flex-shrink:0;width:18px;text-align:center;font-size:14px}
-.pass .icon{color:var(--green)}.fail .icon{color:var(--red)}.fail{color:var(--text-secondary)}
-.up{color:var(--red)}.dn{color:var(--green)}
-/* ── 均線標籤 ── */
-.ma-tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px}
-.ma-tag{font-size:11px;font-family:var(--font-mono);padding:3px 10px;border-radius:99px;font-weight:600}
-.ma-tag.above{background:rgba(74,139,110,.15);color:var(--green)}
-.ma-tag.below{background:rgba(192,84,79,.12);color:var(--red)}
-/* ── 技術指標卡片 ── */
-.ind-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:16px}
-.ind-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px;text-align:center}
-.ind-card-label{font-size:11px;color:var(--text-secondary);margin-bottom:4px}
-.ind-card-val{font-family:var(--font-mono);font-size:22px;font-weight:700}
-.ind-card-sub{font-size:10px;color:var(--text-secondary);margin-top:4px;font-family:var(--font-mono)}
-/* ── 基本面 ── */
-.fund-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-/* ── 個股簡介 ── */
-.stk-intro{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:16px}
-.stk-intro-industry{font-size:12px;color:var(--teal);font-weight:600;margin-bottom:6px}
-.stk-intro-name{font-family:var(--font-display);font-size:16px;color:var(--ink);margin-bottom:4px}
-.stk-intro-meta{font-size:12px;color:var(--text-secondary);line-height:1.7}
-/* ── 相關連結 ── */
-.ext-links{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
-.ext-links a{font-size:12px;color:var(--gold);text-decoration:none;padding:5px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
-.ext-links a:hover{background:var(--gold-soft)}
-/* ── 營收 ── */
-.rev-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px}
-.rev-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
-.rev-label{font-size:12px;color:var(--text-secondary);margin-bottom:4px}
-.rev-val{font-family:var(--font-mono);font-size:18px;font-weight:700;color:var(--ink)}
-.rev-sub{font-size:12px;color:var(--text-secondary);margin-top:4px;font-family:var(--font-mono)}
-.rev-chart-wrap{overflow-x:auto}
-.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
-@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.chip-grid{grid-template-columns:1fr}.rev-grid{grid-template-columns:1fr}.price-big{font-size:24px}.stk-name{font-size:22px}.container{padding:16px 8px 60px}}
-.nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
-@media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
-</style>
-
-<div class="topbar">
-  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-  <button class="nav-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('show')" aria-label="選單">☰</button>
-  <div class="nav-links">
-    <a href="index.html">選股模組</a>
-    <a href="stk.html" class="active">個股分析</a>
-    <a href="heatmap.html">產業熱力圖</a>
-    <a href="institutional.html">法人買賣超</a>
-    <a href="margin.html">融資融券</a>
-    <a href="ipo.html">股票抽籤</a>
-    <a href="calendar.html">投資行事曆</a>
-    <a href="history.html">歷史漲跌幅</a>
-    <a href="tools.html">股票計算機</a>
-    <a href="watchlist.html">★ 自選股</a>
-  
-  </div>
-  <div class="spacer"></div>
-  <div class="search-box">
-    <input type="text" id="stkInput" placeholder="輸入股號 如 2330" maxlength="6">
-    <button onclick="doSearch()">查詢</button>
-  </div>
-  <div id="authArea"></div>
-</div>
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<div id="topbar"></div>
 
 <div class="container" id="app">
   <div class="empty-state">輸入股號查詢個股分析<br><small>例如 <code>2330</code>、<code>2454</code>、<code>3661</code></small></div>
 </div>
-<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）</div>
+<div id="footer"></div>
+
+<div class="modal-overlay" id="scoreModal" style="display:none">
+  <div class="modal">
+    <button class="modal-close" onclick="closeScoreCfg()" aria-label="關閉"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    <div class="modal-title">評分條件設定</div>
+    <div id="scoreCfgBody"></div>
+    <p class="score-cfg-hint" id="scoreCfgHint" style="margin-top:4px"></p>
+    <div class="cfg-actions">
+      <button class="btn" onclick="resetScoreCfgUI()">重設預設</button>
+      <button class="btn btn-primary" onclick="applyScoreCfg()">套用</button>
+    </div>
+  </div>
+</div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/auth.js"></script>
 <script>
-const input=document.getElementById('stkInput');
-input.addEventListener('keydown',e=>{if(e.key==='Enter')doSearch()});
-if(location.hash){input.value=location.hash.slice(1);setTimeout(doSearch,600);}
+if(location.hash){setTimeout(doSearch,300);}
 
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
 let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;
 let _chartRAF=0, _chartEventsAttached=false, _cachedMAs=null, _cachedMADataLen=0;
+let scoreCfgDraft=null;
 const TF_MAP = {
   '5m':  {interval:'5m',  range:'1mo',  label:'5分'},
   '60m': {interval:'60m', range:'6mo', label:'60分'},
@@ -184,7 +44,7 @@ const TF_MAP = {
 let minuteCache = {}; // {key: [{d,o,h,l,c,v}]}
 
 async function doSearch(){
-  const sid=input.value.trim(); if(!sid)return;
+  const sid=(location.hash||'').replace('#','').trim(); if(!sid)return;
   location.hash=sid; currentSid=sid; minuteCache={}; currentTF='D'; chartZoom=1; chartPanIdx=0; _chartEventsAttached=false; _cachedMAs=null;
   if(!sb){document.getElementById('app').innerHTML='<div class="empty-state">系統載入中...</div>';return;}
 
@@ -350,7 +210,6 @@ function renderExtLinks(sid,name){
 
 function renderStock(sid,d){
   const chg=d.change||0,chgPct=d.change_pct||0,chgSign=chg>=0?'▲':'▼';
-  const total=(d.scores.chip||0)+(d.scores.fundamental||0)+(d.scores.technical||0);
   const rev=d.revenue||[];
   const latestRev=rev.length?rev[rev.length-1]:null;
   const chartData=getChartData();
@@ -361,7 +220,7 @@ function renderStock(sid,d){
     <div class="price-row">
       <span class="price-big ${cls(chg)}">${fmt(d.close)}</span>
       <span class="price-change ${cls(chg)}">${chgSign}${Math.abs(chg)} (${chgPct>0?'+':''}${chgPct.toFixed(2)}%)</span>
-      <span class="price-date">📅 ${d.date}</span>
+      <span class="price-date">${I('calendar',12)} ${d.date}</span>
     </div>
     <div class="ohlcv">
       <div class="ohlcv-item"><div class="ohlcv-label">開盤</div><div class="ohlcv-val">${fmt(d.open)}</div></div>
@@ -374,13 +233,14 @@ function renderStock(sid,d){
   ${hasChart?`
   <div class="chart-box">
     <div class="chart-toolbar">
-      <span class="chart-label">📈 K線走勢圖</span>
+      <span class="chart-label">${I('chart',14)} K線走勢圖</span>
       <button class="tf-btn ${currentTF==='5m'?'active':''}" data-tf="5m" onclick="switchTF('5m')">5分</button>
       <button class="tf-btn ${currentTF==='60m'?'active':''}" data-tf="60m" onclick="switchTF('60m')">60分</button>
       <button class="tf-btn ${currentTF==='D'?'active':''}" data-tf="D" onclick="switchTF('D')">日</button>
       <button class="tf-btn ${currentTF==='W'?'active':''}" data-tf="W" onclick="switchTF('W')">週</button>
       <button class="tf-btn ${currentTF==='M'?'active':''}" data-tf="M" onclick="switchTF('M')">月</button>
     </div>
+    <div class="ohlcv-legend" id="ohlcvLegend"></div>
     <div class="ma-legend" id="maLegend"></div>
     <div class="chart-canvas" id="chartCanvas">
       <canvas id="kCanvas"></canvas>
@@ -395,7 +255,7 @@ function renderStock(sid,d){
       <button class="ind-btn ${currentInd==='macd'?'active':''}" data-ind="macd" onclick="switchInd('macd')">MACD</button>
     </div>
     <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
-  </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">📈 K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
+  </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">${I('chart',14)} K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
   ${renderMATags(d)}
   ${renderIndCards(d)}
   ${renderFundCards(d)}
@@ -405,7 +265,7 @@ function renderStock(sid,d){
     <div class="rev-card"><div class="rev-label">年增率 YoY</div><div class="rev-val ${cls(latestRev?.yoy)}">${latestRev?(latestRev.yoy>=0?'+':'')+latestRev.yoy.toFixed(1)+'%':'—'}</div><div class="rev-sub">月增 ${latestRev?(latestRev.mom>=0?'+':'')+latestRev.mom.toFixed(1)+'%':'—'}</div></div>
   </div>
   <div class="chart-box">
-    <div class="chart-toolbar"><span class="chart-label">📊 月營收走勢</span></div>
+    <div class="chart-toolbar"><span class="chart-label">${I('chart',14)} 月營收走勢</span></div>
     <div class="rev-chart-wrap"><canvas id="revCanvas"></canvas></div>
   </div>`:''}
   ${renderExtLinks(sid,d.name)}
@@ -415,12 +275,7 @@ function renderStock(sid,d){
     <div class="chip-card"><div class="chip-label">籌碼集中度</div><div class="chip-val">${d.chip.concentration_pct}%</div><div class="chip-sub">集中股數 ${fmt(d.chip.concentration_shares)}張</div></div>
     <div class="chip-card"><div class="chip-label">大戶 / 羊群持股</div><div class="chip-val">${d.chip.big_holder_pct}%</div><div class="chip-sub">羊群 ${d.chip.retail_holder_pct}%</div></div>
   </div>
-  <div class="score-section">
-    <div class="score-total"><div class="score-ring" style="background:${scoreColor(total)}">${total}/30</div><div><div class="score-total-label">總評分：${scoreComment(total)}</div><div class="score-total-comment">籌碼 ${d.scores.chip}/10 ・ 基本 ${d.scores.fundamental}/10 ・ 技術 ${d.scores.technical}/10</div></div></div>
-    ${renderDim('籌碼面',d.scores.chip,d.criteria.chip)}
-    ${renderDim('基本面',d.scores.fundamental,d.criteria.fundamental)}
-    ${renderDim('技術面',d.scores.technical,d.criteria.technical)}
-  </div>`;
+  <div id="scoreSection">${buildScoreHTML(d)}</div>`;
   if(hasChart){
     // 預設顯示最近60根，pan到最新
     const VISIBLE_DEFAULT=60;
@@ -453,8 +308,17 @@ async function switchTF(tf){
 // K 線圖 (Canvas) — XQ 風格
 // ══════════════════════════════════════
 let chartDataCache=[];
-const MA_COLORS=['#D4A840','#5AADAB','#C0544F','#8060C0'];
+const MA_COLORS=['#2962FF','#FF9800','#9C27B0','#8B8780'];
 const MA_PERIODS=[5,10,20,60];
+
+function setOHLCBar(b, prev){
+  const el=document.getElementById('ohlcvLegend');
+  if(!el||!b) return;
+  const chg=prev?(b.c-prev.c):0;
+  const chgP=prev&&prev.c?(chg/prev.c*100):0;
+  const cc=chg>=0?'up':'dn';
+  el.innerHTML=`<span>${b.d}</span><span>開 <b>${b.o.toFixed(2)}</b></span><span>高 <b class="${b.h>=b.o?'up':'dn'}">${b.h.toFixed(2)}</b></span><span>低 <b class="${b.l<=b.o?'up':'dn'}">${b.l.toFixed(2)}</b></span><span>收 <b>${b.c.toFixed(2)}</b></span><span>漲跌 <b class="${cc}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgP>=0?'+':''}${chgP.toFixed(2)}%)</b></span>`;
+}
 
 function calcMA(data,n){
   const r=[];
@@ -639,6 +503,19 @@ function drawChart(data){
     }).join('');
   }
 
+  // 最新價虛線 + 右側標籤
+  if(visData.length){
+    const lastC=visData[visData.length-1].c;
+    const lastY=yP(lastC);
+    const lc=lastC>=visData[visData.length-2]?.c?cUp:cDn;
+    ctx.strokeStyle=lc;ctx.globalAlpha=0.65;ctx.lineWidth=0.8;ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(padL,lastY);ctx.lineTo(drawW-padR,lastY);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+    ctx.fillStyle=lc;ctx.font='10px monospace';ctx.textAlign='right';
+    ctx.fillText(lastC.toFixed(2),drawW-padR-2,lastY-4);
+    setOHLCBar(visData[visData.length-1], visData[visData.length-2]);
+  }
+
   // ── 事件：只掛一次 ──
   if(!_chartEventsAttached) setupChartEvents(canvas);
   drawIndicator(currentInd);
@@ -698,6 +575,7 @@ function setupChartEvents(canvas){
       if(overlay){const octx=overlay.getContext('2d');octx.clearRect(0,0,overlay.width,overlay.height);}
       if(tooltip)tooltip.style.display='none';
       if(priceTag)priceTag.style.display='none';
+      if(chartDataCache.length) setOHLCBar(chartDataCache[chartDataCache.length-1], chartDataCache[chartDataCache.length-2]);
     }
   });
 
@@ -772,13 +650,14 @@ function drawCrosshair(e){
     const chgP=prev&&prev.c?(chg/prev.c*100):0;
     const c=chg>=0?L.cUp:L.cDn;
     tooltip.style.display='block';
-    tooltip.style.left=Math.min(mx+16,rect.width-180)+'px';
+    tooltip.style.left=Math.max(4,Math.min(mx+16,rect.width-190))+'px';
     tooltip.style.top='8px';
     tooltip.innerHTML=`<div style="margin-bottom:3px;font-weight:600">${d.d}</div>
       開 <span style="color:${c}">${d.o}</span>　高 <span style="color:${c}">${d.h}</span><br>
       低 <span style="color:${c}">${d.l}</span>　收 <span style="color:${c}">${d.c}</span><br>
       量 ${fmt(d.v)}張<br>
       漲跌 <span style="color:${c}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgP>=0?'+':''}${chgP.toFixed(2)}%)</span>`;
+    setOHLCBar(d, prev);
   }else{tooltip.style.display='none';}
 }
 
@@ -918,8 +797,95 @@ function drawRevChart(data){
   });
 }
 
-function renderDim(label,score,items){
-  return`<div class="score-dim open"><div class="score-dim-header" onclick="this.parentElement.classList.toggle('open')"><span class="score-dim-arrow">▶</span><span class="score-dim-title">${label}</span><span class="score-dim-badge ${scoreBadge(score)}">${score}/10</span></div><div class="score-dim-list">${(items||[]).map(c=>'<div class="criteria '+(c.pass?'pass':'fail')+'"><span class="icon">'+(c.pass?'✓':'✗')+'</span><span>'+c.text+'</span></div>').join('')}</div></div>`;
+/* ─── 評分區塊（支援使用者自訂條件與權重） ─── */
+function buildScoreHTML(d){
+  const cfg=loadScoreCfg();
+  const {scores,total}=computeScores(d,cfg);
+  const custom=isDefaultScoreCfg(cfg)?'':'<span class="score-cfg-hint">（自訂評分）</span>';
+  return `<div class="score-section">
+    <div class="score-total">
+      <div class="score-total-left">
+        <div class="score-ring" style="background:${scoreColor(total)}">${total}/30</div>
+        <div>
+          <div class="score-total-label">總評分：${scoreComment(total)} ${custom}</div>
+          <div class="score-total-comment">籌碼 ${scores.chip}/10 ・ 基本 ${scores.fundamental}/10 ・ 技術 ${scores.technical}/10</div>
+        </div>
+      </div>
+      <button class="btn btn-sm" onclick="openScoreCfg()">${I('sliders',13)}評分設定</button>
+    </div>
+    ${SCORE_DIMS.map(dim=>renderDim(dim,d,cfg)).join('')}
+  </div>`;
 }
+function renderDim(dim,d,cfg){
+  const items=computeDim(d,dim,cfg);
+  const wSum=items.reduce((s,c)=>s+(c.on?c.w:0),0);
+  const score=wSum?Math.round(10*items.reduce((s,c)=>s+(c.on&&c.pass?c.w:0),0)/wSum):0;
+  return `<div class="score-dim open"><div class="score-dim-header" onclick="this.parentElement.classList.toggle('open')">
+    <span class="score-dim-arrow">${I('chev',10)}</span>
+    <span class="score-dim-title">${SCORE_DIM_LABEL[dim]}</span>
+    <span class="score-dim-badge ${scoreBadge(score)}">${score}/10</span>
+  </div><div class="score-dim-list">${items.map(c=>
+    `<div class="criteria ${c.pass?'pass':'fail'}" style="${c.on?'':'opacity:.45'}"><span class="icon">${c.pass?I('check',13):I('x',13)}</span><span>${c.text}</span></div>`
+  ).join('')}</div></div>`;
+}
+
+/* ─── 評分設定 Modal ─── */
+function openScoreCfg(){
+  if(!currentAnalysis) return;
+  scoreCfgDraft=loadScoreCfg();
+  renderScoreCfg();
+  document.getElementById('scoreModal').style.display='flex';
+}
+function closeScoreCfg(){ document.getElementById('scoreModal').style.display='none'; }
+function renderScoreCfg(){
+  const d=currentAnalysis;
+  const raw=buildRaw(d);
+  const hasRaw=!!d.raw;
+  document.getElementById('scoreCfgBody').innerHTML=SCORE_DIMS.map(dim=>{
+    const items=SCORE_CRITERIA[dim].map((c,i)=>{
+      const s=scoreCfgDraft[dim][c.id];
+      let pass;
+      if(hasRaw){ try{ pass=!!c.test(raw); }catch(e){ pass=false; } }
+      else pass=!!d.criteria?.[dim]?.[i]?.pass;
+      return `<div class="cfg-item ${s.on?'':'disabled'}">
+        <input type="checkbox" ${s.on?'checked':''} onchange="scoreCfgToggle('${dim}','${c.id}')">
+        <span class="cfg-text">${c.text}</span>
+        <span class="cfg-pass">${pass?'命中':'未命中'}</span>
+        <input type="number" class="cfg-weight" min="1" max="10" value="${s.w}" title="權重"
+          onchange="scoreCfgWeight('${dim}','${c.id}',this.value)">
+      </div>`;
+    }).join('');
+    const score=scoreCfgDraft[dim];
+    return `<div class="cfg-dim">
+      <div class="cfg-dim-head"><span class="cfg-dim-name">${SCORE_DIM_LABEL[dim]}</span>
+      <span class="cfg-dim-score">${items.length} 項條件</span></div>
+      ${items}
+    </div>`;
+  }).join('');
+  document.getElementById('scoreCfgHint').textContent=hasRaw
+    ? '可勾選要計分的條件並調整權重（1–10）。'
+    : '目前資料未含評分原始值，僅可勾選/調整權重；重新執行 update.py 後可依原始值重算。';
+}
+function scoreCfgToggle(dim,id){
+  const item=scoreCfgDraft[dim][id];
+  item.on=!item.on;
+  const row=event.target.closest('.cfg-item');
+  if(row) row.classList.toggle('disabled',!item.on);
+}
+function scoreCfgWeight(dim,id,v){
+  scoreCfgDraft[dim][id].w=Math.max(1,Math.min(10,Math.round(Number(v)||1)));
+}
+function applyScoreCfg(){
+  saveScoreCfg(scoreCfgDraft);
+  closeScoreCfg();
+  const sec=document.getElementById('scoreSection');
+  if(sec&&currentAnalysis) sec.innerHTML=buildScoreHTML(currentAnalysis);
+}
+function resetScoreCfgUI(){
+  resetScoreCfg();
+  scoreCfgDraft=loadScoreCfg();
+  renderScoreCfg();
+}
+
 function onAuthReady(){ if(location.hash) doSearch(); }
 </script>

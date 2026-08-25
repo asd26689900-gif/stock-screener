@@ -1,118 +1,15 @@
 <title>產業熱力圖 — 盤後精選模組</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="stylesheet" href="js/auth.css">
-<style>
-:root {
-  --ink: #1C2127; --text: #3B3F45; --text-secondary: #6B7280;
-  --surface: #F5F2EC; --card: #FFFFFF; --border: #DDD8D0; --border-light: #EBE7E0;
-  --gold: #B8860B; --gold-soft: rgba(184,134,11,0.10);
-  --teal: #3A7D7B; --teal-soft: rgba(58,125,123,0.08);
-  --green: #4A8B6E; --red: #C0544F;
-  --font-display: Georgia, 'Times New Roman', serif;
-  --font-body: -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
-  --radius: 6px;
-  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-    --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-    --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-    --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-    --green: #6BB88E; --red: #E07070;
-    --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-  }
-}
-:root[data-theme="dark"] {
-  --ink: #E8E4DC; --text: #C8C4BC; --text-secondary: #8B8780;
-  --surface: #141618; --card: #1E2024; --border: #2E3036; --border-light: #252830;
-  --gold: #D4A840; --gold-soft: rgba(212,168,64,0.12);
-  --teal: #5AADAB; --teal-soft: rgba(90,173,171,0.10);
-  --green: #6BB88E; --red: #E07070;
-  --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--surface);color:var(--text);font-family:var(--font-body);font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.topbar{position:sticky;top:0;z-index:100;background:var(--card);border-bottom:1px solid var(--border);padding:12px 24px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;box-shadow:var(--shadow)}
-.topbar .brand{font-family:var(--font-display);font-size:18px;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
-.topbar .brand span{color:var(--gold)}
-.topbar .spacer{flex:1}
-.nav-links{display:flex;gap:12px}
-.nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
-.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
-.date-label{font-family:var(--font-mono);font-size:13px;color:var(--text-secondary);white-space:nowrap}
-.container{max-width:1100px;margin:0 auto;padding:24px 16px 80px}
-h2{font-family:var(--font-display);font-size:20px;color:var(--ink);margin-bottom:8px}
-.subtitle{font-size:13px;color:var(--text-secondary);margin-bottom:20px}
-.treemap-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;margin-bottom:24px}
-.treemap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:4px}
-.tm-cell{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.15);cursor:pointer;overflow:hidden;transition:opacity .15s}
-.tm-cell:hover{opacity:.85;z-index:2}
-.tm-label{font-size:12px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,0.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:95%;pointer-events:none}
-.tm-val{font-size:10px;font-family:var(--font-mono);color:rgba(255,255,255,0.85);text-shadow:0 1px 2px rgba(0,0,0,0.5);pointer-events:none}
-.tm-cell.small .tm-label{font-size:9px}.tm-cell.tiny .tm-label,.tm-cell.tiny .tm-val{display:none}
-.tooltip{display:none;position:fixed;z-index:999;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,0.15);padding:12px 16px;font-size:13px;pointer-events:none;max-width:260px}
-.tooltip.show{display:block}
-.tooltip .tt-name{font-weight:700;color:var(--ink);margin-bottom:4px}
-.tooltip .tt-row{display:flex;justify-content:space-between;gap:16px;font-family:var(--font-mono);font-size:12px}
-.legend{display:flex;align-items:center;gap:4px;margin-top:12px;justify-content:center;flex-wrap:wrap}
-.legend-bar{width:200px;height:12px;border-radius:6px;background:linear-gradient(to right,#2d8f4e,#4a8b6e,#888,#c07050,#c0544f)}
-.legend-label{font-size:11px;color:var(--text-secondary);font-family:var(--font-mono)}
-.breadcrumb{font-size:13px;color:var(--text-secondary);margin-bottom:12px;display:flex;align-items:center;gap:6px}
-.breadcrumb a{color:var(--gold);cursor:pointer;text-decoration:none}
-.breadcrumb a:hover{text-decoration:underline}
-.stk-table-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:24px;display:none}
-.stk-table-wrap.show{display:block}
-.stk-table-title{padding:14px 20px;font-family:var(--font-display);font-size:16px;color:var(--ink);border-bottom:1px solid var(--border-light)}
-.table-wrap{overflow-x:auto}
-table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
-thead th{background:var(--card);padding:10px 12px;font-size:11px;font-weight:600;color:var(--text-secondary);text-align:right;white-space:nowrap;border-bottom:2px solid var(--border);letter-spacing:.03em}
-thead th:first-child,thead th:nth-child(2){text-align:left}
-tbody td{padding:9px 12px;font-size:13px;text-align:right;border-bottom:1px solid var(--border-light);white-space:nowrap;font-family:var(--font-mono)}
-tbody td:first-child,tbody td:nth-child(2){text-align:left;font-family:var(--font-body)}
-tbody tr:hover{background:var(--gold-soft)}
-.up{color:var(--red)}.dn{color:var(--green)}
-.footer{text-align:center;padding:32px 16px;font-size:12px;color:var(--text-secondary);line-height:1.8}
-/* context menu */
-.ctx-menu{display:none;position:fixed;z-index:1000;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.18);min-width:200px;padding:6px 0;font-size:13px}
-.ctx-menu.show{display:block}
-.ctx-menu-title{padding:6px 14px;font-size:11px;color:var(--text-secondary);font-weight:600;letter-spacing:.03em}
-.ctx-menu-item{padding:8px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text)}
-.ctx-menu-item:hover{background:var(--gold-soft);color:var(--gold)}
-.ctx-menu-item .check{color:var(--green);font-size:14px;width:16px;text-align:center}
-.ctx-menu-sep{border-top:1px solid var(--border-light);margin:4px 0}
-.ctx-menu-input{display:flex;gap:4px;padding:4px 10px}
-.ctx-menu-input input{flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)}
-.ctx-menu-input button{font-size:11px;padding:4px 10px;border:none;border-radius:4px;background:var(--gold);color:#fff;cursor:pointer}
-@media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.treemap{aspect-ratio:4/3}.container{padding:16px 8px 60px}}
-.nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
-@media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
-</style>
-
-<div class="topbar">
-  <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-  <button class="nav-toggle" onclick="this.classList.toggle('open');this.nextElementSibling.classList.toggle('show')" aria-label="選單">☰</button>
-  <div class="nav-links">
-    <a href="index.html">選股模組</a>
-    <a href="stk.html">個股分析</a>
-    <a href="heatmap.html" class="active">產業熱力圖</a>
-    <a href="institutional.html">法人買賣超</a>
-    <a href="margin.html">融資融券</a>
-    <a href="ipo.html">股票抽籤</a>
-    <a href="calendar.html">投資行事曆</a>
-    <a href="history.html">歷史漲跌幅</a>
-    <a href="tools.html">股票計算機</a>
-    <a href="watchlist.html">★ 自選股</a>
-  
-  </div>
-  <div class="spacer"></div>
-  <span class="date-label" id="dateLabel">載入中...</span>
-  <div id="authArea"></div>
-</div>
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<div id="topbar"></div>
 
 <div class="container">
-  <h2>產業熱力圖</h2>
+  <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <h2>產業熱力圖</h2>
+    <span class="date-label" id="dateLabel"></span>
+  </div>
   <p class="subtitle">色塊面積 = 市值，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
   <div class="breadcrumb" id="breadcrumb" style="display:none"><a onclick="showIndustry()">全部產業</a> <span>›</span> <span id="bcName"></span></div>
   <div class="treemap-wrap"><div class="treemap" id="treemap"></div>
@@ -123,12 +20,13 @@ tbody tr:hover{background:var(--gold-soft)}
     <div class="table-wrap"><table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>市值</th><th>成交額</th></tr></thead><tbody id="stkTableBody"></tbody></table></div>
   </div>
 </div>
-<div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）</div>
+<div id="footer"></div>
 <div class="tooltip" id="tooltip"><div class="tt-name" id="ttName"></div><div class="tt-row"><span>漲跌幅</span><span id="ttChg"></span></div><div class="tt-row"><span>市值</span><span id="ttMcap"></span></div><div class="tt-row"><span>成交額</span><span id="ttVol"></span></div></div>
 <div class="ctx-menu" id="ctxMenu"></div>
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/ui.js"></script>
 <script src="js/auth.js"></script>
 <script>
 let hmData={};
@@ -213,7 +111,7 @@ async function loadHeatmap(){
   if(!sb)return;
   const{data}=await sb.from('daily_heatmap').select('date,data').order('date',{ascending:false}).limit(1).single();
   if(!data)return;
-  document.getElementById('dateLabel').textContent='📅 '+data.date;
+  document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+data.date;
   hmData=data.data||{};
   showIndustry();
 }
@@ -248,13 +146,13 @@ function showCtxMenu(e,sid,sname){
   let html=`<div class="ctx-menu-title">加入 ${sid} ${sname} 到自選股</div>`;
   lists.forEach(ln=>{
     const has=w[ln].includes(sid);
-    html+=`<div class="ctx-menu-item" onclick="toggleWL('${ln}','${sid}')"><span class="check">${has?'✓':''}</span>${ln}</div>`;
+    html+=`<div class="ctx-menu-item" onclick="toggleWL('${ln}','${sid}')"><span class="check">${has?I('check',13):''}</span>${ln}</div>`;
   });
   html+=`<div class="ctx-menu-sep"></div>`;
-  html+=`<div class="ctx-menu-item" onclick="showNewListInput()" id="ctxNewBtn">＋ 新增清單</div>`;
+  html+=`<div class="ctx-menu-item" onclick="showNewListInput()" id="ctxNewBtn">${I('plus',13)} 新增清單</div>`;
   html+=`<div class="ctx-menu-input" id="ctxNewInput" style="display:none"><input id="ctxNewName" placeholder="清單名稱" maxlength="20"><button onclick="createList()">建立</button></div>`;
   html+=`<div class="ctx-menu-sep"></div>`;
-  html+=`<div class="ctx-menu-item" onclick="location.href='stk.html#${sid}'">📊 開啟個股分析</div>`;
+  html+=`<div class="ctx-menu-item" onclick="location.href='stk.html#${sid}'">${I('external',13)} 開啟個股分析</div>`;
   ctxMenu.innerHTML=html;
   // position
   const mx=e.clientX,my=e.clientY;
