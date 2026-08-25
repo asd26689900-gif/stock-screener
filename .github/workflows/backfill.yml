@@ -15,6 +15,10 @@ on:
         description: '延伸模式(往更早回填)'
         type: boolean
         default: false
+      rev_backfill:
+        description: '補月營收歷史(histock 12個月)'
+        type: boolean
+        default: false
   schedule:
     # 每2小時跑一次，盡量吃滿流量
     - cron: '0 */2 * * *'
@@ -43,7 +47,11 @@ jobs:
           elif [ "${{ github.event.inputs.extend }}" = "true" ]; then
             EXTEND_FLAG="--extend"
           fi
-          python -X utf8 backfill.py $EXTEND_FLAG --months ${{ github.event.inputs.months || '6' }} --offset ${{ matrix.batch }} --limit 600
+          REV_FLAG=""
+          if [ "${{ github.event.inputs.rev_backfill }}" = "true" ]; then
+            REV_FLAG="--revenue"
+          fi
+          python -X utf8 backfill.py $EXTEND_FLAG $REV_FLAG --months ${{ github.event.inputs.months || '6' }} --offset ${{ matrix.batch }} --limit 600
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

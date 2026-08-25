@@ -231,6 +231,52 @@ def _parse_mops_html(text):
     return rows
 
 # ═══════════════════════════════════════
+#  抓取月營收 (TWSE/TPEX OpenAPI — 穩定、無 WAF)
+#  上市: openapi.twse.com.tw /opendata/t187ap05_L
+#  上櫃: www.tpex.org.tw /openapi/v1/mopsfin_t187ap05_O
+# ═══════════════════════════════════════
+def fetch_monthly_revenue_openapi():
+    """最新一個月營收彙總表（含 mom/yoy），回傳 {stock_id: [row, ...]}"""
+    result = defaultdict(list)
+    sources = [
+        ("sii", "https://openapi.twse.com.tw/v1/opendata/t187ap05_L"),
+        ("otc", "https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap05_O"),
+    ]
+    for market, url in sources:
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=30)
+            data = r.json()
+            if not isinstance(data, list):
+                print(f"     OpenAPI 營收({market}): 回應格式異常", flush=True)
+                continue
+            cnt = 0
+            for row in data:
+                sid = str(row.get("公司代號", "")).strip()
+                ym = str(row.get("資料年月", "")).strip()
+                if not sid or len(ym) != 5:
+                    continue
+                try:
+                    month = f"{int(ym[:3]) + 1911}/{ym[3:]}"   # 11507 → 2026/07
+                except Exception:
+                    continue
+                rev = parse_num(row.get("營業收入-當月營收", "0"))
+                if not rev:
+                    continue
+                result[sid].append({
+                    "stock_id": sid,
+                    "name": str(row.get("公司名稱", "")).strip(),
+                    "revenue": rev,
+                    "rev_mom": parse_num(row.get("營業收入-上月比較增減(%)", "0")),
+                    "rev_yoy": parse_num(row.get("營業收入-去年同月增減(%)", "0")),
+                    "month": month,
+                })
+                cnt += 1
+            print(f"     OpenAPI 營收: {market} → {cnt} 檔 ({month if cnt else '-'})", flush=True)
+        except Exception as e:
+            print(f"     OpenAPI 營收失敗({market}): {e}", flush=True)
+    return result
+
+# ═══════════════════════════════════════
 #  抓取產業分類 (TWSE/TPEX Open API)
 # ═══════════════════════════════════════
 
@@ -494,23 +540,28 @@ def get_inst_consecutive(sid, inst_type):
 
 # ── 3. 月營收 ──
 print("⏳ 抓取月營收...")
-rev = defaultdict(list)
 REV_MONTHS = int(os.environ.get("REV_MONTHS", "2"))
 print(f"   營收月數: {REV_MONTHS}")
-for months_ago in range(REV_MONTHS):
-    d = today.replace(day=1) - timedelta(days=months_ago * 30)
-    y, m = d.year, d.month
-    for market in ("sii", "otc"):
-        rows = fetch_monthly_revenue(y, m, market)
-        for r in rows:
-            rev[r["stock_id"]].append(r)
-        time.sleep(1)
+# 主來源：TWSE/TPEX OpenAPI（最新一個月，穩定、無 WAF）
+rev = fetch_monthly_revenue_openapi()
+if not rev:
+    print("   ⚠ OpenAPI 營收為空，改用 MOPS 補抓", flush=True)
+    rev = defaultdict(list)
+    for months_ago in range(REV_MONTHS):
+        d = today.replace(day=1) - timedelta(days=months_ago * 30)
+        y, m = d.year, d.month
+        for market in ("sii", "otc"):
+            rows = fetch_monthly_revenue(y, m, market)
+            for r in rows:
+                r["month"] = f"{y}/{m:02d}"
+                rev[r["stock_id"]].append(r)
+            time.sleep(1)
 print(f"   月營收: {len(rev)} 檔")
 if not rev:
-    print("   ⚠ 警告：月營收抓取為 0 檔（MOPS 可能被 WAF 擋住），營收圖與營收條件會缺資料，建議稍後重試", flush=True)
+    print("   ⚠ 警告：月營收抓取為 0 檔（OpenAPI/MOPS 都失敗），營收圖與營收條件會缺資料", flush=True)
 
 for sid in rev:
-    rev[sid].sort(key=lambda x: (x.get("revenue", 0)), reverse=False)  # ponytail: 粗排
+    rev[sid].sort(key=lambda x: x.get("month", ""))
 
 def get_rev_info(sid):
     data = rev.get(sid, [])
@@ -779,6 +830,28 @@ print(f"   產業分類: {len(sid_industry)} 檔")
 
 stk_analysis = {}
 
+# 讀取前一交易日 daily_stk 的營收歷史，跨日累積（避免每日重寫把歷史清空）
+prev_rev_map = {}
+if sb:
+    try:
+        prev_rows = []
+        for page in range(3):
+            rows = sb.table("daily_stk").select("stock_id,data") \
+                .lt("date", end_str).order("date", {"ascending": False}) \
+                .range(page * 1000, page * 1000 + 999).execute().data
+            if not rows:
+                break
+            prev_rows.extend(rows)
+            if len(rows) < 1000:
+                break
+        for row in prev_rows:
+            d = row.get("data") or {}
+            if d.get("revenue"):
+                prev_rev_map[row["stock_id"]] = d["revenue"]
+        print(f"   前一交易日營收歷史: {len(prev_rev_map)} 檔", flush=True)
+    except Exception as e:
+        print(f"   ⚠ 讀取前一交易日營收歷史失敗: {e}", flush=True)
+
 # 分析全部有足夠資料的股票（非 ETF/權證/牛熊證）
 for sid in stocks:
     data = stocks.get(sid, [])
@@ -896,12 +969,21 @@ for sid in stocks:
     # 月營收歷史（營收圖用）
     rev_history = []
     rev_info = rev.get(sid, [])
-    for r in rev_info[-12:]:
+    merged = {}
+    for r in prev_rev_map.get(sid, []):
+        k = r.get("m") or r.get("month")
+        if k:
+            merged[k] = r
+    for r in rev_info:
+        if r.get("month"):
+            merged[r["month"]] = r
+    for mkey in sorted(merged)[-12:]:
+        r = merged[mkey]
         rev_history.append({
-            "m": r.get("month", ""),
-            "rev": r.get("revenue", 0),
-            "mom": float(r.get("rev_mom", 0) or 0),
-            "yoy": float(r.get("rev_yoy", 0) or 0),
+            "m": r.get("m") or r.get("month") or mkey,
+            "rev": r.get("rev", r.get("revenue", 0)),
+            "mom": float(r.get("mom", r.get("rev_mom", 0)) or 0),
+            "yoy": float(r.get("yoy", r.get("rev_yoy", 0)) or 0),
         })
 
     stk_analysis[sid] = {

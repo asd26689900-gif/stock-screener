@@ -138,6 +138,43 @@ def classify_market():
     return market
 
 # ═══════════════════════════════════════
+#  月營收歷史 (histock 個股頁, 補 12 個月給營收圖)
+# ═══════════════════════════════════════
+def fetch_histock_revenue(sid, months=12):
+    """回傳 [{m:'YYYY/MM', rev(千元), mom, yoy}, ...] 由舊到新"""
+    import re
+    url = f"https://histock.tw/stock/financial.aspx?no={sid}"
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=20)
+        r.encoding = "utf-8"
+        html = r.text
+    except Exception:
+        return []
+    mtab = re.search(r"(?s)<table[^>]*>(?:(?!</table>).)*單月月增率.*?</table>", html)
+    if not mtab:
+        return []
+    rows = []
+    for tr in re.findall(r"<tr[^>]*>(.*?)</tr>", mtab.group(0), re.S):
+        tds = [re.sub(r"<[^>]+>", "", td).strip()
+               for td in re.findall(r"<td[^>]*>(.*?)</td>", tr, re.S)]
+        if len(tds) < 5:
+            continue
+        m = re.match(r"^(\d{4})/(\d{1,2})$", tds[0])
+        if not m:
+            continue
+        rev = parse_num(tds[1])
+        if not rev:
+            continue
+        rows.append({
+            "m": f"{m.group(1)}/{int(m.group(2)):02d}",
+            "rev": rev,
+            "mom": parse_num(str(tds[3]).replace("%", "")) if len(tds) > 3 else 0,
+            "yoy": parse_num(str(tds[4]).replace("%", "")) if len(tds) > 4 else 0,
+        })
+    rows.sort(key=lambda x: x["m"])
+    return rows[-months:]
+
+# ═══════════════════════════════════════
 #  主程式
 # ═══════════════════════════════════════
 if __name__ == "__main__":
@@ -149,6 +186,7 @@ if __name__ == "__main__":
     parser.add_argument("--stocks", type=str, default="", help="指定股號 (逗號分隔)")
     parser.add_argument("--extend", action="store_true", help="自動往回延伸：偵測現有最早日期，再往前補 N 個月")
     parser.add_argument("--max-years", type=int, default=10, help="最多回填幾年 (預設 10)")
+    parser.add_argument("--revenue", action="store_true", help="月營收歷史回填模式（histock 補 12 個月）")
     args = parser.parse_args()
 
     if not sb:
@@ -178,6 +216,42 @@ if __name__ == "__main__":
         print("🏢 分類上市/上櫃...")
         market_map = classify_market()
         print(f"   上市 {sum(1 for v in market_map.values() if v=='twse')} / 上櫃 {sum(1 for v in market_map.values() if v=='tpex')}")
+
+    # ── revenue 模式：補月營收歷史到 daily_stk 最新 row ──
+    if args.revenue:
+        print(f"📈 營收歷史回填 (histock): {len(stock_list)} 檔")
+        done = 0
+        errors = 0
+        for idx, sid in enumerate(stock_list):
+            hist = fetch_histock_revenue(sid)
+            if not hist:
+                errors += 1
+                print(f"   ❌ {sid}: histock 無資料", end="\r")
+                time.sleep(0.8)
+                continue
+            try:
+                resp = sb.table("daily_stk").select("date,data").eq("stock_id", sid) \
+                    .order("date", {"ascending": False}).limit(1).execute()
+                if not resp.data:
+                    errors += 1
+                    time.sleep(0.8)
+                    continue
+                row = resp.data[0]
+                data = dict(row.get("data") or {})
+                data["revenue"] = hist
+                sb.table("daily_stk").upsert(
+                    {"date": row["date"], "stock_id": sid, "data": data},
+                    on_conflict="date,stock_id"
+                ).execute()
+                done += 1
+            except Exception as e:
+                errors += 1
+                print(f"   ❌ {sid} upsert error: {e}")
+            time.sleep(0.6)
+            if (idx + 1) % 25 == 0 or idx == len(stock_list) - 1:
+                print(f"   [{idx+1}/{len(stock_list)}] 成功 {done} / 失敗 {errors}")
+        print(f"\n✅ 營收回填完成: 成功 {done} / 失敗 {errors}")
+        sys.exit(0)
 
     # ── extend 模式：查現有最早日期，往前再補 N 個月 ──
     today = datetime.now()
