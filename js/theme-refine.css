@@ -1,0 +1,119 @@
+/* ═══════════════════════════════════════════════════════════
+   Financial-daily refinement
+   Loaded AFTER each page's inline <style>, so later declarations win.
+   Keep additions minimal — this only sharpens the existing design.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Topbar: masthead treatment ─────────────────────────── */
+.topbar{
+  padding: 14px 24px;
+  box-shadow: 0 1px 0 var(--border-light), 0 4px 14px rgba(0,0,0,0.04);
+}
+.topbar .brand{
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+.topbar .brand span{ font-weight: 400; font-style: italic; }
+
+/* ── Nav: gold underline for active section ─────────────── */
+.nav-links a{ position: relative; padding: 6px 10px; }
+.nav-links a:hover{ color: var(--gold); background: var(--gold-soft); }
+.nav-links a.active{
+  color: var(--gold);
+  background: transparent;
+  font-weight: 600;
+}
+.nav-links a.active::after{
+  content: '';
+  position: absolute;
+  left: 10px; right: 10px; bottom: -3px;
+  height: 2px;
+  background: var(--gold);
+  border-radius: 2px 2px 0 0;
+}
+
+/* ── Cards / modules: paper-shadow depth ────────────────── */
+.module{
+  border-radius: 8px;
+  box-shadow:
+    0 1px 0 var(--border-light),
+    0 8px 24px rgba(0,0,0,0.05),
+    0 2px 6px rgba(0,0,0,0.03);
+  transition: box-shadow .2s, transform .2s;
+}
+.module:hover{
+  box-shadow:
+    0 1px 0 var(--border-light),
+    0 12px 32px rgba(0,0,0,0.08),
+    0 3px 8px rgba(0,0,0,0.04);
+}
+.module-title{
+  font-size: 18px;
+  letter-spacing: -0.015em;
+}
+.module-header{ padding: 18px 20px 14px; }
+
+/* ── Table headers: editorial-strong ────────────────────── */
+thead th{
+  padding: 12px 12px 10px;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border);
+  border-bottom: 2px solid var(--border);
+}
+
+/* ── Body rows: zebra stripe for dense numeric reading ── */
+tbody tr:nth-child(even) td{ background: var(--surface); }
+tbody tr:hover td{ background: var(--gold-soft); }
+tbody td{
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+/* ── Stock code cell: refine the underlined link ──────── */
+tbody td:first-child{
+  color: var(--gold);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border-light);
+  position: relative;
+}
+tbody tr:hover td:first-child{ color: var(--gold); }
+
+/* ── Dark-mode fine-tune: cards need inner highlight ──── */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .module{
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.03) inset,
+      0 6px 20px rgba(0,0,0,0.35),
+      0 2px 6px rgba(0,0,0,0.25);
+  }
+  :root:not([data-theme="light"]) .topbar{
+    box-shadow:
+      0 1px 0 rgba(255,255,255,0.02) inset,
+      0 4px 14px rgba(0,0,0,0.4);
+  }
+  :root:not([data-theme="light"]) tbody tr:nth-child(even) td{
+    background: rgba(255,255,255,0.02);
+  }
+}
+:root[data-theme="dark"] .module{
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.03) inset,
+    0 6px 20px rgba(0,0,0,0.35),
+    0 2px 6px rgba(0,0,0,0.25);
+}
+:root[data-theme="dark"] .topbar{
+  box-shadow:
+    0 1px 0 rgba(255,255,255,0.02) inset,
+    0 4px 14px rgba(0,0,0,0.4);
+}
+:root[data-theme="dark"] tbody tr:nth-child(even) td{
+  background: rgba(255,255,255,0.02);
+}
+
+/* ── Empty row: don't zebra it ──────────────────────────── */
+tbody tr.empty-row:nth-child(even) td,
+tbody tr.empty-row td{ background: transparent; }
