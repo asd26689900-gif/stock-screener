@@ -67,9 +67,9 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
     <div class="page-desc">除權息日程，一頁掌握重要事件。</div>
   </div>
   <div class="month-nav">
-    <button onclick="changeMonth(-1)">◀ 上月</button>
+    <button onclick="changeMonth(-1)" aria-label="上月">◀</button>
     <span class="month-label" id="monthLabel"></span>
-    <button onclick="changeMonth(1)">下月 ▶</button>
+    <button onclick="changeMonth(1)" aria-label="下月">▶</button>
   </div>
   <div id="calGrid"></div>
   <div id="eventList"></div>

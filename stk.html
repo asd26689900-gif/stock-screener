@@ -41,10 +41,16 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 .nav-links{display:flex;gap:12px;flex-wrap:wrap}
 .nav-links a{font-size:13px;color:var(--text-secondary);text-decoration:none;padding:4px 8px;border-radius:var(--radius)}
 .nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
-.search-box{display:flex;gap:8px;align-items:center;position:relative}
-.search-box input{font-family:var(--font-mono);font-size:14px;padding:7px 12px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface);color:var(--text);width:140px}
-.search-box input::placeholder{color:var(--text-secondary)}
-.search-box button{padding:7px 16px;background:var(--gold);color:#fff;border:none;border-radius:var(--radius);font-size:13px;font-weight:600;cursor:pointer}
+.search-hero{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:20px;box-shadow:var(--shadow);position:relative}
+.search-hero-label{font-size:11px;color:var(--text-secondary);letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:8px}
+.search-hero-row{display:flex;gap:10px;align-items:center;position:relative}
+.search-hero-row input{flex:1;font-family:var(--font-body);font-size:15px;padding:11px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+.search-hero-row input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.search-hero-row input::placeholder{color:var(--text-secondary)}
+.search-hero-row button{padding:11px 22px;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.search-hero-row button:hover{opacity:.9}
+.search-hero-hint{margin-top:8px;font-size:11px;color:var(--text-secondary)}
+.search-hero-hint code{background:var(--gold-soft);color:var(--gold);padding:1px 6px;border-radius:3px;font-family:var(--font-mono);font-size:11px;margin:0 2px;cursor:pointer}
 .container{max-width:900px;margin:0 auto;padding:24px 16px 80px}
 .empty-state{text-align:center;padding:80px 20px;color:var(--text-secondary);font-size:15px}
 .empty-state code{background:var(--gold-soft);padding:2px 6px;border-radius:3px;font-family:var(--font-mono);font-size:13px}
@@ -132,7 +138,7 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
 @media(max-width:640px){.topbar{padding:10px 12px;gap:8px}.chip-grid{grid-template-columns:1fr}.rev-grid{grid-template-columns:1fr}.price-big{font-size:24px}.stk-name{font-size:22px}.container{padding:16px 8px 60px}}
 .nav-toggle{display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);font-size:20px;padding:4px 10px;cursor:pointer;color:var(--text)}
 @media(max-width:768px){.nav-toggle{display:block}.nav-links{display:none;width:100%;order:99}.nav-links.show{display:flex;flex-wrap:wrap}.topbar{flex-wrap:wrap}}
-.search-dropdown{display:none;position:absolute;top:100%;right:0;z-index:200;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 16px rgba(0,0,0,.15);max-height:320px;overflow-y:auto;min-width:240px;margin-top:4px}
+.search-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:320px;overflow-y:auto;margin-top:6px}
 .search-dropdown.show{display:block}
 .search-item{padding:8px 14px;cursor:pointer;display:flex;gap:8px;font-size:13px;color:var(--text)}
 .search-item:hover,.search-item.active{background:var(--gold-soft);color:var(--gold)}
@@ -162,16 +168,26 @@ body{background:var(--surface);color:var(--text);font-family:var(--font-body);fo
   
   </div>
   <div class="spacer"></div>
-  <div class="search-box">
-    <input type="text" id="stkInput" placeholder="股號或名稱" autocomplete="off">
-    <button onclick="doSearch()">查詢</button>
-    <div class="search-dropdown" id="searchDropdown"></div>
-  </div>
   <div id="authArea"></div>
 </div>
 
-<div class="container" id="app">
-  <div class="empty-state">輸入股號查詢個股分析<br><small>例如 <code>2330</code>、<code>2454</code>、<code>3661</code></small></div>
+<div class="container">
+  <div class="search-hero">
+    <div class="search-hero-label">個股分析</div>
+    <div class="search-hero-row">
+      <input type="text" id="stkInput" placeholder="輸入股號或公司名稱（例：2330 或 台積電）" autocomplete="off">
+      <button onclick="doSearch()">查詢</button>
+      <div class="search-dropdown" id="searchDropdown"></div>
+    </div>
+    <div class="search-hero-hint">
+      快速範例：
+      <code onclick="quickSearch('2330')">2330 台積電</code>
+      <code onclick="quickSearch('2454')">2454 聯發科</code>
+      <code onclick="quickSearch('2317')">2317 鴻海</code>
+      <code onclick="quickSearch('3661')">3661 世芯</code>
+    </div>
+  </div>
+  <div id="app"></div>
 </div>
 <div class="footer">盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>⛰️ 每日自動更新：盤後 15:00（第一次）、22:00（第二次）</div>
 
@@ -211,7 +227,8 @@ input.addEventListener('keydown',e=>{
   if(e.key==='Enter')doSearch();
 });
 function pickStock(id){input.value=id;dropdown.classList.remove('show');doSearch();}
-document.addEventListener('click',e=>{if(!e.target.closest('.search-box'))dropdown.classList.remove('show');});
+function quickSearch(id){input.value=id;dropdown.classList.remove('show');doSearch();}
+document.addEventListener('click',e=>{if(!e.target.closest('.search-hero'))dropdown.classList.remove('show');});
 
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd', customMode=false;
 let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;

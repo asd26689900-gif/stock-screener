@@ -117,7 +117,7 @@ tbody tr:hover{background:var(--gold-soft)}
   <p class="subtitle">色塊面積 = 市值，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
   <div class="breadcrumb" id="breadcrumb" style="display:none"><a onclick="showIndustry()">全部產業</a> <span>›</span> <span id="bcName"></span></div>
   <div class="treemap-wrap"><div class="treemap" id="treemap"></div>
-    <div class="legend"><span class="legend-label">-5%</span><div class="legend-bar"></div><span class="legend-label">+5%</span></div>
+    <div class="legend"><span class="legend-label">-10%</span><div class="legend-bar"></div><span class="legend-label">+10%</span></div>
   </div>
   <div class="stk-table-wrap" id="stkTable">
     <div class="stk-table-title" id="stkTableTitle"></div>
@@ -137,8 +137,8 @@ const treemapEl=document.getElementById('treemap');
 const tooltip=document.getElementById('tooltip');
 
 function chgColor(pct){
-  // ponytail: power curve (0.45) amplifies small changes so ±0.5% is already visibly red/green
-  const c=Math.max(-5,Math.min(5,pct)),abs=Math.abs(c)/5,s=Math.pow(abs,0.45);
+  // ponytail: power curve (0.5) amplifies small changes; cap ±10% = 台股單日漲跌停
+  const c=Math.max(-10,Math.min(10,pct)),abs=Math.abs(c)/10,s=Math.pow(abs,0.5);
   if(c>=0)return`rgb(${Math.round(128+72*s)},${Math.round(128-73*s)},${Math.round(128-83*s)})`;
   return`rgb(${Math.round(128-98*s)},${Math.round(128+32*s)},${Math.round(128-53*s)})`;
 }
