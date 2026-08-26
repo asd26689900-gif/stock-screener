@@ -273,7 +273,7 @@ if __name__ == "__main__":
                 continue
             try:
                 resp = sb.table("daily_stk").select("date,data").eq("stock_id", sid) \
-                    .order("date", {"ascending": False}).limit(1).execute()
+                    .order("date", desc=False).limit(1).execute()
                 if not resp.data:
                     errors += 1
                     time.sleep(0.8)

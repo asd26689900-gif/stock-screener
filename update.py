@@ -837,7 +837,7 @@ if sb:
         prev_rows = []
         for page in range(3):
             rows = sb.table("daily_stk").select("stock_id,data") \
-                .lt("date", end_str).order("date", {"ascending": False}) \
+                .lt("date", end_str).order("date", desc=False) \
                 .range(page * 1000, page * 1000 + 999).execute().data
             if not rows:
                 break
