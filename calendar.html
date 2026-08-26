@@ -3,165 +3,542 @@
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/style.css">
+<style>
+  /* calendar 專屬樣式（延伸自 style.css） */
+  .cal-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px}
+  .cal-summary .summary-val{font-family:var(--font-display);font-size:22px;font-weight:700}
+  .cal-summary .summary-val .unit{font-size:11px;color:var(--text-secondary);font-family:var(--font-body);font-weight:400;margin-left:4px}
+
+  .heat-wrap{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px}
+  .heat-title{font-size:11px;color:var(--text-secondary);letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .heat-legend{display:flex;gap:5px;align-items:center;font-size:10px;color:var(--text-secondary);font-family:var(--font-mono);letter-spacing:0;text-transform:none;font-weight:400}
+  .heat-legend-swatch{width:10px;height:10px;border-radius:2px}
+  .heat-grid{display:grid;grid-template-columns:repeat(14,1fr);gap:4px}
+  .heat-cell{aspect-ratio:1;border-radius:5px;background:var(--surface);border:1px solid var(--border-light);display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;position:relative;transition:transform .12s,border-color .12s}
+  .heat-cell:hover{transform:translateY(-2px);border-color:var(--gold)}
+  .heat-cell.today{border-color:var(--gold);border-width:2px}
+  .heat-cell.past{opacity:.4}
+  .heat-cell.weekend{background:rgba(0,0,0,0.02)}
+  .heat-cell .hc-dow{font-size:9px;color:var(--text-secondary);letter-spacing:.05em;line-height:1}
+  .heat-cell .hc-day{font-family:var(--font-mono);font-size:14px;font-weight:700;color:var(--ink);line-height:1;margin-top:2px}
+  .heat-cell .hc-count{position:absolute;top:2px;right:2px;background:var(--gold);color:#fff;font-size:9px;font-weight:700;padding:1px 5px;border-radius:9px;font-family:var(--font-mono);line-height:1.3;min-width:16px;text-align:center;display:none}
+  .heat-cell.has-events .hc-count{display:block}
+  .heat-cell.d-1{background:rgba(184,134,11,0.08)}
+  .heat-cell.d-2{background:rgba(184,134,11,0.18)}
+  .heat-cell.d-3{background:rgba(184,134,11,0.32)}
+  .heat-cell.d-4{background:rgba(184,134,11,0.48)}
+  .heat-strip-labels{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:8px;font-size:10px;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.08em;font-weight:600}
+  .heat-strip-labels span{text-align:center}
+
+  .filter-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:6px 4px 12px}
+  .filter-pills{display:flex;gap:6px;flex-wrap:wrap}
+  .filter-pill{padding:5px 14px;border-radius:99px;font-size:12px;font-weight:600;border:1px solid var(--border);background:transparent;color:var(--text-secondary);cursor:pointer;transition:all .12s;font-family:inherit}
+  .filter-pill:hover{border-color:var(--gold);color:var(--gold)}
+  .filter-pill.active{background:var(--gold-soft);border-color:var(--gold);color:var(--gold)}
+  .filter-toggle{margin-left:auto;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text-secondary);cursor:pointer;user-select:none}
+  .filter-toggle input{accent-color:var(--gold);cursor:pointer}
+
+  .event-group{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px}
+  .event-group-header{padding:11px 16px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--border-light);background:rgba(0,0,0,0.015)}
+  .event-group-title{font-family:var(--font-display);font-size:14px;color:var(--ink);font-weight:600}
+  .event-group-title .tag{font-size:10px;color:var(--gold);background:var(--gold-soft);padding:2px 8px;border-radius:99px;margin-left:8px;font-family:var(--font-body);font-weight:700;letter-spacing:.05em}
+  .event-group.today .event-group-header{background:var(--gold-soft)}
+  .event-group.today .event-group-title{color:var(--gold)}
+  .event-group-count{font-size:11px;color:var(--text-secondary);font-family:var(--font-mono)}
+  .event-list{padding:2px 0}
+  .event-row{display:grid;grid-template-columns:64px 74px 1fr auto;gap:12px;padding:9px 16px;align-items:center;border-bottom:1px solid var(--border-light);cursor:pointer;transition:background .1s}
+  .event-row:last-child{border-bottom:none}
+  .event-row:hover{background:var(--hover)}
+  .event-row.no-click{cursor:default}
+  .event-date{font-family:var(--font-mono);font-size:12px;color:var(--text-secondary);white-space:nowrap}
+  .event-date .weekday{color:var(--text-secondary);margin-left:3px;font-size:11px}
+  .event-type{font-size:10px;padding:3px 8px;border-radius:4px;font-weight:700;letter-spacing:.03em;text-align:center;white-space:nowrap}
+  .event-type.dividend{background:rgba(74,139,110,0.15);color:var(--green)}
+  .event-type.ipo{background:rgba(192,84,79,0.15);color:var(--red)}
+  .event-type.earnings{background:rgba(58,125,123,0.15);color:var(--teal)}
+  .event-body{font-size:12.5px;color:var(--text);display:flex;gap:10px;align-items:baseline;min-width:0}
+  .event-body .sid{font-family:var(--font-mono);color:var(--gold);font-weight:700}
+  .event-body .name{color:var(--text);font-weight:500}
+  .event-body .detail{color:var(--text-secondary);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .event-wl{font-size:11px;color:var(--gold);white-space:nowrap;display:inline-flex;align-items:center;gap:3px}
+
+  .month-toggle{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-top:6px}
+  .month-toggle-header{display:flex;align-items:center;gap:10px;padding:13px 16px;cursor:pointer;user-select:none}
+  .month-toggle-header:hover{background:var(--hover)}
+  .month-toggle-arrow{display:inline-flex;color:var(--text-secondary);transition:transform .18s}
+  .month-toggle.open .month-toggle-arrow{transform:rotate(90deg)}
+  .month-toggle-title{font-family:var(--font-display);font-size:14px;color:var(--ink);font-weight:600;flex:1}
+  .month-toggle-body{display:none;padding:0 16px 16px;border-top:1px solid var(--border-light)}
+  .month-toggle.open .month-toggle-body{display:block}
+  .cal-day.has-events{background:var(--surface)}
+  .cal-dots{display:flex;gap:2px;flex-wrap:wrap;margin-top:2px}
+  .cal-dot{width:5px;height:5px;border-radius:50%}
+  .cal-dot.dividend{background:var(--gold)}
+  .cal-dot.ipo{background:var(--red)}
+  .cal-dot.earnings{background:var(--teal)}
+  .cal-more{position:absolute;bottom:3px;right:5px;font-size:9px;font-family:var(--font-mono);color:var(--text-secondary);font-weight:700}
+
+  @media(max-width:640px){
+    .event-row{grid-template-columns:56px 64px 1fr;gap:8px;padding:9px 12px}
+    .event-wl{display:none}
+    .heat-grid{grid-template-columns:repeat(7,1fr)}
+    .heat-strip-labels{grid-template-columns:1fr}
+    .heat-strip-labels span:nth-child(2){display:none}
+  }
+</style>
 <div id="topbar"></div>
 
-<div class="container">
+<div class="container" data-page="calendar">
   <div>
     <div class="page-title">📆 投資行事曆</div>
-    <div class="page-desc">除權息日程，一頁掌握重要事件。</div>
+    <div class="page-desc">未來兩週密度一眼掌握，即將到來事件依時序卡片列出。</div>
   </div>
-  <div class="month-nav">
-    <button onclick="changeMonth(-1)">◀ 上月</button>
-    <span class="month-label" id="monthLabel"></span>
- <button onclick="changeMonth(1)">下月</button>
+
+  <!-- 摘要卡 -->
+  <div class="cal-summary" id="summaryStrip"></div>
+
+  <!-- 熱力條 -->
+  <div class="heat-wrap">
+    <div class="heat-title">
+      <span>未來 14 天密度</span>
+      <div class="heat-legend">
+        <span>少</span>
+        <div class="heat-legend-swatch" style="background:var(--surface);border:1px solid var(--border-light)"></div>
+        <div class="heat-legend-swatch" style="background:rgba(184,134,11,0.08)"></div>
+        <div class="heat-legend-swatch" style="background:rgba(184,134,11,0.18)"></div>
+        <div class="heat-legend-swatch" style="background:rgba(184,134,11,0.32)"></div>
+        <div class="heat-legend-swatch" style="background:rgba(184,134,11,0.48)"></div>
+        <span>多</span>
+      </div>
+    </div>
+    <div class="heat-grid" id="heatGrid"></div>
+    <div class="heat-strip-labels"><span>本週</span><span>下週</span></div>
   </div>
-  <div id="calGrid"></div>
-  <div id="eventList"></div>
+
+  <!-- 篩選 -->
+  <div class="filter-bar">
+    <div class="filter-pills" id="typePills">
+      <button class="filter-pill active" data-type="all">全部</button>
+      <button class="filter-pill" data-type="dividend">除權息</button>
+      <button class="filter-pill" data-type="ipo">股票抽籤</button>
+      <button class="filter-pill" data-type="earnings">財報</button>
+    </div>
+    <label class="filter-toggle">
+      <input type="checkbox" id="wlOnly">只看自選股
+    </label>
+  </div>
+
+  <!-- 事件卡片 -->
+  <div id="eventGroups"><div class="loading">載入中...</div></div>
+
+  <!-- 完整月曆（可展開） -->
+  <div class="month-toggle" id="monthToggle">
+    <div class="month-toggle-header" onclick="toggleMonth()">
+      <span class="month-toggle-arrow" id="mtArrow"></span>
+      <span class="month-toggle-title">完整月曆檢視</span>
+      <span style="font-size:11px;color:var(--text-secondary)">展開查看整月分佈</span>
+    </div>
+    <div class="month-toggle-body">
+      <div class="month-nav">
+        <button onclick="changeMonth(-1)" aria-label="上月" id="prevMonthBtn"></button>
+        <span class="month-label" id="monthLabel"></span>
+        <button onclick="changeMonth(1)" aria-label="下月" id="nextMonthBtn"></button>
+      </div>
+      <div id="calGrid"></div>
+    </div>
+  </div>
 </div>
 <div id="footer"></div>
 
+<script src="js/supabase.min.js"></script>
+<script src="js/config.js"></script>
 <script src="js/ui.js"></script>
+<script src="js/auth.js"></script>
 <script>
-let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
-let events=[];
+// ═══════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════
+let events = []; // {date, id, name, type, label, detail}
+let curYear = new Date().getFullYear(), curMonth = new Date().getMonth() + 1;
+let filterType = 'all';
+let wlOnly = false;
+let watchlistIds = new Set();
 
+const DOW = ['日','一','二','三','四','五','六'];
+
+// ═══════════════════════════════════════════════
+// Utils
+// ═══════════════════════════════════════════════
 function pad(n){return String(n).padStart(2,'0');}
+function ymd(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+function todayStr(){return ymd(new Date());}
+function addDays(d, n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function weekdayZh(dateStr){const d=new Date(dateStr);return DOW[d.getDay()];}
 function rocToAD(s){
   if(!s)return'';
-  // handle "115/08/01"
-  let p=s.split('/');
-  if(p.length===3) return `${parseInt(p[0])+1911}-${p[1]}-${p[2]}`;
-  // handle "115年08月20日"
+  const p=s.split('/');
+  if(p.length===3) return `${parseInt(p[0])+1911}-${pad(p[1])}-${pad(p[2])}`;
   const m=s.match(/(\d+)年(\d+)月(\d+)日/);
-  if(m) return `${parseInt(m[1])+1911}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+  if(m) return `${parseInt(m[1])+1911}-${pad(m[2])}-${pad(m[3])}`;
   return s;
 }
 
-function changeMonth(d){
-  curMonth+=d;
-  if(curMonth>12){curMonth=1;curYear++;}
-  if(curMonth<1){curMonth=12;curYear--;}
-  loadData();
-}
-
-async function fetchMonth(year, month){
-  const ym=`${year-1911}${pad(month)}`;
+// ═══════════════════════════════════════════════
+// Data fetch
+// ═══════════════════════════════════════════════
+async function fetchDividend(year, month){
+  const ym = `${year-1911}${pad(month)}`;
   try{
-    const r=await fetch(`/api/twse-proxy?type=dividend&date=${ym}`);
-    const j=await r.json();
-    if(j.data&&j.data.length){
-      j.data.forEach(row=>{
-        const dateStr=rocToAD(row[0]);
-        const id=(row[1]||'').trim();
-        const name=(row[2]||'').trim();
-        const type=(row[3]||'').includes('息')?'除息':'除權';
-        const detail=(row[4]||'').trim();
-        events.push({date:dateStr,id,name,type:'dividend',label:`${type} ${id} ${name} ${detail}`});
-      });
-    }
-  }catch(e){}
-}
-
-async function loadData(){
-  document.getElementById('monthLabel').textContent=`${curYear} 年 ${curMonth} 月`;
-  events=[];
-
-  // 抓當月 + 前後月，確保 ±7 天跨月也有資料
-  const months=[];
-  for(let off=-1;off<=1;off++){
-    let y=curYear, m=curMonth+off;
-    if(m<1){m=12;y--;}
-    if(m>12){m=1;y++;}
-    months.push([y,m]);
-  }
-  await Promise.all(months.map(([y,m])=>fetchMonth(y,m)));
-
-  // 去重（同 date+id）
-  const seen=new Set();
-  events=events.filter(e=>{const k=e.date+e.id;if(seen.has(k))return false;seen.add(k);return true;});
-
-  renderCalendar();
-  renderEventList();
-}
-
-function renderCalendar(){
-  const today=new Date().toISOString().slice(0,10);
-  const firstDay=new Date(curYear,curMonth-1,1).getDay();
-  const daysInMonth=new Date(curYear,curMonth,0).getDate();
-  const daysInPrev=new Date(curYear,curMonth-1,0).getDate();
-
-  const evByDate={};
-  events.forEach(e=>{if(e.date)evByDate[e.date]=(evByDate[e.date]||[]).concat(e);});
-
-  let html='<div class="cal-grid">';
-  ['日','一','二','三','四','五','六'].forEach(d=>html+=`<div class="cal-hdr">${d}</div>`);
-
-  // prev month padding
-  for(let i=firstDay-1;i>=0;i--){
-    const d=daysInPrev-i;
-    html+=`<div class="cal-day other"><div class="cal-num">${d}</div></div>`;
-  }
-
-  // this month
-  for(let d=1;d<=daysInMonth;d++){
-    const dateStr=`${curYear}-${pad(curMonth)}-${pad(d)}`;
-    const isToday=dateStr===today;
-    const dayEvents=evByDate[dateStr]||[];
-    html+=`<div class="cal-day${isToday?' today':''}"><div class="cal-num">${d}</div>`;
-    dayEvents.slice(0,3).forEach(e=>{
-      html+=`<div class="cal-event ${e.type}">${e.id} ${e.name}</div>`;
+    const r = await fetch(`/api/twse-proxy?type=dividend&date=${ym}`);
+    const j = await r.json();
+    if(!j.data) return;
+    j.data.forEach(row=>{
+      const dateStr = rocToAD(row[0]);
+      const id = (row[1]||'').trim();
+      const name = (row[2]||'').trim();
+      const type = (row[3]||'').includes('息')?'除息':'除權';
+      const detail = (row[4]||'').trim();
+      if(!dateStr||!id) return;
+      events.push({date:dateStr, id, name, type:'dividend', label:type, detail});
     });
-    if(dayEvents.length>3) html+=`<div class="cal-event" style="color:var(--text-secondary)">+${dayEvents.length-3} 更多</div>`;
-    html+='</div>';
-  }
-
-  // next month padding
-  const totalCells=firstDay+daysInMonth;
-  const remaining=totalCells%7===0?0:7-totalCells%7;
-  for(let i=1;i<=remaining;i++){
-    html+=`<div class="cal-day other"><div class="cal-num">${i}</div></div>`;
-  }
-  html+='</div>';
-  document.getElementById('calGrid').innerHTML=html;
+  }catch(e){/* silent */}
 }
 
-function renderEventList(){
-  if(!events.length){
-    document.getElementById('eventList').innerHTML='<div class="loading" style="padding:30px">本月尚無除權息資料</div>';
+async function fetchIPO(){
+  try{
+    const r = await fetch('/api/twse-proxy?type=ipo');
+    const j = await r.json();
+    if(!j.data) return;
+    j.data.forEach(row=>{
+      const drawDate = rocToAD(row[0]);
+      const startDate = rocToAD(row[1]);
+      const endDate = rocToAD(row[2]);
+      const id = (row[4]||'').trim();
+      const name = (row[5]||'').trim();
+      const subPrice = (row[7]||'').trim();
+      if(!id) return;
+      if(startDate) events.push({date:startDate, id, name, type:'ipo', label:'抽籤開始', detail:`承銷價 ${subPrice} 元`});
+      if(endDate)   events.push({date:endDate,   id, name, type:'ipo', label:'抽籤截止', detail:`承銷價 ${subPrice} 元`});
+      if(drawDate)  events.push({date:drawDate,  id, name, type:'ipo', label:'抽籤日',   detail:`承銷價 ${subPrice} 元`});
+    });
+  }catch(e){/* silent */}
+}
+
+async function fetchEarnings(){
+  // 已公告季報：per-stock event，出表日期即公告日
+  try{
+    const r = await fetch('/api/twse-proxy?type=earnings');
+    const j = await r.json();
+    if(!Array.isArray(j)) return;
+    j.forEach(row=>{
+      const rocDate = (row['出表日期']||'').trim();
+      if(rocDate.length !== 7) return;
+      const dateStr = `${parseInt(rocDate.slice(0,3))+1911}-${rocDate.slice(3,5)}-${rocDate.slice(5,7)}`;
+      const id = (row['公司代號']||'').trim();
+      const name = (row['公司名稱']||'').trim().replace(/股份有限公司$/, '');
+      const q = row['季別']||'';
+      const eps = row['基本每股盈餘(元)']||'';
+      if(!id) return;
+      events.push({
+        date: dateStr, id, name,
+        type: 'earnings',
+        label: `Q${q} 財報`,
+        detail: eps ? `EPS ${eps} 元` : '',
+      });
+    });
+  }catch(e){/* silent */}
+}
+
+// 台股法定財報申報截止日（市場層級事件，全體適用）
+function generateStatutoryEarnings(){
+  const t = new Date();
+  const year = t.getFullYear();
+  const push = (dateStr, label, detail) => {
+    if(dateStr < todayStr()) return; // skip past dates
+    events.push({date:dateStr, id:'—', name:'全體上市櫃', type:'earnings', label, detail});
+  };
+  // 未來 12 個月的每月 10 日：月營收公告日
+  for(let i=0; i<12; i++){
+    const d = new Date(t.getFullYear(), t.getMonth()+i, 10);
+    const prev = new Date(d.getFullYear(), d.getMonth()-1, 1);
+    push(ymd(d), '月營收公告日', `${prev.getFullYear()}/${pad(prev.getMonth()+1)} 月營收截止`);
+  }
+  // 季報 / 年報截止（未來兩年涵蓋）
+  for(const y of [year, year+1]){
+    push(`${y}-05-15`, 'Q1 季報截止', `${y-1911} 年第一季`);
+    push(`${y}-08-14`, 'Q2 季報截止', `${y-1911} 年上半年`);
+    push(`${y}-11-14`, 'Q3 季報截止', `${y-1911} 年第三季`);
+    push(`${y}-03-31`, '年報截止',    `${y-1912} 年年報`);
+  }
+}
+
+async function loadAll(){
+  events = [];
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth()+1;
+  const months = [[y, m]];
+  const nm = m+1 > 12 ? [y+1, 1] : [y, m+1];
+  months.push(nm);
+  await Promise.all([
+    ...months.map(([yy, mm]) => fetchDividend(yy, mm)),
+    fetchIPO(),
+    fetchEarnings(),
+  ]);
+  generateStatutoryEarnings();
+  const seen = new Set();
+  events = events.filter(e=>{
+    const k = `${e.date}|${e.id}|${e.label}`;
+    if(seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+  events.sort((a,b)=>a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+}
+
+// ═══════════════════════════════════════════════
+// Render
+// ═══════════════════════════════════════════════
+function filteredEvents(){
+  return events.filter(e => {
+    if(filterType !== 'all' && e.type !== filterType) return false;
+    if(wlOnly && !watchlistIds.has(e.id)) return false;
+    return true;
+  });
+}
+
+function renderSummary(){
+  const t = todayStr();
+  const next7 = events.filter(e => e.date >= t && e.date <= ymd(addDays(new Date(), 7)));
+  const div7 = new Set(next7.filter(e=>e.type==='dividend').map(e=>e.id)).size;
+  const ipo7 = new Set(next7.filter(e=>e.type==='ipo').map(e=>e.id)).size;
+  const eps7 = next7.filter(e=>e.type==='earnings').length;
+  const wl7 = next7.filter(e=>watchlistIds.has(e.id) && e.id !== '—');
+  const wlCount = new Set(wl7.map(e=>e.id)).size;
+
+  document.getElementById('summaryStrip').innerHTML = `
+    <div class="summary-card"><div class="summary-label">未來 7 天</div>
+      <div class="summary-val">${next7.length}<span class="unit">件事件</span></div></div>
+    <div class="summary-card"><div class="summary-label">除權息</div>
+      <div class="summary-val">${div7}<span class="unit">檔</span></div></div>
+    <div class="summary-card"><div class="summary-label">財報 / 抽籤</div>
+      <div class="summary-val">${eps7}<span class="unit">財</span>&nbsp;·&nbsp;${ipo7}<span class="unit">抽</span></div></div>
+    <div class="summary-card"><div class="summary-label">自選股觸發</div>
+      <div class="summary-val" style="color:${wlCount?'var(--gold)':'var(--text-secondary)'}">${wlCount}<span class="unit">檔</span></div></div>
+  `;
+}
+
+function heatLevel(n){
+  if(n===0) return 0;
+  if(n<=2) return 1;
+  if(n<=5) return 2;
+  if(n<=10) return 3;
+  return 4;
+}
+function renderHeatStrip(){
+  const now = new Date();
+  const monday = new Date(now); monday.setDate(now.getDate() - ((now.getDay()+6)%7));
+  const t = todayStr();
+  const filtered = filteredEvents();
+  const byDate = {};
+  filtered.forEach(e => { byDate[e.date] = (byDate[e.date]||0)+1; });
+
+  let html = '';
+  for(let i=0; i<14; i++){
+    const d = addDays(monday, i);
+    const dateStr = ymd(d);
+    const dow = d.getDay();
+    const cnt = byDate[dateStr] || 0;
+    const level = heatLevel(cnt);
+    const isToday = dateStr === t;
+    const isPast = dateStr < t;
+    const isWeekend = dow === 0 || dow === 6;
+    const cls = ['heat-cell',
+      isToday?'today':'',
+      isPast?'past':'',
+      isWeekend?'weekend':'',
+      cnt>0?'has-events':'',
+      level>0?`d-${level}`:''
+    ].filter(Boolean).join(' ');
+    html += `<div class="${cls}" onclick="jumpToDate('${dateStr}')" title="${dateStr} ・ ${cnt} 件">
+      <span class="hc-dow">${DOW[dow]}</span>
+      <span class="hc-day">${d.getDate()}</span>
+      <span class="hc-count">${cnt}</span>
+    </div>`;
+  }
+  document.getElementById('heatGrid').innerHTML = html;
+}
+
+function rowHtml(e){
+  const dateShort = e.date.slice(5).replace('-','/');
+  const dow = weekdayZh(e.date);
+  const typeLabel = e.label || (e.type==='dividend'?'除權息':e.type==='ipo'?'抽籤':'財報');
+  const isMarketWide = e.id === '—';
+  const inWL = !isMarketWide && watchlistIds.has(e.id);
+  const clickHandler = isMarketWide ? '' : `onclick="location.href='stk.html#${e.id}'"`;
+  return `<div class="event-row ${isMarketWide?'no-click':''}" ${clickHandler}>
+    <span class="event-date">${dateShort}<span class="weekday">(${dow})</span></span>
+    <span class="event-type ${e.type}">${typeLabel}</span>
+    <span class="event-body">
+      <span class="sid">${e.id}</span>
+      <span class="name">${e.name}</span>
+      <span class="detail">${e.detail||''}</span>
+    </span>
+    ${inWL?`<span class="event-wl">${I('star',12)} 自選</span>`:'<span></span>'}
+  </div>`;
+}
+
+function renderGroups(){
+  const t = todayStr();
+  const d3 = ymd(addDays(new Date(), 3));
+  const d7 = ymd(addDays(new Date(), 7));
+  const filtered = filteredEvents().filter(e => e.date >= t);
+
+  if(!filtered.length){
+    document.getElementById('eventGroups').innerHTML =
+      '<div class="event-group"><div class="empty-msg">此條件下無即將到來的事件</div></div>';
     return;
   }
-  const today=new Date().toISOString().slice(0,10);
-  const d7ago=new Date(Date.now()-7*864e5).toISOString().slice(0,10);
-  const d7later=new Date(Date.now()+7*864e5).toISOString().slice(0,10);
-  const sorted=[...events].sort((a,b)=>a.date.localeCompare(b.date));
-  const nearby=sorted.filter(e=>e.date>=d7ago&&e.date<=d7later);
-  const rest=sorted.filter(e=>e.date<d7ago||e.date>d7later);
 
-  let html='';
-  if(nearby.length){
-    html+=`<div style="font-weight:600;color:var(--gold);margin-bottom:8px">📌 前後 7 天 (${d7ago.slice(5)} ~ ${d7later.slice(5)})</div>`;
-    html+='<div class="event-list">'+nearby.map(e=>{
-      const isToday=e.date===today;
-      return `<div class="ev-card${isToday?' today':''}">
-        <span class="ev-date">${e.date}</span>
-        <span class="ev-type ${e.type}">除權息</span>
-        <span class="ev-body">${e.label}</span>
-      </div>`;
-    }).join('')+'</div>';
-  }
-  if(rest.length){
-  html+=`<div style="font-weight:600;color:var(--text-secondary);margin:16px 0 8px">本月其他</div>`;
-    html+='<div class="event-list">'+rest.map(e=>`
-      <div class="ev-card">
-        <span class="ev-date">${e.date}</span>
-        <span class="ev-type ${e.type}">除權息</span>
-        <span class="ev-body">${e.label}</span>
+  const buckets = {today:[], soon:[], week:[], later:[]};
+  filtered.forEach(e=>{
+    if(e.date === t) buckets.today.push(e);
+    else if(e.date <= d3) buckets.soon.push(e);
+    else if(e.date <= d7) buckets.week.push(e);
+    else buckets.later.push(e);
+  });
+
+  const groupHtml = (title, tag, items, extraCls) => items.length ? `
+    <div class="event-group ${extraCls||''}">
+      <div class="event-group-header">
+        <div class="event-group-title">${title}${tag?`<span class="tag">${tag}</span>`:''}</div>
+        <div class="event-group-count">${items.length} 件</div>
       </div>
-    `).join('')+'</div>';
-  }
-  if(!html) html='<div class="loading" style="padding:30px">前後7天無除權息資料</div>';
-  document.getElementById('eventList').innerHTML=html;
+      <div class="event-list">${items.map(rowHtml).join('')}</div>
+    </div>` : '';
+
+  document.getElementById('eventGroups').innerHTML =
+    groupHtml('今天', todayStr().slice(5).replace('-','/'), buckets.today, 'today') +
+    groupHtml('未來 3 天內', '', buckets.soon) +
+    groupHtml('未來 7 天內', '', buckets.week) +
+    groupHtml('更遠', '本月剩下', buckets.later);
 }
 
-loadData();
+function toggleMonth(){
+  const el = document.getElementById('monthToggle');
+  el.classList.toggle('open');
+  if(el.classList.contains('open')) renderMonthGrid();
+}
+function changeMonth(delta){
+  curMonth += delta;
+  if(curMonth > 12){curMonth = 1; curYear++;}
+  if(curMonth < 1){curMonth = 12; curYear--;}
+  renderMonthGrid();
+}
+function renderMonthGrid(){
+  document.getElementById('monthLabel').textContent = `${curYear} 年 ${curMonth} 月`;
+  const t = todayStr();
+  const firstDay = new Date(curYear, curMonth-1, 1).getDay();
+  const daysInMonth = new Date(curYear, curMonth, 0).getDate();
+  const daysInPrev = new Date(curYear, curMonth-1, 0).getDate();
+
+  const filtered = filteredEvents();
+  const byDate = {};
+  filtered.forEach(e => { (byDate[e.date] = byDate[e.date]||[]).push(e); });
+
+  let html = '<div class="cal-grid">';
+  DOW.forEach(d => html += `<div class="cal-hdr">${d}</div>`);
+  for(let i=firstDay-1; i>=0; i--){
+    html += `<div class="cal-day other"><div class="cal-num">${daysInPrev-i}</div></div>`;
+  }
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${curYear}-${pad(curMonth)}-${pad(d)}`;
+    const isToday = dateStr === t;
+    const dayEvts = byDate[dateStr] || [];
+    const hasEvents = dayEvts.length > 0;
+    const typeCounts = {dividend:0, ipo:0, earnings:0};
+    dayEvts.forEach(e => typeCounts[e.type] = (typeCounts[e.type]||0)+1);
+    const dots = Object.entries(typeCounts)
+      .filter(([_,c])=>c>0)
+      .map(([type,c])=>Array(Math.min(c,3)).fill(`<div class="cal-dot ${type}"></div>`).join(''))
+      .join('');
+    html += `<div class="cal-day${isToday?' today':''}${hasEvents?' has-events':''}">
+      <div class="cal-num">${d}</div>
+      <div class="cal-dots">${dots}</div>
+      ${dayEvts.length>6?`<div class="cal-more">+${dayEvts.length-6}</div>`:''}
+    </div>`;
+  }
+  const totalCells = firstDay + daysInMonth;
+  const remaining = totalCells%7===0 ? 0 : 7-totalCells%7;
+  for(let i=1; i<=remaining; i++){
+    html += `<div class="cal-day other"><div class="cal-num">${i}</div></div>`;
+  }
+  html += '</div>';
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+// Interaction
+// ═══════════════════════════════════════════════
+function jumpToDate(dateStr){
+  const rows = document.querySelectorAll('.event-row');
+  const short = dateStr.slice(5).replace('-','/');
+  for(const r of rows){
+    if(r.querySelector('.event-date').textContent.startsWith(short)){
+      r.scrollIntoView({behavior:'smooth', block:'center'});
+      const orig = r.style.background;
+      r.style.transition = 'background .3s';
+      r.style.background = 'var(--gold-soft)';
+      setTimeout(()=>{r.style.background = orig;}, 1200);
+      return;
+    }
+  }
+}
+
+document.getElementById('typePills').addEventListener('click', e => {
+  const btn = e.target.closest('.filter-pill');
+  if(!btn) return;
+  filterType = btn.dataset.type;
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.toggle('active', p===btn));
+  renderAll();
+});
+document.getElementById('wlOnly').addEventListener('change', e => {
+  wlOnly = e.target.checked;
+  renderAll();
+});
+
+// ═══════════════════════════════════════════════
+// Boot
+// ═══════════════════════════════════════════════
+function renderAll(){
+  renderSummary();
+  renderHeatStrip();
+  renderGroups();
+  if(document.getElementById('monthToggle').classList.contains('open')) renderMonthGrid();
+}
+
+function initIcons(){
+  // Inject icons for month nav + arrow (I() defined in ui.js)
+  if(typeof I === 'function'){
+    document.getElementById('mtArrow').innerHTML = I('chev', 11);
+    document.getElementById('prevMonthBtn').innerHTML = I('chev', 14) + '';
+    document.getElementById('prevMonthBtn').style.transform = 'rotate(180deg)';
+    document.getElementById('nextMonthBtn').innerHTML = I('chev', 14);
+  }
+}
+
+(async ()=>{
+  // watchlistIds from ui.js getWL (falls back to plain array key)
+  try{
+    if(typeof getWL === 'function'){
+      const w = getWL();
+      watchlistIds = new Set(Object.values(w).flat());
+    } else {
+      const old = JSON.parse(localStorage.getItem('watchlist')||'[]');
+      watchlistIds = new Set(old);
+    }
+  }catch(e){ watchlistIds = new Set(); }
+
+  initIcons();
+  await loadAll();
+  renderAll();
+})();
 </script>

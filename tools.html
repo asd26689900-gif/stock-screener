@@ -3,6 +3,24 @@
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="css/style.css">
+<style>
+  /* tools.html 專屬 form 樣式 — 2-column grid + 對齊 label */
+  .tool-card{padding:22px 26px;margin-bottom:18px}
+  .tool-title{font-family:var(--font-display);font-size:17px;color:var(--ink);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:8px}
+  .calc-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px}
+  .calc-field{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center}
+  .calc-field.full{grid-column:1/-1}
+  .calc-field label{font-size:13px;color:var(--text);font-weight:500}
+  .calc-field input,.calc-field select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font-mono);font-size:14px;transition:border-color .15s,box-shadow .15s}
+  .calc-field input:focus,.calc-field select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+  .calc-field input::placeholder{color:var(--text-secondary);opacity:.55}
+  .calc-btn{margin-top:18px;padding:10px 32px;background:var(--gold);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s}
+  .calc-btn:hover{opacity:.9}.calc-btn:active{transform:translateY(1px)}
+  .result-box{display:none;margin-top:18px;padding:16px 20px;background:var(--surface);border-left:3px solid var(--gold);border-radius:6px;font-family:var(--font-mono);font-size:13px;line-height:1.9}
+  .result-box.show{display:block}
+  .result-box .big{font-size:22px;font-weight:700;color:var(--gold);letter-spacing:-.01em}
+  @media(max-width:640px){.tool-card{padding:18px 16px}.calc-form{grid-template-columns:1fr}.calc-field{grid-template-columns:100px 1fr}}
+</style>
 <div id="topbar"></div>
 
 <div class="container">
@@ -14,14 +32,16 @@
   <!-- 報酬率計算機 -->
   <div class="tool-card">
     <div class="tool-title">💰 股票報酬率計算機</div>
-    <div class="form-row"><label>買進價格</label><input type="number" id="r_buy" placeholder="100"></div>
-    <div class="form-row"><label>賣出價格</label><input type="number" id="r_sell" placeholder="120"></div>
-    <div class="form-row"><label>張數</label><input type="number" id="r_lots" value="1" min="1"></div>
-    <div class="form-row"><label>手續費折扣</label>
-      <select id="r_disc"><option value="1">無折扣</option><option value="0.6">6折</option><option value="0.5">5折</option><option value="0.38">3.8折</option><option value="0.28" selected>2.8折</option></select>
-    </div>
-    <div class="form-row"><label>當沖減稅</label>
-      <select id="r_daytrade"><option value="0" selected>否</option><option value="1">是 (證交稅減半)</option></select>
+    <div class="calc-form">
+      <div class="calc-field"><label>買進價格</label><input type="number" id="r_buy" placeholder="100"></div>
+      <div class="calc-field"><label>賣出價格</label><input type="number" id="r_sell" placeholder="120"></div>
+      <div class="calc-field"><label>張數</label><input type="number" id="r_lots" value="1" min="1"></div>
+      <div class="calc-field"><label>手續費折扣</label>
+        <select id="r_disc"><option value="1">無折扣</option><option value="0.6">6折</option><option value="0.5">5折</option><option value="0.38">3.8折</option><option value="0.28" selected>2.8折</option></select>
+      </div>
+      <div class="calc-field full"><label>當沖減稅</label>
+        <select id="r_daytrade"><option value="0" selected>否</option><option value="1">是（證交稅減半）</option></select>
+      </div>
     </div>
     <button class="calc-btn" onclick="calcReturn()">計算</button>
     <div class="result-box" id="r_result"></div>
@@ -29,10 +49,12 @@
 
   <!-- 殖利率計算機 -->
   <div class="tool-card">
- <div class="tool-title">殖利率 & 合理價計算機</div>
-    <div class="form-row"><label>現金股利</label><input type="number" id="y_div" placeholder="5"></div>
-    <div class="form-row"><label>目前股價</label><input type="number" id="y_price" placeholder="100"></div>
-    <div class="form-row"><label>目標殖利率%</label><input type="number" id="y_target" value="5"></div>
+    <div class="tool-title">📈 殖利率 & 合理價計算機</div>
+    <div class="calc-form">
+      <div class="calc-field"><label>現金股利</label><input type="number" id="y_div" placeholder="5"></div>
+      <div class="calc-field"><label>目前股價</label><input type="number" id="y_price" placeholder="100"></div>
+      <div class="calc-field full"><label>目標殖利率%</label><input type="number" id="y_target" value="5"></div>
+    </div>
     <button class="calc-btn" onclick="calcYield()">計算</button>
     <div class="result-box" id="y_result"></div>
   </div>
@@ -40,9 +62,11 @@
   <!-- 定期定額試算 -->
   <div class="tool-card">
     <div class="tool-title">🌱 定期定額複利試算</div>
-    <div class="form-row"><label>每月投入</label><input type="number" id="d_monthly" value="10000"></div>
-    <div class="form-row"><label>年化報酬率%</label><input type="number" id="d_rate" value="8"></div>
-    <div class="form-row"><label>投資年數</label><input type="number" id="d_years" value="20"></div>
+    <div class="calc-form">
+      <div class="calc-field"><label>每月投入</label><input type="number" id="d_monthly" value="10000"></div>
+      <div class="calc-field"><label>年化報酬率%</label><input type="number" id="d_rate" value="8"></div>
+      <div class="calc-field full"><label>投資年數</label><input type="number" id="d_years" value="20"></div>
+    </div>
     <button class="calc-btn" onclick="calcDCA()">計算</button>
     <div class="result-box" id="d_result"></div>
   </div>

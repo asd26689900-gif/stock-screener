@@ -3,6 +3,7 @@
 // GET /api/twse-proxy?type=index_daily&date=202608
 // GET /api/twse-proxy?type=ipo
 // GET /api/twse-proxy?type=dividend
+// GET /api/twse-proxy?type=earnings   （已公告季報清單）
 export default async function handler(req, res) {
   const { type, date } = req.query;
   const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
@@ -43,6 +44,15 @@ export default async function handler(req, res) {
       // 公開申購 — TWSE 抽籤資訊
       // TWSE 已將 publicLottery 改版為 publicForm（公開申購公告-抽籤日程表）
       const url = 'https://www.twse.com.tw/rwd/zh/announcement/publicForm?response=json';
+      const r = await fetch(url, { headers: { 'User-Agent': UA } });
+      const j = await r.json();
+      return res.json(j);
+    }
+
+    if (type === 'earnings') {
+      // 已公告季報清單 — openapi.twse
+      // 回傳: [{出表日期(民國), 年度, 季別, 公司代號, 公司名稱, 基本每股盈餘(元), ...}]
+      const url = 'https://openapi.twse.com.tw/v1/opendata/t187ap14_L';
       const r = await fetch(url, { headers: { 'User-Agent': UA } });
       const j = await r.json();
       return res.json(j);

@@ -13,7 +13,7 @@
   <p class="subtitle">色塊面積 = 市值，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
   <div class="breadcrumb" id="breadcrumb" style="display:none"><a onclick="showIndustry()">全部產業</a> <span>›</span> <span id="bcName"></span></div>
   <div class="treemap-wrap"><div class="treemap" id="treemap"></div>
-    <div class="legend"><span class="legend-label">-5%</span><div class="legend-bar"></div><span class="legend-label">+5%</span></div>
+    <div class="legend"><span class="legend-label">-10%</span><div class="legend-bar"></div><span class="legend-label">+10%</span></div>
   </div>
   <div class="stk-table-wrap" id="stkTable">
     <div class="stk-table-title" id="stkTableTitle"></div>
@@ -34,10 +34,12 @@ const treemapEl=document.getElementById('treemap');
 const tooltip=document.getElementById('tooltip');
 
 function chgColor(pct){
-  const c=Math.max(-5,Math.min(5,pct)),t=(c+5)/10;
+  // cap ±10% = 台股單日漲跌停；用 power curve 讓小幅波動也看得出色差
+  const c=Math.max(-10,Math.min(10,pct));
+  const abs=Math.abs(c)/10, s=Math.pow(abs,0.55);
   let r,g,b;
-  if(t<.5){const s=t/.5;r=Math.round(45+s*91);g=Math.round(143-s*7);b=Math.round(78+s*58);}
-  else{const s=(t-.5)/.5;r=Math.round(136+s*56);g=Math.round(136-s*52);b=Math.round(136-s*57);}
+  if(c>=0){r=Math.round(136+56*s);g=Math.round(136-52*s);b=Math.round(136-57*s);}
+  else{r=Math.round(136-91*s);g=Math.round(136+7*s);b=Math.round(136-58*s);}
   return`rgb(${r},${g},${b})`;
 }
 

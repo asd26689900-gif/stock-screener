@@ -43,9 +43,32 @@ const TF_MAP = {
 };
 let minuteCache = {}; // {key: [{d,o,h,l,c,v}]}
 
+let stockList=[]; // {id,name} cache for name→id resolution
+async function ensureStockList(){
+  if(stockList.length||!sb) return;
+  const{data}=await sb.from('daily_heatmap').select('data').order('date',{ascending:false}).limit(1).single();
+  if(!data||!data.data) return;
+  (data.data.industries||[]).forEach(ind=>(ind.stocks||[]).forEach(s=>stockList.push({id:s.id,name:s.name})));
+}
+async function resolveInput(raw){
+  const q=String(raw||'').trim();
+  if(!q) return '';
+  if(/^\d+$/.test(q)) return q;
+  await ensureStockList();
+  const exact=stockList.find(s=>s.name===q);
+  if(exact) return exact.id;
+  const partial=stockList.find(s=>s.name.includes(q));
+  return partial?partial.id:q;
+}
+
 async function doSearch(){
-  const sid=(location.hash||'').replace('#','').trim(); if(!sid)return;
-  location.hash=sid; currentSid=sid; minuteCache={}; currentTF='D'; chartZoom=1; chartPanIdx=0; _chartEventsAttached=false; _cachedMAs=null;
+  let raw=(location.hash||'').replace('#','').trim();
+  try{ raw=decodeURIComponent(raw); }catch(e){/* already decoded */}
+  if(!raw)return;
+  const sid=await resolveInput(raw);
+  if(!sid)return;
+  if(sid!==raw) location.hash=sid;
+  currentSid=sid; minuteCache={}; currentTF='D'; chartZoom=1; chartPanIdx=0; _chartEventsAttached=false; _cachedMAs=null;
   if(!sb){document.getElementById('app').innerHTML='<div class="empty-state">系統載入中...</div>';return;}
 
   // 同時抓分析資料和歷史K線

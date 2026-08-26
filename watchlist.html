@@ -12,7 +12,7 @@
   </div>
   <div class="wl-tabs" id="wlTabs"></div>
   <div class="add-bar">
-    <input type="text" id="addInput" placeholder="輸入股號，如 2330" maxlength="10">
+    <input type="text" id="addInput" placeholder="股號或公司名（如 2330 或 台積電）" maxlength="20" autocomplete="off">
     <button onclick="addStock()">加入</button>
   </div>
   <div id="app"><div class="empty-msg">尚未加入自選股</div></div>
@@ -61,9 +61,29 @@ function delList(n){
   renderTabs();loadWatchlist();
 }
 
-function addStock(){
+let stockList=[]; // for name→id resolution
+async function ensureStockList(){
+  if(stockList.length||!sb) return;
+  try{
+    const{data}=await sb.from('daily_heatmap').select('data').order('date',{ascending:false}).limit(1).single();
+    if(!data||!data.data) return;
+    (data.data.industries||[]).forEach(ind=>(ind.stocks||[]).forEach(s=>stockList.push({id:s.id,name:s.name})));
+  }catch(e){/* ignore */}
+}
+async function resolveInput(raw){
+  const q=String(raw||'').trim();
+  if(!q) return '';
+  if(/^\d+$/.test(q)) return q.toUpperCase();
+  await ensureStockList();
+  const exact=stockList.find(s=>s.name===q);
+  if(exact) return exact.id;
+  const partial=stockList.find(s=>s.name.includes(q));
+  return partial?partial.id:q.toUpperCase();
+}
+
+async function addStock(){
   const input=document.getElementById('addInput');
-  const sid=input.value.trim().toUpperCase();
+  const sid=await resolveInput(input.value);
   if(!sid)return;
   const w=getWL();
   if(!w[curList])w[curList]=[];

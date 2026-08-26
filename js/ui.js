@@ -89,6 +89,10 @@ function renderChrome() {
       </div>`).join('');
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
+      <div class="search-box" role="search">
+        <input type="text" id="globalSearch" placeholder="股號或公司名（如 2330 或 台積電）" maxlength="20" aria-label="搜尋股號或公司名">
+        <button id="globalSearchBtn" aria-label="查詢">${I('search', 14)}</button>
+      </div>
       <button class="nav-toggle" id="navToggle" aria-label="選單">${I('menu', 18)}</button>
       <div class="nav-links" id="navLinks">${nav}
         <div class="nav-group">
@@ -96,10 +100,6 @@ function renderChrome() {
         </div>
       </div>
       <div class="spacer"></div>
-      <div class="search-box">
-        <input type="text" id="globalSearch" placeholder="輸入股號 如 2330" maxlength="6" aria-label="搜尋股號">
-        <button id="globalSearchBtn" aria-label="查詢">${I('search', 14)}</button>
-      </div>
       <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>
       <div id="authArea"></div>`;
     const toggle = document.getElementById('navToggle');
@@ -108,7 +108,8 @@ function renderChrome() {
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
     const go = () => {
       const v = document.getElementById('globalSearch').value.trim();
-      if (v) location.href = 'stk.html#' + v;
+      if (v) location.href = 'stk.html#' + encodeURIComponent(v);
+      // stk.html decodes and resolves 中文名 → 股號
     };
     document.getElementById('globalSearch').addEventListener('keydown', e => { if (e.key === 'Enter') go(); });
     document.getElementById('globalSearchBtn').addEventListener('click', go);
