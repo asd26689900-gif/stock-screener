@@ -11,12 +11,23 @@ export default async function handler(req, res) {
 
   try {
     if (type === 'margin') {
-      // 融資融券 — TWSE 信用交易統計
+      // 融資融券 — TWSE 信用交易統計（資料約 21:00 發布，未發布時往前找最近有資料的日期）
       const d = date || new Date().toISOString().slice(0,10).replace(/-/g,'');
-      const url = `https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=json&date=${d}&selectType=STOCK`;
-      const r = await fetch(url, { headers: { 'User-Agent': UA } });
-      const j = await r.json();
-      return res.json(j);
+      let found = null;
+      for (let i = 0; i < 10; i++) {
+        const dt = new Date(parseInt(d.slice(0,4), 10), parseInt(d.slice(4,6), 10) - 1, parseInt(d.slice(6,8), 10) - i);
+        const ds = `${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}`;
+        const r = await fetch(
+          `https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=json&date=${ds}&selectType=STOCK`,
+          { headers: { 'User-Agent': UA } }
+        );
+        const j = await r.json();
+        if (j.stat === 'OK' && j.tables && j.tables.some(t => t.data && t.data.length)) {
+          found = j;
+          break;
+        }
+      }
+      return res.json(found || { stat: 'OK', date: d, tables: [] });
     }
 
     if (type === 'index_daily') {
