@@ -2,8 +2,8 @@
 盤後選股模組 — 每日自動更新腳本
 資料來源：TWSE/TPEX 官方 API（完全免費，不需 token）
 """
-import os, json, csv, io, math, requests, sys, time
-from datetime import datetime, timedelta
+import os, json, csv, io, math, re, requests, sys, time
+from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
@@ -98,6 +98,7 @@ def fetch_twse_prices(date_dt):
                 "close": close,
                 "change": parse_num(line[9]),
                 "Trading_Volume": parse_num(line[3]),
+                "amount": parse_num(line[4]),
             })
         except: continue
     return rows
@@ -130,6 +131,7 @@ def fetch_tpex_prices(date_dt):
                 "close": close,
                 "change": chg,
                 "Trading_Volume": parse_num(line[7]),
+                "amount": parse_num(line[8]) if len(line) > 8 else 0,
             })
     return rows
 
@@ -180,6 +182,46 @@ def fetch_tpex_inst(date_dt):
                 "dealer_net": parse_num(line[19]) if len(line) > 19 else 0,
             })
     return rows
+
+# ═══════════════════════════════════════
+#  抓取集保戶股權分散表（TDCC，每週六凌晨更新）
+#  大戶 = 持股 400 張以上（分級 12–15）；散戶 = 10 張以下（分級 1–3）
+# ═══════════════════════════════════════
+
+TDCC_OD_URL = "https://smart.tdcc.com.tw/opendata/getOD.ashx?id=1-5"
+
+def fetch_tdcc_snapshot():
+    """抓最新一週集保分散表，回傳 (資料日期, {sid: agg})。
+    agg 含 big_shares/big_ratio（400張以上）、big_holders（千張人數）、
+    retail_shares/retail_ratio（10張以下）。"""
+    r = requests.get(TDCC_OD_URL, headers=HEADERS, timeout=300)
+    r.encoding = "utf-8"
+    data_date, agg = "", {}
+    for line in csv.reader(io.StringIO(r.text)):
+        if len(line) < 6 or not line[0].strip().isdigit():
+            continue
+        data_date = line[0].strip()
+        sid = line[1].strip()
+        try:
+            lv = int(line[2])
+        except Exception:
+            continue
+        if lv < 1 or lv > 15:  # 16/17 為特殊級距，跳過
+            continue
+        shares = parse_num(line[4])
+        ratio = parse_num(line[5])
+        a = agg.setdefault(sid, {"big_shares": 0, "big_ratio": 0.0,
+                                 "retail_shares": 0, "retail_ratio": 0.0,
+                                 "big_holders": 0})
+        if lv >= 12:
+            a["big_shares"] += int(shares)
+            a["big_ratio"] = round(a["big_ratio"] + ratio, 4)
+            if lv == 15:
+                a["big_holders"] += int(parse_num(line[3]))
+        if lv <= 3:
+            a["retail_shares"] += int(shares)
+            a["retail_ratio"] = round(a["retail_ratio"] + ratio, 4)
+    return data_date, agg
 
 # ═══════════════════════════════════════
 #  抓取月營收 (MOPS 公開資訊觀測站)
@@ -418,8 +460,9 @@ def fetch_tpex_fundamentals():
 # ═══════════════════════════════════════
 #  主程式
 # ═══════════════════════════════════════
-today = datetime.now()
-end_str = iso_date(today)
+# 一律用台北時間判斷日期（GitHub Actions 容器預設 UTC）
+TZ_TAIPEI = timezone(timedelta(hours=8))
+today = datetime.now(TZ_TAIPEI)
 
 # 產生過去 N 天的工作日列表
 # 環境變數 FETCH_DAYS 可控制回溯天數（預設 90，本地測試可設 10）
@@ -437,6 +480,8 @@ work_days = trading_days(FETCH_CALENDAR_DAYS)
 if len(work_days) < 3:
     # ponytail: 連假時 5 天可能不足 3 個交易日，自動拉寬到至少 40 個日曆日
     work_days = trading_days(FETCH_CALENDAR_DAYS * 8)
+# 週末/假日跑時以最後一個交易日為資料日
+end_str = iso_date(work_days[-1])
 print(f"📅 抓取區間: {iso_date(work_days[0])} ~ {iso_date(work_days[-1])} ({len(work_days)} 個工作日)", flush=True)
 
 # ── 1. 全市場每日行情（近60+交易日）──
@@ -1272,6 +1317,182 @@ else:
         ).execute()
     print(f"   stock_metrics: {len(metrics_rows)} 檔")
 
+    # 6. 每日焦點（市場總覽首頁）
+    print("   🔍 產生每日焦點...")
+
+    def is_etf(sid):
+        return bool(re.match(r"^(00|010)", sid or ""))
+
+    def is_active_etf(sid):
+        return is_etf(sid) and bool(re.search(r"[AD]$", sid or ""))
+
+    focus = {"date": end_str, "week_strong": [], "big_buyer": {}, "institutional": {}, "etf": {}, "margin": {}}
+
+    # 本週強勢股：近 5 交易日漲幅 + 成交張數過濾（排除 ETF）
+    week_cands = []
+    for sid, data in stocks.items():
+        if is_etf(sid) or len(data) < 6: continue
+        p = data[-1]
+        base = data[-6].get("close")
+        if not p.get("close") or not base: continue
+        vol = int(p.get("Trading_Volume", 0) / 1000)
+        if vol < 3000: continue
+        chg5 = (p["close"] - base) / base * 100
+        if chg5 > 0:
+            week_cands.append([sid, name_map.get(sid, sid), round(p["close"], 2), round(chg5, 2), vol])
+    week_cands.sort(key=lambda x: x[3], reverse=True)
+    focus["week_strong"] = week_cands[:10]
+
+    # 大戶加碼股：集保分散表（每週六凌晨更新）本週 vs 上週 400張以上持股比率增減
+    # 每週快照存 daily_modules.module_key='tdcc'；快照不足兩週時回退法人近似
+    tdcc_snaps = {}
+    try:
+        resp = sb.table("daily_modules").select("date,data").eq("module_key", "tdcc").order("date", desc=True).limit(4).execute()
+        for row in resp.data:
+            tdcc_snaps[row["date"]] = row["data"]
+    except Exception as e:
+        print(f"   ⚠ TDCC 快照讀取失敗: {e}", flush=True)
+
+    need_tdcc = today.weekday() == 5 or not tdcc_snaps
+    if tdcc_snaps and not need_tdcc:
+        try:
+            if (today.date() - datetime.strptime(max(tdcc_snaps), "%Y-%m-%d").date()).days >= 9:
+                need_tdcc = True  # 上週六沒抓到，本週工作日重試
+        except Exception:
+            pass
+    if need_tdcc:
+        print("   ⏳ 抓取集保戶股權分散表（約 1 分鐘）...", flush=True)
+        try:
+            tdate, tdata = fetch_tdcc_snapshot()
+            if tdata:
+                sb.table("daily_modules").upsert(
+                    {"date": tdate, "module_key": "tdcc", "data": tdata},
+                    on_conflict="date,module_key").execute()
+                tdcc_snaps[tdate] = tdata
+                print(f"   TDCC 快照: {tdate} {len(tdata)} 檔", flush=True)
+        except Exception as e:
+            print(f"   ⚠ TDCC 抓取失敗: {e}", flush=True)
+
+    tdcc_dates = sorted(tdcc_snaps)
+    if len(tdcc_dates) >= 2:
+        prev_d, cur_d = tdcc_dates[-2], tdcc_dates[-1]
+        big_rows = []
+        for sid, agg in tdcc_snaps[cur_d].items():
+            if is_etf(sid) or sid not in stocks:
+                continue
+            old = tdcc_snaps[prev_d].get(sid)
+            if not old:
+                continue
+            delta = round(agg.get("big_ratio", 0) - old.get("big_ratio", 0), 2)
+            if delta <= 0:
+                continue
+            p = latest_price(sid)
+            if not p:
+                continue
+            big_rows.append([sid, name_map.get(sid, sid), round(p["close"], 2),
+                             round(agg.get("big_ratio", 0), 2), delta])
+        big_rows.sort(key=lambda x: x[4], reverse=True)
+        focus["big_buyer"] = {"date": cur_d, "rows": big_rows[:10], "fallback": False}
+        print(f"   大戶加碼（集保 {cur_d}）: {len(big_rows)} 檔", flush=True)
+    else:
+        # 回退：法人/主力連買且當日淨買超
+        big_cands = []
+        for sid in stocks:
+            if is_etf(sid): continue
+            fd, fn = get_inst_consecutive(sid, "foreign")
+            td, tn = get_inst_consecutive(sid, "trust")
+            dd, dn = get_inst_consecutive(sid, "dealer")
+            main_net = int((fn + tn + dn) / 1000)
+            if (fd >= 3 or td >= 3 or dd >= 3) and main_net > 0:
+                p = latest_price(sid)
+                if p:
+                    big_cands.append([sid, name_map.get(sid, sid), main_net, max(fd, td, dd), round(p["close"], 2)])
+        big_cands.sort(key=lambda x: x[2], reverse=True)
+        focus["big_buyer"] = {"date": end_str, "rows": big_cands[:10], "fallback": True}
+
+    # 三大法人：當日排行（含資料日期）
+    inst_rows = []
+    inst_max_date = ""
+    for sid, recs in inst.items():
+        if not recs: continue
+        latest = sorted(recs, key=lambda x: x["date"])[-1]
+        inst_max_date = max(inst_max_date, latest["date"])
+        inst_rows.append([sid, name_map.get(sid, sid),
+                          latest.get("foreign_net", 0), latest.get("trust_net", 0), latest.get("dealer_net", 0)])
+    focus["institutional"] = {
+        "date": inst_max_date,
+        "foreign_top": sorted(inst_rows, key=lambda x: x[2], reverse=True)[:5],
+        "trust_top": sorted(inst_rows, key=lambda x: x[3], reverse=True)[:5],
+        "dealer_top": sorted(inst_rows, key=lambda x: x[4], reverse=True)[:5],
+        "both_buy": sum(1 for r in inst_rows if r[2] > 0 and r[3] > 0),
+    }
+
+    # ETF 動向（含主動式識別：代號尾碼 A/D）
+    etf_rows = []
+    for sid, data in stocks.items():
+        if not is_etf(sid): continue
+        p = data[-1]
+        if not p.get("close"): continue
+        prev = data[-2] if len(data) >= 2 else p
+        recs = sorted(inst.get(sid, []), key=lambda x: x["date"])
+        fn = tn = dn = 0
+        if recs:
+            lr = recs[-1]
+            fn, tn, dn = lr.get("foreign_net", 0), lr.get("trust_net", 0), lr.get("dealer_net", 0)
+        etf_rows.append([
+            sid, name_map.get(sid, sid), round(p["close"], 2), round(change_pct(p, prev), 2),
+            int(p.get("Trading_Volume", 0) / 1000), round((p.get("amount") or 0) / 1e8, 2),
+            int((fn + tn + dn) / 1000), is_active_etf(sid),
+        ])
+    etf_rows.sort(key=lambda x: x[5], reverse=True)
+    focus["etf"] = {
+        "all": etf_rows,
+        "top_amount": etf_rows[:10],
+        "active": [r for r in etf_rows if r[7]][:10],
+        "active_count": sum(1 for r in etf_rows if r[7]),
+    }
+
+    # 資券變化（TWSE 融資融券，22:00 後才有當日資料；非當日則留空由前端標示）
+    try:
+        end_dt = datetime.strptime(end_str, "%Y-%m-%d")
+        for i in range(10):
+            probe = end_dt - timedelta(days=i)
+            url = f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=json&date={ad_date(probe)}&selectType=STOCK"
+            mj = requests.get(url, headers=HEADERS, timeout=20).json()
+            if mj.get("stat") != "OK": continue
+            mrows = []
+            for t in mj.get("tables", []):
+                for line in (t.get("data") or [])[1:]:
+                    if len(line) < 14: continue
+                    sid = str(line[0]).strip()
+                    if not sid or not sid[0].isdigit(): continue
+                    mrows.append({
+                        "id": sid, "name": str(line[1]).strip(),
+                        "m_prev": parse_num(line[5]), "m_today": parse_num(line[6]),
+                        "s_prev": parse_num(line[11]), "s_today": parse_num(line[12]),
+                    })
+            if not mrows: continue
+            mdate = iso_date(probe)
+            if mdate == end_str:
+                def margin_top(rows, key, reverse=True, n=8):
+                    return sorted(rows, key=lambda r: r[key + "_today"] - r[key + "_prev"], reverse=reverse)[:n]
+                focus["margin"] = {
+                    "date": mdate,
+                    "m_up": margin_top(mrows, "m"),
+                    "m_dn": margin_top(mrows, "m", reverse=False),
+                    "s_up": margin_top(mrows, "s"),
+                    "s_dn": margin_top(mrows, "s", reverse=False),
+                }
+            break
+    except Exception as e:
+        print(f"   ⚠ 資券抓取失敗: {e}", flush=True)
+
+    try:
+        sb.table("daily_focus").upsert({"date": end_str, "data": focus}, on_conflict="date").execute()
+        print(f"   daily_focus: {end_str} 已寫入", flush=True)
+    except Exception as e:
+        print(f"   ⚠ daily_focus 寫入失敗: {e}", flush=True)
+
 total = sum(len(v) for v in results.values())
 strat_total = sum(len(v) for v in strategies.values())
 print(f"\n✅ 完成！")
@@ -1293,7 +1514,7 @@ except Exception as e:
 
 cutoff = (today - timedelta(days=30)).strftime("%Y-%m-%d")
 print(f"\n🧹 清理 {cutoff} 之前的選股舊資料...")
-for tbl in ["daily_heatmap", "daily_modules", "daily_strategies"]:
+for tbl in ["daily_heatmap", "daily_modules", "daily_strategies", "daily_focus"]:
     try:
         sb.table(tbl).delete().lt("date", cutoff).execute()
         print(f"   {tbl}: 已清理")

@@ -1,0 +1,22 @@
+name: 新聞晨報
+on:
+  schedule:
+    # 08:30 台北 = 00:30 UTC：每日新聞爬蟲（晨報）
+    - cron: '30 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -X utf8 -u news.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PYTHONUNBUFFERED: "1"

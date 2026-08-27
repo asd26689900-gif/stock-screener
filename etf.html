@@ -1,0 +1,59 @@
+<title>ETF 總覽 — 盤後精選模組</title>
+<meta name="description" content="ETF 總覽：主動式 ETF 買賣統計、成交量、成交額與三大法人買賣超。">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<div id="topbar"></div>
+
+<div class="container">
+  <div>
+    <h1 class="page-title">ETF 總覽</h1>
+    <p class="page-desc">成交量、成交額與三大法人買賣超統計。主動式 ETF 以代號尾碼 A（股票型）/ D（債券型）自動識別。</p>
+  </div>
+  <div class="summary-grid" id="summaryCards"></div>
+  <div class="section-title">主動式 ETF</div>
+  <div id="activeBox"><div class="loading">載入中...</div></div>
+  <div class="section-title">全部 ETF（依成交額排行）</div>
+  <div id="allBox"><div class="loading">載入中...</div></div>
+</div>
+<div id="footer"></div>
+
+<script src="js/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/init.js"></script>
+<script>
+function fmt(v){ return fmtVal(v); }
+
+function etfTable(rows){
+  if(!rows||!rows.length) return '<div class="empty-msg">尚無資料</div>';
+  return `<div class="table-wrap"><table><thead><tr><th>代號</th><th>名稱</th><th>收盤</th><th>漲跌%</th><th>成交張</th><th>成交額(億)</th><th>法人買賣超(張)</th></tr></thead><tbody>${
+    rows.map(r=>`<tr onclick="location.href='stk.html#${r[0]}'">
+      <td>${r[0]}</td><td>${r[1]}${r[7]?' <span class="etf-tag">主動</span>':''}</td>
+      <td>${fmt(r[2])}</td>
+      <td class="${pctClass(r[3])}">${fmtPct(r[3],2)}</td>
+      <td>${fmt(r[4])}</td>
+      <td>${fmt(r[5])}</td>
+      <td class="${pctClass(r[6])}">${r[6]>0?'+':''}${fmt(r[6])}</td>
+    </tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+async function load(){
+  if(!sb) return;
+  const {data}=await sb.from('daily_focus').select('date,data').order('date',{ascending:false}).limit(1);
+  const f=data&&data[0]?data[0].data:{};
+  const etf=f.etf||{};
+  const all=etf.all||[];
+  const active=all.filter(r=>r[7]);
+  const rest=all.filter(r=>!r[7]).sort((a,b)=>b[5]-a[5]);
+  document.getElementById('summaryCards').innerHTML=`
+    <div class="summary-card"><div class="summary-label">ETF 檔數</div><div class="summary-val">${all.length}<span class="unit">檔</span></div><div class="summary-sub">${f.date||''}</div></div>
+    <div class="summary-card"><div class="summary-label">主動式 ETF</div><div class="summary-val">${active.length}<span class="unit">檔</span></div><div class="summary-sub">代號尾碼 A / D</div></div>
+    <div class="summary-card"><div class="summary-label">成交額最大</div><div class="summary-val">${all[0]?all[0][1]:'—'}</div><div class="summary-sub">${all[0]?fmt(all[0][5])+' 億':'—'}</div></div>`;
+  document.getElementById('activeBox').innerHTML=etfTable(active.slice(0,20));
+  document.getElementById('allBox').innerHTML=etfTable(rest.slice(0,40));
+}
+function onDataReady(){ load(); }
+</script>

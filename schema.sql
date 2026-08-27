@@ -84,12 +84,34 @@ create table if not exists stock_prices (
 create or replace view available_dates as
   select distinct date from daily_modules order by date desc;
 
+-- 8. 每日新聞（晨報爬蟲）
+create table if not exists daily_news (
+  id bigint generated always as identity primary key,
+  date date not null,
+  query text not null,
+  title text not null,
+  link text not null unique,
+  source text,
+  snippet text,
+  published_at timestamptz,
+  created_at timestamptz default now()
+);
+
+-- 9. 每日焦點（市場總覽首頁）
+create table if not exists daily_focus (
+  id bigint generated always as identity primary key,
+  date date not null unique,
+  data jsonb not null default '{}',
+  created_at timestamptz default now()
+);
+
 -- ── 索引 ──
 create index if not exists idx_daily_modules_date on daily_modules(date);
 create index if not exists idx_daily_stk_date on daily_stk(date);
 create index if not exists idx_daily_strategies_date on daily_strategies(date);
 create index if not exists idx_stock_metrics_close on stock_metrics(close);
 create index if not exists idx_stock_metrics_rev_yoy on stock_metrics(rev_yoy);
+create index if not exists idx_daily_news_date on daily_news(date);
 
 -- ── RLS ──
 alter table daily_modules enable row level security;
@@ -98,6 +120,8 @@ alter table daily_heatmap enable row level security;
 alter table daily_strategies enable row level security;
 alter table stock_metrics enable row level security;
 alter table stock_prices enable row level security;
+alter table daily_news enable row level security;
+alter table daily_focus enable row level security;
 
 -- 所有人可讀市場資料
 drop policy if exists "公開讀取" on daily_modules;
@@ -112,5 +136,9 @@ drop policy if exists "公開讀取" on stock_metrics;
 create policy "公開讀取" on stock_metrics for select using (true);
 drop policy if exists "公開讀取" on stock_prices;
 create policy "公開讀取" on stock_prices for select using (true);
+drop policy if exists "公開讀取" on daily_news;
+create policy "公開讀取" on daily_news for select using (true);
+drop policy if exists "公開讀取" on daily_focus;
+create policy "公開讀取" on daily_focus for select using (true);
 
 -- update.py 用 service_role key 寫入，不受 RLS 限制
