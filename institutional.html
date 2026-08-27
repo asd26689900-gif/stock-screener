@@ -1,4 +1,5 @@
 <title>法人買賣超 — 盤後精選模組</title>
+<meta name="description" content="三大法人買賣超排行：外資、投信、自營商每日動向。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -7,7 +8,7 @@
 
 <div class="container">
   <div>
- <div class="page-title">法人買賣超排行</div>
+  <h1 class="page-title">法人買賣超排行</h1>
     <div class="page-desc">三大法人（外資、投信、自營商）每日個股買賣超排行，追蹤法人資金動向。</div>
   </div>
 
@@ -18,15 +19,15 @@
       <button onclick="setInst('trust')">投信</button>
       <button onclick="setInst('dealer')">自營商</button>
     </div>
-    <select class="filter-select" id="marketFilter" onchange="renderAll()">
+    <select class="filter-select" id="marketFilter" onchange="renderAll()" aria-label="市場別">
       <option value="all">上市櫃</option>
       <option value="twse">上市</option>
       <option value="tpex">上櫃</option>
     </select>
-    <select class="filter-select" id="industryFilter" onchange="renderAll()">
+    <select class="filter-select" id="industryFilter" onchange="renderAll()" aria-label="產業別">
       <option value="all">所有產業</option>
     </select>
-    <span class="date-badge" id="dateBadge"></span>
+    <span class="date-label" id="dateBadge"></span>
   </div>
 
   <!-- ─── 摘要卡 ─── -->
@@ -59,15 +60,15 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 let allData=[], curInst='foreign';
 const instLabels={foreign:'外資',trust:'投信',dealer:'自營商'};
 
-function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function fmt(v){ return fmtVal(v); }
 function cls(v){return v>0?'up':v<0?'dn':'';}
 
-async function onAuthReady(){
+async function onDataReady(){
   if(!sb) return;
   const {data}=await sb.from('stock_metrics')
     .select('stock_id,name,date,close,change_pct,volume,foreign_net_shares,foreign_consec_days,trust_net_shares,trust_consec_days,dealer_consec_days,dealer_net_shares,market_type,industry')
@@ -149,7 +150,7 @@ function renderAll(){
     return `<tr onclick="location.href='stk.html#${r.stock_id}'">
       <td>${i+1}</td><td>${r.stock_id}</td><td>${r.name||''}</td>
       <td>${fmt(r.close)}</td>
-      <td class="${cls(r.change_pct)}">${r.change_pct>0?'+':''}${(r.change_pct||0).toFixed(2)}%</td>
+      <td class="${pctClass(r.change_pct)}">${fmtPct(r.change_pct,2)}</td>
       <td><span class="net-bar buy" style="width:${barW}px"></span><span class="net-val up">+${fmt(net)}</span></td>
       <td>${consec>0?`<span class="consec buy">${consec}天</span>`:'—'}</td>
     </tr>`;
@@ -161,7 +162,7 @@ function renderAll(){
     return `<tr onclick="location.href='stk.html#${r.stock_id}'">
       <td>${i+1}</td><td>${r.stock_id}</td><td>${r.name||''}</td>
       <td>${fmt(r.close)}</td>
-      <td class="${cls(r.change_pct)}">${r.change_pct>0?'+':''}${(r.change_pct||0).toFixed(2)}%</td>
+      <td class="${pctClass(r.change_pct)}">${fmtPct(r.change_pct,2)}</td>
       <td><span class="net-bar sell" style="width:${barW}px"></span><span class="net-val dn">${fmt(net)}</span></td>
       <td>${consec<0?`<span class="consec sell">${Math.abs(consec)}天</span>`:'—'}</td>
     </tr>`;

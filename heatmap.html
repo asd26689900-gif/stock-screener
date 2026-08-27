@@ -1,4 +1,5 @@
 <title>產業熱力圖 — 盤後精選模組</title>
+<meta name="description" content="台股產業熱力圖：產業與個股漲跌幅一眼掌握。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -7,7 +8,7 @@
 
 <div class="container">
   <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px">
-    <h2>產業熱力圖</h2>
+    <h1 class="page-title">產業熱力圖</h1>
     <span class="date-label" id="dateLabel"></span>
   </div>
   <p class="subtitle">色塊面積 = 市值，顏色 = 漲跌幅。點擊產業可展開成分股。</p>
@@ -27,7 +28,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 let hmData={};
 const treemapEl=document.getElementById('treemap');
@@ -80,7 +81,13 @@ function renderTreemap(items){
     const div=document.createElement('div');
     div.className='tm-cell'+(r.w<60||r.h<40?' small':'')+(r.w<35||r.h<25?' tiny':'');
     div.style.cssText=`left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px;background:${chgColor(r.chg)}`;
-    div.innerHTML=`<span class="tm-label">${r.label}</span><span class="tm-val">${r.chg>=0?'+':''}${r.chg.toFixed(1)}%</span>`;
+    div.innerHTML=`<span class="tm-label">${r.label}</span><span class="tm-val">${fmtPct(r.chg,1)}</span>`;
+    div.setAttribute('tabindex','0');
+    div.setAttribute('role','button');
+    div.setAttribute('aria-label', `${r.label} 漲跌 ${fmtPct(r.chg,2)}`);
+    div.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); div.click(); }
+    });
     div.addEventListener('mouseenter',e=>showTT(e,r));
     div.addEventListener('mousemove',moveTT);
     div.addEventListener('mouseleave',hideTT);
@@ -90,7 +97,7 @@ function renderTreemap(items){
   }
 }
 function fmtAmt(v){if(!v)return'—';if(v>=1e8)return(v/1e8).toFixed(0)+'億';if(v>=1e6)return(v/1e6).toFixed(0)+'百萬';return Math.round(v).toLocaleString();}
-function showTT(e,r){document.getElementById('ttName').textContent=r.label;const el=document.getElementById('ttChg');el.textContent=(r.chg>=0?'+':'')+r.chg.toFixed(2)+'%';el.className=r.chg>=0?'up':'dn';document.getElementById('ttMcap').textContent=fmtAmt(r.mcap);document.getElementById('ttVol').textContent=fmtAmt(r.amount);tooltip.classList.add('show');moveTT(e);}
+function showTT(e,r){document.getElementById('ttName').textContent=r.label;const el=document.getElementById('ttChg');el.textContent=fmtPct(r.chg,2);el.className=pctClass(r.chg);document.getElementById('ttMcap').textContent=fmtAmt(r.mcap);document.getElementById('ttVol').textContent=fmtAmt(r.amount);tooltip.classList.add('show');moveTT(e);}
 function moveTT(e){tooltip.style.left=(e.clientX+12)+'px';tooltip.style.top=(e.clientY-40)+'px';}
 function hideTT(){tooltip.classList.remove('show');}
 
@@ -106,7 +113,7 @@ function drillDown(ind){
   renderTreemap((ind.stocks||[]).map(s=>({label:s.id+' '+s.name,value:s.mcap||s.amount,chg:s.chg_pct,mcap:s.mcap,amount:s.amount,stockId:s.id,stockName:s.name,onClick:()=>{location.href='stk.html#'+s.id;}})));
   const tw=document.getElementById('stkTable');tw.classList.add('show');
   document.getElementById('stkTableTitle').textContent=ind.name+' — 成分股明細';
-  document.getElementById('stkTableBody').innerHTML=[...(ind.stocks||[])].sort((a,b)=>(b.mcap||b.amount)-(a.mcap||a.amount)).map(s=>`<tr><td>${s.id}</td><td>${s.name}</td><td>${s.close.toLocaleString()}</td><td class="${s.chg_pct>=0?'up':'dn'}">${s.chg_pct>=0?'+':''}${s.chg_pct.toFixed(2)}%</td><td>${fmtAmt(s.mcap)}</td><td>${fmtAmt(s.amount)}</td></tr>`).join('');
+  document.getElementById('stkTableBody').innerHTML=[...(ind.stocks||[])].sort((a,b)=>(b.mcap||b.amount)-(a.mcap||a.amount)).map(s=>`<tr><td>${s.id}</td><td>${s.name}</td><td>${fmtVal(s.close)}</td><td class="${pctClass(s.chg_pct)}">${fmtPct(s.chg_pct,2)}</td><td>${fmtAmt(s.mcap)}</td><td>${fmtAmt(s.amount)}</td></tr>`).join('');
 }
 
 async function loadHeatmap(){
@@ -117,7 +124,7 @@ async function loadHeatmap(){
   hmData=data.data||{};
   showIndustry();
 }
-function onAuthReady(){loadHeatmap();}
+function onDataReady(){loadHeatmap();}
 window.addEventListener('resize',()=>{if(document.getElementById('breadcrumb').style.display==='none')showIndustry();});
 
 /* === 多清單自選股 + 右鍵選單 === */
@@ -169,8 +176,10 @@ document.addEventListener('contextmenu',e=>{if(!e.target.closest('.tm-cell'))hid
 function toggleWL(listName,sid){
   const w=getWL();
   const idx=w[listName].indexOf(sid);
+  const added=idx<0;
   if(idx>=0)w[listName].splice(idx,1); else w[listName].push(sid);
   saveWL(w);
+  toast(added?('已加入「'+listName+'」 '+sid):('已從「'+listName+'」移除 '+sid));
   // refresh menu
   if(ctxTarget) showCtxMenu({preventDefault:()=>{},clientX:parseInt(ctxMenu.style.left),clientY:parseInt(ctxMenu.style.top)},ctxTarget.id,ctxTarget.name);
 }
@@ -186,6 +195,7 @@ function createList(){
   if(!w[name])w[name]=[];
   if(ctxTarget&&!w[name].includes(ctxTarget.id))w[name].push(ctxTarget.id);
   saveWL(w);
+  toast('已建立清單「'+name+'」');
   showCtxMenu({preventDefault:()=>{},clientX:parseInt(ctxMenu.style.left),clientY:parseInt(ctxMenu.style.top)},ctxTarget.id,ctxTarget.name);
 }
 </script>

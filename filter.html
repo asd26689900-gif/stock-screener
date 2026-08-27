@@ -1,4 +1,5 @@
 <title>自訂篩選 — 盤後精選模組</title>
+<meta name="description" content="自訂篩選：從股價、成交量、法人動向與營收等條件篩選台股。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -6,46 +7,46 @@
 <div id="topbar"></div>
 
 <div class="container">
-  <h2>自訂篩選</h2>
+  <h1 class="page-title">自訂篩選</h1>
   <p class="subtitle">自由調整篩選條件，從 stock_metrics 表即時查詢。每日盤後更新指標。</p>
 
   <div class="filter-panel">
     <div class="filter-grid">
       <div class="filter-group">
         <label>股價區間</label>
-        <div class="filter-row"><input type="number" id="f_close_min" placeholder="最低"> <span>~</span> <input type="number" id="f_close_max" placeholder="最高"></div>
+        <div class="filter-row"><input type="number" id="f_close_min" placeholder="最低" aria-label="最低股價"> <span>~</span> <input type="number" id="f_close_max" placeholder="最高" aria-label="最高股價"></div>
       </div>
       <div class="filter-group">
         <label>漲跌幅 %</label>
-        <div class="filter-row"><input type="number" id="f_chg_min" placeholder="最低" step="0.1"> <span>~</span> <input type="number" id="f_chg_max" placeholder="最高" step="0.1"></div>
+        <div class="filter-row"><input type="number" id="f_chg_min" placeholder="最低" step="0.1" aria-label="最低漲跌幅"> <span>~</span> <input type="number" id="f_chg_max" placeholder="最高" step="0.1" aria-label="最高漲跌幅"></div>
       </div>
       <div class="filter-group">
         <label>成交張數 ≥</label>
-        <div class="filter-row"><input type="number" id="f_vol_min" placeholder="如 1000"></div>
+        <div class="filter-row"><input type="number" id="f_vol_min" placeholder="如 1000" aria-label="最低成交張數"></div>
       </div>
       <div class="filter-group">
         <label>外資連買天數 ≥</label>
-        <div class="filter-row"><input type="number" id="f_foreign_min" placeholder="如 3"></div>
+        <div class="filter-row"><input type="number" id="f_foreign_min" placeholder="如 3" aria-label="最低外資連買天數"></div>
       </div>
       <div class="filter-group">
         <label>投信連買天數 ≥</label>
-        <div class="filter-row"><input type="number" id="f_trust_min" placeholder="如 2"></div>
+        <div class="filter-row"><input type="number" id="f_trust_min" placeholder="如 2" aria-label="最低投信連買天數"></div>
       </div>
       <div class="filter-group">
         <label>營收 YOY % ≥</label>
-        <div class="filter-row"><input type="number" id="f_yoy_min" placeholder="如 20" step="1"></div>
+        <div class="filter-row"><input type="number" id="f_yoy_min" placeholder="如 20" step="1" aria-label="最低營收年增率"></div>
       </div>
       <div class="filter-group">
         <label>營收 MOM % ≥</label>
-        <div class="filter-row"><input type="number" id="f_mom_min" placeholder="如 0" step="1"></div>
+        <div class="filter-row"><input type="number" id="f_mom_min" placeholder="如 0" step="1" aria-label="最低營收月增率"></div>
       </div>
       <div class="filter-group">
         <label>營收連續成長月數 ≥</label>
-        <div class="filter-row"><input type="number" id="f_grow_min" placeholder="如 3"></div>
+        <div class="filter-row"><input type="number" id="f_grow_min" placeholder="如 3" aria-label="最低營收連續成長月數"></div>
       </div>
       <div class="filter-group">
         <label>5日乖離率 % 範圍</label>
-        <div class="filter-row"><input type="number" id="f_bias_min" placeholder="-3" step="0.1"> <span>~</span> <input type="number" id="f_bias_max" placeholder="7" step="0.1"></div>
+        <div class="filter-row"><input type="number" id="f_bias_min" placeholder="-3" step="0.1" aria-label="最低乖離率"> <span>~</span> <input type="number" id="f_bias_max" placeholder="7" step="0.1" aria-label="最高乖離率"></div>
       </div>
     </div>
     <div class="filter-actions">
@@ -64,7 +65,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 const COLS = [
   {key:'stock_id',label:'股號',align:'left'},
@@ -130,15 +131,10 @@ function renderTable(){
     return '<tr onclick="location.href=\'stk.html#'+row.stock_id+'\'">' + COLS.map(c=>{
       let v = row[c.key];
       if(c.key==='stock_id'||c.key==='name') return '<td>'+v+'</td>';
-      if(c.key==='change_pct'){
-        const cls = v>=0?'up':'dn';
-        return `<td class="${cls}">${v>=0?'+':''}${(v||0).toFixed(1)}%</td>`;
-      }
-      if(c.key==='rev_yoy'||c.key==='rev_mom'||c.key==='bias_5'){
-        return '<td>'+(v||0).toFixed(1)+'</td>';
-      }
-      if(typeof v==='number') return '<td>'+v.toLocaleString()+'</td>';
-      return '<td>'+(v||'-')+'</td>';
+      if(c.key==='change_pct') return `<td class="${pctClass(v)}">${fmtPct(v,2)}</td>`;
+      if(c.key==='rev_yoy'||c.key==='rev_mom'||c.key==='bias_5') return '<td class="'+pctClass(v)+'">'+fmtPct(v,2)+'</td>';
+      if(typeof v==='number') return '<td>'+fmtVal(v)+'</td>';
+      return '<td>'+(v??'—')+'</td>';
     }).join('') + '<td>'+starBtn(row.stock_id)+'</td></tr>';
   }).join('');
 
@@ -164,5 +160,5 @@ function resetFilters(){
   document.getElementById('resultCount').textContent='';
 }
 
-function onAuthReady(){ /* ready */ }
+function onDataReady(){ /* ready */ }
 </script>

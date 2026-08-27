@@ -1,4 +1,5 @@
 <title>題材概念股 — 盤後精選模組</title>
+<meta name="description" content="題材概念股：熱門題材與領漲股。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -7,7 +8,7 @@
 
 <div class="container">
   <div class="page-header">
-    <h2>題材概念股</h2>
+    <h1 class="page-title">題材概念股</h1>
     <p>依投資題材分類的概念股群組，顯示各題材當日平均漲跌幅與領漲股。點擊可展開成分股明細。</p>
   </div>
  <div id="app"><div class="loading">載入題材資料...</div></div>
@@ -18,7 +19,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 // ── 題材概念股對照表 ──
 const CONCEPTS = [
@@ -66,7 +67,7 @@ const CONCEPTS = [
 
 let metricsMap = {};
 
-function fmt(v){ return typeof v==='number' ? v.toLocaleString('zh-TW') : v; }
+function fmt(v){ return fmtVal(v); }
 
 async function loadConcepts(){
   if(!sb){ document.getElementById('app').innerHTML='<div class="loading">系統載入中...</div>'; return; }
@@ -95,21 +96,21 @@ async function loadConcepts(){
   cards.sort((a, b) => b.avgChg - a.avgChg);
 
   const html = '<div class="concept-grid">' + cards.map(c => {
-    const cls = c.avgChg >= 0 ? 'up' : 'dn';
-    const arrow = c.avgChg >= 0 ? '▲' : '▼';
-    const borderColor = c.avgChg >= 0 ? 'var(--red)' : 'var(--green)';
+    const cls = pctClass(c.avgChg);
+    const arrow = c.avgChg > 0 ? '▲' : c.avgChg < 0 ? '▼' : '';
+    const borderColor = c.avgChg > 0 ? 'var(--red)' : c.avgChg < 0 ? 'var(--green)' : 'var(--border)';
     const lChg = c.leader.change_pct || 0;
-    const lCls = lChg >= 0 ? 'up' : 'dn';
+    const lCls = pctClass(lChg);
     return `<div class="concept-card" onclick="showDetail('${c.key}')">
       <div class="border-left" style="background:${borderColor}"></div>
       <div class="card-top">
         <div class="card-title">${c.title}</div>
-        <div class="card-chg ${cls}">${arrow}${Math.abs(c.avgChg).toFixed(2)}%</div>
+        <div class="card-chg ${cls}">${arrow} ${fmtPct(c.avgChg,2)}</div>
       </div>
       <div class="card-desc">${c.desc}</div>
       <div class="card-bottom">
         <span class="card-count">${c.count} 檔</span>
-        <span class="card-leader">領漲 <span class="lname">${c.leader.name||c.leader.stock_id}</span> <span class="${lCls}">${lChg>=0?'+':''}${lChg.toFixed(2)}%</span></span>
+        <span class="card-leader">領漲 <span class="lname">${c.leader.name||c.leader.stock_id}</span> <span class="${lCls}">${fmtPct(lChg,2)}</span></span>
       </div>
     </div>`;
   }).join('') + '</div>';
@@ -124,11 +125,11 @@ function showDetail(key){
   stocks.sort((a, b) => (b.change_pct||0) - (a.change_pct||0));
   const rows = stocks.map(d => {
     const chg = d.change_pct || 0;
-    const cls = chg >= 0 ? 'up' : 'dn';
+    const cls = pctClass(chg);
     return `<tr onclick="location.href='stk.html#${d.stock_id}'">
       <td>${d.stock_id}</td><td>${d.name||'—'}</td>
       <td>${fmt(d.close)}</td>
-      <td class="${cls}">${chg>=0?'+':''}${chg.toFixed(2)}%</td>
+      <td class="${cls}">${fmtPct(chg,2)}</td>
       <td>${fmt(d.volume)}</td>
     </tr>`;
   }).join('');
@@ -153,5 +154,5 @@ function closeDetail(){
 }
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeDetail(); });
 
-function onAuthReady(){ loadConcepts(); }
+function onDataReady(){ loadConcepts(); }
 </script>

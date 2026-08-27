@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       fetch_days:
-        description: '行情抓取天數 (每日30, 首次回補用365)'
-        default: '30'
+        description: '行情抓取天數 (每日5, 首次回補用365)'
+        default: '5'
       rev_months:
         description: '營收抓取月數 (每日2, 回補用12)'
         default: '2'
@@ -29,5 +29,5 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           PYTHONUNBUFFERED: "1"
-          FETCH_DAYS: ${{ github.event.inputs.fetch_days || '30' }}
+          FETCH_DAYS: ${{ github.event.inputs.fetch_days || '5' }}
           REV_MONTHS: ${{ github.event.inputs.rev_months || '2' }}

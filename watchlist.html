@@ -1,4 +1,5 @@
 <title>自選股 — 盤後精選模組</title>
+<meta name="description" content="自選股：追蹤關注股票的價格、均線與法人動向。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -7,12 +8,12 @@
 
 <div class="container">
   <div class="page-header">
-  <h2>自選股</h2>
+  <h1 class="page-title">自選股</h1>
     <p>加入常關注的股票，一頁查看最新數據。資料儲存在瀏覽器中，換裝置需重新加入。</p>
   </div>
   <div class="wl-tabs" id="wlTabs"></div>
   <div class="add-bar">
-    <input type="text" id="addInput" placeholder="股號或公司名（如 2330 或 台積電）" maxlength="20" autocomplete="off">
+    <input type="text" id="addInput" placeholder="股號或公司名（如 2330 或 台積電）" maxlength="20" autocomplete="off" aria-label="加入自選股號或公司名">
     <button onclick="addStock()">加入</button>
   </div>
   <div id="app"><div class="empty-msg">尚未加入自選股</div></div>
@@ -22,7 +23,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 const WL_KEY='watchlists';
 let curList='我的自選';
@@ -48,18 +49,62 @@ function renderTabs(){
 }
 function switchList(n){curList=n;renderTabs();loadWatchlist();}
 function newList(){
-  const name=prompt('輸入新清單名稱：');
-  if(!name||!name.trim())return;
-  const w=getWL();
-  if(!w[name.trim()])w[name.trim()]=[];
-  saveWL(w);curList=name.trim();renderTabs();loadWatchlist();
+  openWlModal({
+    title:'新增自選清單', input:true, placeholder:'輸入新清單名稱', okText:'建立',
+    onOk:name=>{
+      const w=getWL();
+      if(!w[name]) w[name]=[];
+      saveWL(w); curList=name; renderTabs(); loadWatchlist();
+      toast('已建立清單「'+name+'」');
+    }
+  });
 }
 function delList(n){
-  if(!confirm(`確定刪除清單「${n}」？`))return;
-  const w=getWL();delete w[n];saveWL(w);
-  curList=Object.keys(w)[0]||'我的自選';
-  renderTabs();loadWatchlist();
+  openWlModal({
+    title:'刪除清單', okText:'刪除',
+    desc:`確定刪除清單「${n}」？此操作無法復原。`,
+    onOk:()=>{
+      const w=getWL(); delete w[n]; saveWL(w);
+      curList=Object.keys(w)[0]||'我的自選';
+      renderTabs(); loadWatchlist();
+      toast('已刪除「'+n+'」');
+    }
+  });
 }
+
+/* 自訂 Modal（取代原生 prompt/confirm，與全站 modal 風格一致） */
+function openWlModal({title, input, placeholder, desc, okText, onOk}){
+  const old=document.getElementById('wlModal');
+  if(old) old.remove();
+  const ov=document.createElement('div');
+  ov.className='modal-overlay';
+  ov.id='wlModal';
+  ov.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="${title}">
+    <button class="modal-close" onclick="closeWlModal()" aria-label="關閉">${I('x',16)}</button>
+    <div class="modal-title">${title}</div>
+    ${desc?`<p class="page-desc">${desc}</p>`:''}
+    ${input?`<input class="wl-modal-input" id="wlModalInput" placeholder="${placeholder||''}" maxlength="20">`:''}
+    <div class="cfg-actions">
+      <button class="btn" onclick="closeWlModal()">取消</button>
+      <button class="btn btn-primary" id="wlModalOk">${okText||'確定'}</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const inp=document.getElementById('wlModalInput');
+  if(inp) inp.focus();
+  const ok=document.getElementById('wlModalOk');
+  const submit=()=>{
+    const val=inp?inp.value.trim():null;
+    if(inp&&!val) return;
+    onOk(val);
+    closeWlModal();
+  };
+  ok.addEventListener('click', submit);
+  if(inp) inp.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  ov.addEventListener('click', e=>{ if(e.target===ov) closeWlModal(); });
+  document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ closeWlModal(); document.removeEventListener('keydown', esc); } });
+}
+function closeWlModal(){ const m=document.getElementById('wlModal'); if(m) m.remove(); }
 
 let stockList=[]; // for name→id resolution
 async function ensureStockList(){
@@ -90,6 +135,7 @@ async function addStock(){
   if(w[curList].includes(sid)){input.value='';return;}
   w[curList].push(sid);
   saveWL(w);input.value='';loadWatchlist();
+  toast('已加入 '+sid);
 }
 document.getElementById('addInput').addEventListener('keydown',e=>{if(e.key==='Enter')addStock();});
 
@@ -97,9 +143,10 @@ function removeStock(sid){
   const w=getWL();
   w[curList]=(w[curList]||[]).filter(s=>s!==sid);
   saveWL(w);loadWatchlist();
+  toast('已移除 '+sid);
 }
 
-function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function fmt(v){ return fmtVal(v); }
 
 // 事件提示：抓除權息資料，比對自選股
 let eventMap={}; // stock_id → [{type,date,detail}]
@@ -170,8 +217,8 @@ async function loadWatchlist(){
   const rows=list.map((sid,ri)=>{
     const d=map[sid];
     if(!d)return`<tr><td>${sid}</td><td>—</td><td colspan="9" style="text-align:center;color:var(--text-secondary)">無資料</td><td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">${I('trash',14)}</button></td></tr>`;
-    const cls=(d.change_pct||0)>=0?'up':'dn';
-    const chg=d.change_pct!=null?(d.change_pct>=0?'+':'')+d.change_pct.toFixed(2)+'%':'—';
+    const cls=pctClass(d.change_pct);
+    const chg=fmtPct(d.change_pct,2);
     const fc=d.foreign_consec_days||0,tc=d.trust_consec_days||0;
     const fcCls=fc>0?'up':fc<0?'dn':'',tcCls=tc>0?'up':tc<0?'dn':'';
     const badges=eventBadges(sid);
@@ -185,15 +232,15 @@ async function loadWatchlist(){
       <td>${sparks[ri]&&sparks[ri].length>1?sparkSVG(sparks[ri]):'—'}</td>
       <td class="${fcCls}">${fc>0?'連買'+fc+'日':fc<0?'連賣'+Math.abs(fc)+'日':'—'}</td>
       <td class="${tcCls}">${tc>0?'連買'+tc+'日':tc<0?'連賣'+Math.abs(tc)+'日':'—'}</td>
-      <td>${d.rev_yoy!=null?(d.rev_yoy>=0?'+':'')+d.rev_yoy.toFixed(1)+'%':'—'}</td>
+      <td class="${pctClass(d.rev_yoy)}">${fmtPct(d.rev_yoy,1)}</td>
       <td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">${I('trash',14)}</button></td>
     </tr>`;
   }).join('');
 
-  app.innerHTML=alertHtml+`<table>
+  app.innerHTML=alertHtml+`<div class="table-wrap"><table>
     <thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th><th>MA5</th><th>MA20</th><th>近30日</th><th>外資動向</th><th>投信動向</th><th>營收YoY</th><th></th></tr></thead>
-    <tbody>${rows}</tbody></table>`;
+    <tbody>${rows}</tbody></table></div>`;
 }
 
-function onAuthReady(){renderTabs();loadWatchlist();}
+function onDataReady(){renderTabs();loadWatchlist();}
 </script>

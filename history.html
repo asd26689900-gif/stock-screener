@@ -1,4 +1,5 @@
 <title>歷史漲跌幅 — 盤後精選模組</title>
+<meta name="description" content="加權指數歷史漲跌幅：每月交易日統計。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -7,7 +8,7 @@
 
 <div class="container">
   <div>
- <div class="page-title">加權指數歷史漲跌幅</div>
+  <h1 class="page-title">加權指數歷史漲跌幅</h1>
     <div class="page-desc">台灣加權指數每月交易日統計，每日自動更新。</div>
   </div>
   <div class="summary-grid" id="summaryCards"></div>
@@ -23,7 +24,7 @@
 <script src="js/ui.js"></script>
 <script>
 let curYear=new Date().getFullYear(), curMonth=new Date().getMonth()+1;
-function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW',{maximumFractionDigits:2}):v;}
+function fmt(v){ return fmtVal(v); }
 function pad(n){return String(n).padStart(2,'0');}
 
 function changeMonth(d){
@@ -65,7 +66,7 @@ async function loadData(){
     const maxDn=rows.reduce((m,r)=>r.chg_pt<m.chg_pt?r:m,rows[0]);
     document.getElementById('summaryCards').innerHTML=`
       <div class="summary-card"><div class="summary-label">交易日</div><div class="summary-val">${rows.length} 天</div><div class="summary-sub">上漲 ${upDays} / 下跌 ${dnDays}</div></div>
-      <div class="summary-card"><div class="summary-label">月漲跌</div><div class="summary-val ${totalChg>=0?'up':'dn'}">${totalChg>=0?'+':''}${fmt(totalChg)} 點</div></div>
+      <div class="summary-card"><div class="summary-label">月漲跌</div><div class="summary-val ${pctClass(totalChg)}">${totalChg>0?'+':''}${fmt(totalChg)} 點</div></div>
       <div class="summary-card"><div class="summary-label">最大漲幅日</div><div class="summary-val up">+${fmt(maxUp.chg_pt)}</div><div class="summary-sub">${maxUp.date}</div></div>
       <div class="summary-card"><div class="summary-label">最大跌幅日</div><div class="summary-val dn">${fmt(maxDn.chg_pt)}</div><div class="summary-sub">${maxDn.date}</div></div>`;
 
@@ -73,7 +74,7 @@ async function loadData(){
       <thead><tr><th>日期</th><th>加權指數</th><th>漲跌點數</th><th>成交金額(億)</th></tr></thead>
       <tbody>${rows.map(r=>`<tr>
         <td>${r.date}</td><td>${fmt(r.index)}</td>
-        <td class="${r.chg_pt>=0?'up':'dn'}">${r.chg_pt>=0?'+':''}${fmt(r.chg_pt)}</td>
+        <td class="${pctClass(r.chg_pt)}">${r.chg_pt>0?'+':''}${fmtVal(r.chg_pt)}</td>
         <td>${fmt(Math.round(r.amount/1e8))}</td>
       </tr>`).join('')}</tbody>
     </table></div></div>`;
