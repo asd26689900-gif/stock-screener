@@ -239,7 +239,14 @@ function renderFocus(f){
   const dateTag=`<span class="date-label">${esc(d.date||'')}</span>`;
   const cards=[];
   cards.push(focusCard('本週強勢股', miniTable(['股號','名稱','收盤','5日漲跌%','成交張'], d.week_strong||[]), dateTag));
-  cards.push(focusCard('大戶加碼股（法人近似）', miniTable(['股號','名稱','淨買超張','連買','收盤'], d.big_buyer||[]), dateTag));
+  const bb=d.big_buyer;
+  if(Array.isArray(bb)||(bb&&bb.fallback)){
+    const rows=Array.isArray(bb)?bb:((bb&&bb.rows)||[]);
+    cards.push(focusCard('大戶加碼股（法人近似）', miniTable(['股號','名稱','淨買超張','連買','收盤'], rows), dateTag));
+  }else{
+    const bbDate=bb&&bb.date?`<span class="date-label">集保 ${esc(bb.date)}</span>`:(dateTag);
+    cards.push(focusCard('大戶加碼股（集保）', miniTable(['股號','名稱','收盤','大戶%','增減%'], (bb&&bb.rows)||[]), bbDate));
+  }
   const inst=d.institutional||{};
   const instDate=inst.date?`<span class="date-label">${esc(inst.date)}</span>`:'';
   const instBody=`
