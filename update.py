@@ -1351,6 +1351,7 @@ else:
         ])
     etf_rows.sort(key=lambda x: x[5], reverse=True)
     focus["etf"] = {
+        "all": etf_rows,
         "top_amount": etf_rows[:10],
         "active": [r for r in etf_rows if r[7]][:10],
         "active_count": sum(1 for r in etf_rows if r[7]),

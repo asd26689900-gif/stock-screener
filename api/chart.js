@@ -6,7 +6,8 @@ export default async function handler(req, res) {
   if (!sid) return res.status(400).json({ error: 'missing sid' });
 
   // 嘗試 .TW (上市) 和 .TWO (上櫃)
-  const suffixes = ['.TW', '.TWO'];
+  // 指數（^開頭）直接用原代號，例如 ^TWII 加權指數
+  const suffixes = sid.startsWith('^') ? [''] : ['.TW', '.TWO'];
   let result = null;
 
   for (const suffix of suffixes) {

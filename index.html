@@ -1,7 +1,7 @@
-<title>盤後精選模組 — 多因子選股系統</title>
-<meta name="description" content="多因子選股系統：籌碼、營收、技術面與法人動向交叉篩選，每日盤後更新。">
-<meta property="og:title" content="盤後精選模組 — 多因子選股系統">
-<meta property="og:description" content="多因子選股系統：籌碼、營收、技術面與法人動向交叉篩選，每日盤後更新。">
+<title>市場總覽 — 盤後精選模組</title>
+<meta name="description" content="台股市場總覽：大盤走勢、每日焦點（本週強勢股、大戶加碼、法人動向、資券變化、主動式 ETF）與多因子選股模組。">
+<meta property="og:title" content="市場總覽 — 盤後精選模組">
+<meta property="og:description" content="台股市場總覽：大盤走勢、每日焦點與多因子選股模組。">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#F5F2EC">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -12,15 +12,41 @@
 
 <div class="container">
   <div class="page-header">
-    <h1 class="page-title">選股模組</h1>
-    <p class="page-desc">多因子選股系統：籌碼、營收、技術面與法人動向交叉篩選，每日盤後更新。</p>
+    <h1 class="page-title">市場總覽</h1>
+    <p class="page-desc">大盤走勢、每日焦點與多因子選股模組，每日盤後自動更新。</p>
   </div>
+
   <div class="controls">
     <span class="date-label" id="dateLabel">載入中...</span>
-    <select id="datePicker" aria-label="選擇資料日期"></select>
+    <select id="datePicker" aria-label="選擇選股資料日期"></select>
     <label><input type="checkbox" id="filterEmpty" checked> 僅顯示有標的</label>
     <button class="btn btn-sm" id="toggleAll" onclick="toggleAllModules()" type="button">全部收合</button>
   </div>
+
+  <!-- 大盤：指數卡片 + 分K -->
+  <div class="mkt-cards" id="mktCards"></div>
+  <div class="chart-box">
+    <div class="chart-toolbar">
+      <span class="chart-label">大盤走勢</span>
+      <button class="tf-btn active" data-tf="5m" onclick="switchTwii('5m')">5分</button>
+      <button class="tf-btn" data-tf="60m" onclick="switchTwii('60m')">60分</button>
+      <button class="tf-btn" data-tf="1d" onclick="switchTwii('1d')">日</button>
+    </div>
+    <div class="ohlcv-legend" id="twiiLegend"></div>
+    <div class="twii-canvas"><canvas id="twiiCanvas"></canvas></div>
+    <p class="twii-note">資料來源：Yahoo Finance（延遲約 15 分），僅供參考。</p>
+  </div>
+
+  <!-- 每日焦點 -->
+  <div class="section-title">每日焦點</div>
+  <div id="focusBox"><div class="loading">載入焦點中...</div></div>
+
+  <!-- 新聞晨報 -->
+  <div class="section-title">新聞晨報</div>
+  <div id="newsBox"><div class="loading">載入新聞中...</div></div>
+
+  <!-- 選股模組 -->
+  <div class="section-title">選股模組</div>
   <div id="app"><div class="loading">正在載入選股資料...</div></div>
 </div>
 
@@ -47,8 +73,10 @@ const MODULE_ORDER = ['chip_high','main_buy','rev_grow','hot_grow','inst_duo','m
 const app = document.getElementById('app');
 let allModules = {};
 
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmt(v){ return fmtVal(v); }
 
+/* ── 選股模組（保留原功能） ── */
 function render(filterEmpty){
   let html='';
   for(const key of MODULE_ORDER){
@@ -72,20 +100,17 @@ async function loadData(date){
   let query = sb.from('daily_modules').select('module_key,data,date');
   if(date) query = query.eq('date', date);
   else {
-    // 先取最新日期，避免模組缺資料時跨日混搭
     const { data: latest } = await sb.from('daily_modules').select('date').order('date',{ascending:false}).limit(1);
     if (!latest || !latest.length) { app.innerHTML=errorBox('無法載入資料'); return; }
     query = query.eq('date', latest[0].date);
   }
-
   const {data,error} = await query;
   if(error||!data||!data.length){
     app.innerHTML=errorBox('無法載入資料','loadData('+(date?JSON.stringify(date):'')+')'); return;
   }
   allModules={};
   data.forEach(r=>{ allModules[r.module_key]=r.data; });
-  const filterBox=document.getElementById('filterEmpty');
-  render(filterBox.checked);
+  render(document.getElementById('filterEmpty').checked);
 }
 
 async function loadDates(){
@@ -99,19 +124,181 @@ async function loadDates(){
     document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+picker.value;
     loadData(picker.value);
   });
-  if(dates.length){
-    document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+dates[0];
+  if(dates.length) document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+dates[0];
+}
+
+/* ── 大盤：指數卡片 + 分K ── */
+async function loadMarket(){
+  const box=document.getElementById('mktCards');
+  try{
+    const now=new Date();
+    const ym=String(now.getFullYear())+String(now.getMonth()+1).padStart(2,'0');
+    const r=await fetch('/api/twse-proxy?type=index_daily&date='+ym);
+    const j=await r.json();
+    if(j.stat!=='OK'||!j.data||!j.data.length) throw new Error('no index');
+    const last=j.data[j.data.length-1];
+    const idx=parseFloat(String(last[4]||'0').replace(/,/g,''));
+    const chg=parseFloat(String(last[5]||'0').replace(/,/g,''));
+    const amt=parseFloat(String(last[2]||'0').replace(/,/g,''));
+    const d=String(last[0]||'');
+    const dp=d.split('/');
+    const dateStr=dp.length===3?(parseInt(dp[0])+1911)+'/'+dp[1]+'/'+dp[2]:d;
+    const chgPct=idx-chg!==0?fmtPct(chg/(idx-chg)*100,2):'—';
+    box.innerHTML=`
+      <div class="summary-card"><div class="summary-label">加權指數</div><div class="summary-val ${pctClass(chg)}">${fmtVal(idx)}</div><div class="summary-sub">${dateStr}</div></div>
+      <div class="summary-card"><div class="summary-label">漲跌點數</div><div class="summary-val ${pctClass(chg)}">${chg>0?'+':''}${fmtVal(chg)}</div><div class="summary-sub">${chgPct}</div></div>
+      <div class="summary-card"><div class="summary-label">成交金額</div><div class="summary-val">${fmtVal(Math.round(amt/1e8))}<span class="unit">億</span></div><div class="summary-sub">加權指數每日收盤</div></div>`;
+  }catch(e){
+    box.innerHTML='<div class="empty-msg">大盤資料載入失敗</div>';
   }
+}
+
+let twiiTF='5m', twiiCache={};
+async function loadTwii(tf){
+  const key=tf;
+  if(twiiCache[key]) return twiiCache[key];
+  const range=tf==='5m'?'1d':tf==='60m'?'1mo':'6mo';
+  try{
+    const r=await fetch('/api/chart?sid=%5ETWII&interval='+tf+'&range='+range);
+    const j=await r.json();
+    twiiCache[key]=(j.bars||[]).filter(b=>b.c!=null);
+  }catch(e){ twiiCache[key]=[]; }
+  return twiiCache[key];
+}
+function drawTwii(bars){
+  const canvas=document.getElementById('twiiCanvas');
+  if(!canvas) return;
+  const wrap=canvas.parentElement;
+  const W=wrap.clientWidth||800, H=260, dpr=window.devicePixelRatio||1;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  if(bars.length<2){
+    ctx.fillStyle='var(--text-secondary)'; ctx.font='13px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('暫無資料', W/2, H/2);
+    return;
+  }
+  const cs=getComputedStyle(document.documentElement);
+  const cUp=cs.getPropertyValue('--red').trim()||'#B24A45';
+  const cDn=cs.getPropertyValue('--green').trim()||'#3A7357';
+  const cGrid=cs.getPropertyValue('--border-light').trim()||'#EBE7E0';
+  const cText=cs.getPropertyValue('--text-secondary').trim()||'#5F6672';
+  const padL=54, padR=12, padT=14, padB=24;
+  const prices=bars.map(b=>b.c);
+  const pMin=Math.min(...prices), pMax=Math.max(...prices);
+  const pm=(pMax-pMin)*0.05||1;
+  const lo=pMin-pm, hi=pMax+pm;
+  const y=v=>padT+(1-(v-lo)/(hi-lo))*(H-padT-padB);
+  const x=i=>padL+(i*(W-padL-padR))/(bars.length-1);
+  ctx.strokeStyle=cGrid; ctx.lineWidth=0.5;
+  for(let i=0;i<=4;i++){
+    const pv=lo+(hi-lo)*i/4, yy=y(pv);
+    ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(W-padR,yy); ctx.stroke();
+    ctx.fillStyle=cText; ctx.font='10px monospace'; ctx.textAlign='right';
+    ctx.fillText(pv>=100?pv.toFixed(0):pv.toFixed(1), padL-4, yy+3);
+  }
+  const up=bars[bars.length-1].c>=bars[0].c;
+  const col=up?cUp:cDn;
+  ctx.strokeStyle=col; ctx.lineWidth=1.6;
+  ctx.beginPath();
+  bars.forEach((b,i)=>{ const xx=x(i), yy=y(b.c); i===0?ctx.moveTo(xx,yy):ctx.lineTo(xx,yy); });
+  ctx.stroke();
+  const last=bars[bars.length-1].c;
+  ctx.fillStyle=col; ctx.font='700 13px monospace'; ctx.textAlign='right';
+  ctx.fillText(last.toFixed(2), W-padR, y(last)-6);
+  const legend=document.getElementById('twiiLegend');
+  if(legend) legend.innerHTML=`<span>加權指數</span><span>最新 <b>${last.toFixed(2)}</b></span><span class="${up?'up':'dn'}">${fmtPct(last-bars[0].c,2)}</span>`;
+}
+async function switchTwii(tf){
+  twiiTF=tf;
+  document.querySelectorAll('.chart-box .tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
+  const bars=await loadTwii(tf);
+  drawTwii(bars);
+}
+
+/* ── 每日焦點 ── */
+function miniTable(headers, rows, linkCol=0){
+  if(!rows||!rows.length) return '<div class="empty-msg" style="padding:18px">尚無資料</div>';
+  return `<div class="table-wrap"><table><thead><tr>${headers.map(h=>'<th>'+h+'</th>').join('')}</tr></thead><tbody>${
+    rows.map(r=>'<tr onclick="location.href=\'stk.html#'+r[linkCol]+'\'">'+r.map((v,i)=>{
+      if(i===0) return '<td>'+esc(v)+'</td>';
+      if(i===1) return '<td>'+esc(v)+'</td>';
+      return '<td class="'+pctClass(v)+'">'+fmt(v)+'</td>';
+    }).join('')+'</tr>').join('')}
+  </tbody></table></div>`;
+}
+function focusCard(title, body, extra){
+  return `<div class="focus-card"><div class="focus-head"><span>${title}</span>${extra||''}</div>${body}</div>`;
+}
+function renderFocus(f){
+  const box=document.getElementById('focusBox');
+  if(!f||!f.data){ box.innerHTML='<div class="empty-msg">今日焦點尚未產生（盤後更新）</div>'; return; }
+  const d=f.data;
+  const dateTag=`<span class="date-label">${esc(d.date||'')}</span>`;
+  const cards=[];
+  cards.push(focusCard('本週強勢股', miniTable(['股號','名稱','收盤','5日漲跌%','成交張'], d.week_strong||[]), dateTag));
+  cards.push(focusCard('大戶加碼股（法人近似）', miniTable(['股號','名稱','淨買超張','連買','收盤'], d.big_buyer||[]), dateTag));
+  const inst=d.institutional||{};
+  const instDate=inst.date?`<span class="date-label">${esc(inst.date)}</span>`:'';
+  const instBody=`
+    <div class="inst-cols">
+      <div><div class="inst-label">外資買超</div>${(inst.foreign_top||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r[0])}">${esc(r[0])} ${esc(r[1])}</a><b class="up">+${fmt(r[2])}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div>
+      <div><div class="inst-label">投信買超</div>${(inst.trust_top||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r[0])}">${esc(r[0])} ${esc(r[1])}</a><b class="up">+${fmt(r[3])}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div>
+      <div><div class="inst-label">自營買超</div>${(inst.dealer_top||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r[0])}">${esc(r[0])} ${esc(r[1])}</a><b class="up">+${fmt(r[4])}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div>
+    </div>
+    <div class="inst-foot">外資 + 投信同日買超：<b class="up">${inst.both_buy??'—'} 檔</b></div>`;
+  cards.push(focusCard('三大法人', instBody, instDate));
+  const etf=d.etf||{};
+  const etfRows=(etf.active&&etf.active.length?etf.active:etf.top_amount||[]).slice(0,8);
+  const etfBody=miniTable(['代號','名稱','收盤','漲跌%','成交額(億)','法人買賣超'],
+    etfRows.map(r=>[r[0],r[1]+(r[7]?' 主動':''),r[2],r[3],r[5],r[6]]),0)+
+    `<div class="focus-foot"><a href="etf.html">查看 ETF 總覽 →</a><span>主動式 ${etf.active_count||0} 檔</span></div>`;
+  cards.push(focusCard('ETF 動向', etfBody, dateTag));
+  const mg=d.margin;
+  const marginBody=mg&&mg.date
+    ? `<div class="inst-cols">
+        <div><div class="inst-label">融資增加</div>${(mg.m_up||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="up">+${fmt(r.m_today-r.m_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div>
+        <div><div class="inst-label">融資減少</div>${(mg.m_dn||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="dn">${fmt(r.m_today-r.m_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div>
+        <div><div class="inst-label">融券增加</div>${(mg.s_up||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="up">+${fmt(r.s_today-r.s_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div>
+        <div><div class="inst-label">融券減少</div>${(mg.s_dn||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="dn">${fmt(r.s_today-r.s_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div>
+      </div>`
+    : '<div class="empty-msg">資券變化約 22:00 後公布</div>';
+  cards.push(focusCard('資券變化', marginBody, mg&&mg.date?`<span class="date-label">${esc(mg.date)}</span>`:''));
+  box.innerHTML=`<div class="focus-grid">${cards.join('')}</div>`;
+}
+async function loadFocus(){
+  if(!sb) return;
+  const {data}=await sb.from('daily_focus').select('date,data').order('date',{ascending:false}).limit(1);
+  renderFocus(data&&data[0]?data[0]:null);
+}
+
+/* ── 新聞晨報 ── */
+async function loadNews(){
+  const box=document.getElementById('newsBox');
+  if(!sb){ box.innerHTML=''; return; }
+  const {data}=await sb.from('daily_news').select('title,link,source,published_at,snippet').order('published_at',{ascending:false}).limit(10);
+  if(!data||!data.length){ box.innerHTML='<div class="empty-msg">今日新聞尚未爬取（08:30 更新）</div>'; return; }
+  box.innerHTML=`<div class="news-list">${data.map(n=>`
+    <a class="news-item" href="${esc(n.link)}" target="_blank" rel="noopener">
+      <span class="news-src">${esc(n.source||'新聞')}</span>
+      <span class="news-title">${esc(n.title)}</span>
+      <span class="news-time">${n.published_at?String(n.published_at).slice(11,16):''}</span>
+    </a>`).join('')}</div>`;
 }
 
 let dataLoaded = false;
 function onDataReady(){
-  if(!dataLoaded){ dataLoaded=true; loadDates(); loadData(); }
-  else render(document.getElementById('filterEmpty').checked);
+  if(!dataLoaded){
+    dataLoaded=true;
+    loadDates(); loadData(); loadFocus(); loadNews(); loadMarket(); loadTwii(twiiTF).then(drawTwii);
+  } else {
+    render(document.getElementById('filterEmpty').checked);
+  }
 }
 
 document.getElementById('filterEmpty').addEventListener('change',function(){ render(this.checked); });
-
 function toggleAllModules(){
   const mods=[...document.querySelectorAll('.module')];
   const allOpen=mods.length>0&&mods.every(m=>m.classList.contains('open'));

@@ -67,6 +67,7 @@ const NAV_GROUPS = [
       ['margin.html', 'margin', '融資融券'],
       ['calendar.html', 'calendar', '投資行事曆'],
       ['ipo.html', 'ipo', '股票抽籤'],
+      ['etf.html', 'etf', 'ETF 總覽'],
       ['history.html', 'history', '歷史漲跌幅'],
     ],
   },
