@@ -93,12 +93,11 @@ function renderChrome() {
       <div class="nav-links" id="navLinks">${nav}
         <div class="nav-group">
           <a href="watchlist.html" class="${page === 'watchlist' ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span> 自選股</a>
+          <a href="stk.html" class="${page === 'stk' ? 'active' : ''}">${I('search', 12)} 查股</a>
         </div>
       </div>
       <div class="spacer"></div>
-      <a href="stk.html" class="topbar-search-cta" title="個股搜尋">${I('search', 14)}<span>查股</span></a>
-      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>
-      <div id="authArea"></div>`;
+      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
     const toggle = document.getElementById('navToggle');
     const links = document.getElementById('navLinks');
     toggle.addEventListener('click', () => links.classList.toggle('show'));
