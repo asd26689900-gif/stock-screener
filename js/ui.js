@@ -22,6 +22,9 @@ const ICON_PATHS = {
   trash: '<path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>',
   clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
   sliders: '<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>',
+  creditCard: '<rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/>',
+  calculator: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/>',
+  gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>',
 };
 function I(name, size = 14) {
   const p = ICON_PATHS[name] || '';
@@ -72,6 +75,8 @@ const NAV_GROUPS = [
     items: [
       ['heatmap.html', 'heatmap', '產業熱力圖'],
       ['tools.html', 'tools', '股票計算機'],
+      ['concepts.html', 'concepts', '題材概念股'],
+      ['strategy.html', 'strategy', '選股策略'],
     ],
   },
 ];
@@ -81,6 +86,7 @@ function renderChrome() {
   const tb = document.getElementById('topbar');
   const ft = document.getElementById('footer');
   if (tb) {
+    tb.className = 'topbar';
     const nav = NAV_GROUPS.map(g => `
       <div class="nav-group">
         ${g.items.map(([href, key, label]) =>
@@ -90,12 +96,11 @@ function renderChrome() {
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
       <button class="nav-toggle" id="navToggle" aria-label="選單">${I('menu', 18)}</button>
-      <div class="nav-links" id="navLinks">${nav}
+      <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
         <div class="nav-group">
           <a href="watchlist.html" class="${page === 'watchlist' ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span> 自選股</a>
-          <a href="stk.html" class="${page === 'stk' ? 'active' : ''}">${I('search', 12)} 查股</a>
         </div>
-      </div>
+      </nav>
       <div class="spacer"></div>
       <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
     const toggle = document.getElementById('navToggle');
@@ -117,16 +122,44 @@ function fmtNum(v) {
   const n = parseFloat(v);
   return Number.isFinite(n) ? n.toLocaleString('zh-TW') : v;
 }
+
+/* 百分比數值：回傳 number；缺失或非有限回傳 null */
+function pctNum(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = typeof v === 'string' ? parseFloat(v) : Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/* 漲跌類別：正=up(紅)、負=dn(綠)、零=中性 */
+function pctClass(v) {
+  const n = pctNum(v);
+  if (n === null || n === 0) return '';
+  return n > 0 ? 'up' : 'dn';
+}
+
+/* 百分比格式化：null→—；零不帶正負號；|v|>10000% 視為異常資料 */
 function fmtPct(v, d = 2) {
+  const n = pctNum(v);
+  if (n === null || Math.abs(n) > 10000) return '—';
+  if (Math.abs(n) < 0.005) return (0).toFixed(d) + '%';
+  return (n > 0 ? '+' : '') + n.toFixed(d) + '%';
+}
+
+/* 一般數值格式化：缺失 / 非有限 →— */
+function fmtVal(v, d) {
   if (v === null || v === undefined || v === '') return '—';
   const n = Number(v);
-  return (n >= 0 ? '+' : '') + n.toFixed(d) + '%';
+  if (!Number.isFinite(n)) return '—';
+  if (d !== undefined) return n.toLocaleString('zh-TW', { minimumFractionDigits: d, maximumFractionDigits: d });
+  return n.toLocaleString('zh-TW');
 }
 function fmtAmt(v) {
-  if (!v) return '—';
-  if (v >= 1e8) return (v / 1e8).toFixed(1) + '億';
-  if (v >= 1e4) return (v / 1e4).toFixed(0) + '萬';
-  return fmtNum(v);
+  const n = pctNum(v);
+  if (n === null) return '—';
+  if (n === 0) return '0';
+  if (n >= 1e8) return (n / 1e8).toFixed(1) + '億';
+  if (n >= 1e4) return (n / 1e4).toFixed(0) + '萬';
+  return fmtNum(n);
 }
 
 /* ─── 自選股（與 watchlist.html 共用 localStorage） ─── */
@@ -160,14 +193,33 @@ function toggleStar(btn, sid) {
   const i = w['我的自選'].indexOf(sid);
   if (i >= 0) w['我的自選'].splice(i, 1); else w['我的自選'].push(sid);
   saveWL(w);
-  btn.classList.toggle('on', i < 0);
+  const added = i < 0;
+  btn.classList.toggle('on', added);
+  toast(added ? '已加入自選 ' + sid : '已移除自選 ' + sid);
+}
+
+/* ─── Toast 提示 ─── */
+let _toastTimer = null;
+function toast(msg) {
+  let el = document.getElementById('toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'toast';
+    el.className = 'toast';
+    el.setAttribute('role', 'status');
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
 }
 
 /* ─── Sparkline ─── */
 const sparkCache = {};
 async function fetchSpark(sid) {
   if (sparkCache[sid]) return sparkCache[sid];
-  // sb 是 auth.js 頂層 let（全域 lexical），不會掛到 window，需用 typeof 判斷
+  // sb 是 init.js 頂層 let（全域 lexical），不會掛到 window，需用 typeof 判斷
   if (typeof sb === 'undefined' || !sb) return [];
   try {
     const { data } = await sb.from('stock_prices')
@@ -356,4 +408,41 @@ function computeScores(d, cfg) {
 }
 
 /* ─── 啟動 ─── */
-document.addEventListener('DOMContentLoaded', () => { initTheme(); renderChrome(); });
+/* ─── 鍵盤可達性強化 ───
+   把帶 onclick 的非原生控制項（div/tr/span…）變成可聚焦、
+   可用 Enter/Space 觸發，並同步 aria-expanded。 */
+function enhanceAccessibility(root = document) {
+  root.querySelectorAll('[onclick]').forEach(el => {
+    if (el.matches('button,a,input,select,textarea,label')) return;
+    if (!el.hasAttribute('tabindex')) el.setAttribute('tabindex', '0');
+    if (!el.getAttribute('role')) el.setAttribute('role', el.matches('tr') ? 'link' : 'button');
+  });
+  root.querySelectorAll('.module-header,.score-dim-header,.month-toggle-header').forEach(h => {
+    const open = h.parentElement.classList.contains('open');
+    h.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
+}
+
+function syncAriaExpanded(e) {
+  const h = e.target.closest ? e.target.closest('.module-header,.score-dim-header,.month-toggle-header') : null;
+  if (h) h.setAttribute('aria-expanded', h.parentElement.classList.contains('open') ? 'true' : 'false');
+}
+
+document.addEventListener('click', syncAriaExpanded, true);
+document.addEventListener('keydown', e => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('[onclick]')
+      && !e.target.matches('button,a,input,select,textarea,label')) {
+    e.preventDefault();
+    e.target.click();
+    syncAriaExpanded(e);
+  }
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.lang = 'zh-Hant';
+  initTheme();
+  renderChrome();
+  enhanceAccessibility();
+  const mo = new MutationObserver(() => enhanceAccessibility());
+  mo.observe(document.body, { childList: true, subtree: true });
+});

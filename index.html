@@ -1,4 +1,9 @@
 <title>盤後精選模組 — 多因子選股系統</title>
+<meta name="description" content="多因子選股系統：籌碼、營收、技術面與法人動向交叉篩選，每日盤後更新。">
+<meta property="og:title" content="盤後精選模組 — 多因子選股系統">
+<meta property="og:description" content="多因子選股系統：籌碼、營收、技術面與法人動向交叉篩選，每日盤後更新。">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#F5F2EC">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -6,10 +11,15 @@
 <div id="topbar"></div>
 
 <div class="container">
+  <div class="page-header">
+    <h1 class="page-title">選股模組</h1>
+    <p class="page-desc">多因子選股系統：籌碼、營收、技術面與法人動向交叉篩選，每日盤後更新。</p>
+  </div>
   <div class="controls">
     <span class="date-label" id="dateLabel">載入中...</span>
-    <select id="datePicker"></select>
+    <select id="datePicker" aria-label="選擇資料日期"></select>
     <label><input type="checkbox" id="filterEmpty" checked> 僅顯示有標的</label>
+    <button class="btn btn-sm" id="toggleAll" onclick="toggleAllModules()" type="button">全部收合</button>
   </div>
   <div id="app"><div class="loading">正在載入選股資料...</div></div>
 </div>
@@ -19,7 +29,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 const MODULE_META = {
   chip_high: { title: '籌碼集中創高股', desc: '交易家數遞減代表籌碼從散戶流向大戶，同時股價創近期新高且乖離率仍在合理範圍。', rules: ['股價創N日新高','交易家數連3日遞減','5日均線乖離率<7%','成交量>5日均量'], cols: ['股號','名稱','收盤價','漲跌%','成交張','5日均量','創高天數','乖離率%'] },
@@ -37,7 +47,7 @@ const MODULE_ORDER = ['chip_high','main_buy','rev_grow','hot_grow','inst_duo','m
 const app = document.getElementById('app');
 let allModules = {};
 
-function fmt(v){ return typeof v==='number'?v.toLocaleString('zh-TW'):v; }
+function fmt(v){ return fmtVal(v); }
 
 function render(filterEmpty){
   let html='';
@@ -48,7 +58,8 @@ function render(filterEmpty){
       ?'<tr class="empty-row"><td colspan="'+(meta.cols.length+1)+'">今日無符合標的</td></tr>'
       :data.map(row=>'<tr onclick="location.href=\'stk.html#'+row[0]+'\'">'+row.map((v,i)=>{
         if(i<=1) return '<td>'+v+'</td>';
-        if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return '<td class="'+c+'">'+d+'</td>';}
+        if(i===3) return '<td class="'+pctClass(v)+'">'+fmtPct(v,2)+'</td>';
+        if(/MOM|YOY|乖離|殖利率/.test(meta.cols[i]||'')) return '<td class="'+pctClass(v)+'">'+fmtPct(v,2)+'</td>';
         return '<td>'+fmt(v)+'</td>';
       }).join('')+'<td>'+starBtn(row[0])+'</td></tr>').join('');
     html+=`<div class="module open"><div class="module-header" onclick="this.parentElement.classList.toggle('open')"><span class="arrow">${I('chev', 11)}</span><span class="module-title">${meta.title}</span><span class="badge-count">${data.length} 檔</span></div><div class="module-desc">${meta.desc}</div><div class="module-meta">${meta.rules.map(r=>'<span>'+r+'</span>').join('')}</div><div class="table-wrap"><table><thead><tr>${meta.cols.map(c=>'<th>'+c+'</th>').join('')}<th></th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
@@ -94,10 +105,17 @@ async function loadDates(){
 }
 
 let dataLoaded = false;
-function onAuthReady(){
+function onDataReady(){
   if(!dataLoaded){ dataLoaded=true; loadDates(); loadData(); }
   else render(document.getElementById('filterEmpty').checked);
 }
 
 document.getElementById('filterEmpty').addEventListener('change',function(){ render(this.checked); });
+
+function toggleAllModules(){
+  const mods=[...document.querySelectorAll('.module')];
+  const allOpen=mods.length>0&&mods.every(m=>m.classList.contains('open'));
+  mods.forEach(m=>m.classList.toggle('open',!allOpen));
+  document.getElementById('toggleAll').textContent=allOpen?'全部展開':'全部收合';
+}
 </script>

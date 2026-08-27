@@ -2,7 +2,7 @@
 盤後選股模組 — 每日自動更新腳本
 資料來源：TWSE/TPEX 官方 API（完全免費，不需 token）
 """
-import os, json, csv, io, requests, sys, time
+import os, json, csv, io, math, requests, sys, time
 from datetime import datetime, timedelta
 from collections import defaultdict
 
@@ -26,6 +26,28 @@ def parse_num(s):
     if not s or s.strip() in ('', '--', 'X', '-'): return 0
     try: return float(str(s).replace(',', ''))
     except: return 0
+
+def parse_pct(s):
+    """百分比欄位：缺失 / 異常字串回 None，正常回 float"""
+    if s is None: return None
+    s = str(s).strip()
+    if not s or s in ('--', 'X', '-', 'N/A', 'NA', '—', '－'):
+        return None
+    try:
+        return float(s.replace(',', '').replace('%', ''))
+    except Exception:
+        return None
+
+def sane_pct(v, max_abs=10000.0):
+    """YOY/MOM 合理性檢查：非有限或超出 ±10000%（基期過小）視為無資料"""
+    if v is None: return None
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(v) or abs(v) > max_abs:
+        return None
+    return v
 
 def roc_date(dt):
     """datetime → 民國年字串 '115/08/14'"""
@@ -63,6 +85,8 @@ def fetch_twse_prices(date_dt):
         sid = line[1].strip().strip('"')
         # 只保留普通股（4碼數字 or 4碼數字+字母）
         if not sid or len(sid) < 4: continue
+        close = parse_num(line[8])
+        if close <= 0: continue  # 暫停交易 / 異常行情不寫入
         try:
             rows.append({
                 "stock_id": sid,
@@ -71,7 +95,7 @@ def fetch_twse_prices(date_dt):
                 "open": parse_num(line[5]),
                 "high": parse_num(line[6]),
                 "low": parse_num(line[7]),
-                "close": parse_num(line[8]),
+                "close": close,
                 "change": parse_num(line[9]),
                 "Trading_Volume": parse_num(line[3]),
             })
@@ -94,6 +118,7 @@ def fetch_tpex_prices(date_dt):
             sid = str(line[0]).strip()
             if not sid or len(sid) < 4: continue
             close = parse_num(line[2])
+            if close <= 0: continue
             chg = parse_num(line[3])
             rows.append({
                 "stock_id": sid,
@@ -224,8 +249,8 @@ def _parse_mops_html(text):
                 "stock_id": sid,
                 "name": re.sub(r'<[^>]+>', '', tds[1]).strip(),
                 "revenue": parse_num(re.sub(r'<[^>]+>', '', tds[2])),
-                "rev_mom": parse_num(re.sub(r'<[^>]+>', '', tds[5])),
-                "rev_yoy": parse_num(re.sub(r'<[^>]+>', '', tds[6])),
+                "rev_mom": parse_pct(re.sub(r'<[^>]+>', '', tds[5])),
+                "rev_yoy": parse_pct(re.sub(r'<[^>]+>', '', tds[6])),
             })
         except: continue
     return rows
@@ -266,8 +291,8 @@ def fetch_monthly_revenue_openapi():
                     "stock_id": sid,
                     "name": str(row.get("公司名稱", "")).strip(),
                     "revenue": rev,
-                    "rev_mom": parse_num(row.get("營業收入-上月比較增減(%)", "0")),
-                    "rev_yoy": parse_num(row.get("營業收入-去年同月增減(%)", "0")),
+                    "rev_mom": parse_pct(row.get("營業收入-上月比較增減(%)")),
+                    "rev_yoy": parse_pct(row.get("營業收入-去年同月增減(%)")),
                     "month": month,
                 })
                 cnt += 1
@@ -587,13 +612,13 @@ def get_rev_info(sid):
     data = rev.get(sid, [])
     if not data: return None
     latest = data[-1]
-    mom = float(latest.get("rev_mom", 0) or 0)
-    yoy = float(latest.get("rev_yoy", 0) or 0)
+    mom = sane_pct(latest.get("rev_mom"))
+    yoy = sane_pct(latest.get("rev_yoy"))
     # 連續正成長月數
     consec = 0
     for i in range(len(data)-1, -1, -1):
-        m = float(data[i].get("rev_mom", 0) or 0)
-        if m > 0: consec += 1
+        m = sane_pct(data[i].get("rev_mom"))
+        if m is not None and m > 0: consec += 1
         else: break
     return {"mom": mom, "yoy": yoy, "consec_grow": consec, "data": data}
 
@@ -701,8 +726,7 @@ print("🔍 模組3: 營收成長量增股")
 m3 = []
 for sid in stocks:
     ri = get_rev_info(sid)
-    if not ri or ri["consec_grow"] < 3: continue
-    if ri["yoy"] <= 0: continue
+    if not ri or ri["consec_grow"] < 3 or ri["yoy"] is None or ri["yoy"] <= 0: continue
     fd, _ = get_inst_consecutive(sid, "foreign")
     if fd < 2: continue
     p = latest_price(sid)
@@ -722,7 +746,7 @@ m4 = []
 for sid in stocks:
     ri = get_rev_info(sid)
     if not ri: continue
-    if ri["mom"] <= 0 or ri["yoy"] < 20: continue
+    if ri["mom"] is None or ri["mom"] <= 0 or ri["yoy"] is None or ri["yoy"] < 20: continue
     b = bias(sid, 5)
     if b is None or b > 8: continue
     p = latest_price(sid)
@@ -760,8 +784,7 @@ print("🔍 模組6: 毛利營收雙創高")
 m6 = []
 for sid in stocks:
     ri = get_rev_info(sid)
-    if not ri or ri["consec_grow"] < 2: continue
-    if ri["mom"] <= 0: continue
+    if not ri or ri["consec_grow"] < 2 or ri["mom"] is None or ri["mom"] <= 0: continue
     p = latest_price(sid)
     if not p: continue
     data = stocks[sid]
@@ -790,7 +813,7 @@ for sid in stocks:
     data = stocks[sid]
     prev = data[-2] if len(data) >= 2 else p
     av = avg_vol(sid, 5)
-    mom_str = f"{ri['mom']:.0f}%" if ri else "N/A"
+    mom_str = f"{ri['mom']:.0f}%" if ri and ri["mom"] is not None else "—"
     m7.append([sid, name_map.get(sid, sid),
                p["close"], change_pct(p, prev),
                int(p["Trading_Volume"]/1000), int(av or 0), mom_str])
@@ -803,7 +826,7 @@ m8 = []
 for sid in stocks:
     ri = get_rev_info(sid)
     if not ri or ri["consec_grow"] < 3: continue
-    if ri["yoy"] < 50 or ri["mom"] < 15: continue
+    if ri["yoy"] is None or ri["yoy"] < 50 or ri["mom"] is None or ri["mom"] < 15: continue
     p = latest_price(sid)
     if not p: continue
     data = stocks[sid]
@@ -834,7 +857,7 @@ for sid in stocks:
     if signals < 2: continue
     prev = data[-2] if len(data) >= 2 else p
     av = avg_vol(sid, 5)
-    mom_str = f"{ri['mom']:.0f}%" if ri else "N/A"
+    mom_str = f"{ri['mom']:.0f}%" if ri and ri["mom"] is not None else "—"
     m9.append([sid, name_map.get(sid, sid),
                p["close"], change_pct(p, prev),
                int(p["Trading_Volume"]/1000), int(av or 0), mom_str])
@@ -1002,8 +1025,8 @@ for sid in stocks:
         rev_history.append({
             "m": r.get("m") or r.get("month") or mkey,
             "rev": r.get("rev", r.get("revenue", 0)),
-            "mom": float(r.get("mom", r.get("rev_mom", 0)) or 0),
-            "yoy": float(r.get("yoy", r.get("rev_yoy", 0)) or 0),
+            "mom": sane_pct(r.get("mom", r.get("rev_mom"))),
+            "yoy": sane_pct(r.get("yoy", r.get("rev_yoy"))),
         })
 
     stk_analysis[sid] = {
@@ -1022,8 +1045,8 @@ for sid in stocks:
             "main_net": main_net, "retail_net": retail_net,
             "vol": vol, "avg_vol5": avg_vol(sid, 5),
             "pe": pe, "pb": pb, "dy": dy,
-            "yoy": (ri.get("yoy", 0) if ri else 0),
-            "mom": (ri.get("mom", 0) if ri else 0),
+            "yoy": (ri.get("yoy") if ri else None),
+            "mom": (ri.get("mom") if ri else None),
             "consec_up": consec_up, "d3_chg": round(d3_chg, 2), "rsv": round(rsv, 2),
             "ma5": ma5, "ma10": ma10, "ma20": ma20, "ma60": ma60,
             "close": close,
@@ -1144,11 +1167,9 @@ s4 = []
 for sid in stocks:
     ri = get_rev_info(sid)
     if not ri or len(ri["data"]) < 3: continue
-    try:
-        prev_mom = float(ri["data"][-2].get("rev_mom", 0) or 0)
-    except: prev_mom = 0
+    prev_mom = sane_pct(ri["data"][-2].get("rev_mom"))
     cur_mom = ri["mom"]
-    if not (prev_mom < 0 and cur_mom > 0): continue
+    if prev_mom is None or cur_mom is None or not (prev_mom < 0 and cur_mom > 0): continue
     data = stocks[sid]
     if len(data) < 20: continue
     p = data[-1]
@@ -1237,8 +1258,8 @@ else:
             "trust_consec_days": td,
             "trust_net_shares": int(tt / 1000),
             "dealer_consec_days": dd,
-            "rev_mom": ri["mom"] if ri else 0,
-            "rev_yoy": ri["yoy"] if ri else 0,
+            "rev_mom": ri["mom"] if ri else None,
+            "rev_yoy": ri["yoy"] if ri else None,
             "rev_consec_grow": ri["consec_grow"] if ri else 0,
         })
     batch = 100

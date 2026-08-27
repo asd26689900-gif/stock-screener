@@ -1,4 +1,5 @@
 <title>投資行事曆 — 盤後精選模組</title>
+<meta name="description" content="投資行事曆：除權息、財報與股票抽籤時程一覽。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -90,7 +91,7 @@
 
 <div class="container" data-page="calendar">
   <div>
-    <div class="page-title">📆 投資行事曆</div>
+    <h1 class="page-title">投資行事曆</h1>
     <div class="page-desc">未來兩週密度一眼掌握，即將到來事件依時序卡片列出。</div>
   </div>
 
@@ -153,7 +154,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 // ═══════════════════════════════════════════════
 // State
@@ -415,11 +416,14 @@ function renderGroups(){
       <div class="event-list">${items.map(rowHtml).join('')}</div>
     </div>` : '';
 
+  const LATER_CAP = 30;
+  const later = buckets.later;
+  const cappedLater = later.length > LATER_CAP ? later.slice(0, LATER_CAP) : later;
   document.getElementById('eventGroups').innerHTML =
     groupHtml('今天', todayStr().slice(5).replace('-','/'), buckets.today, 'today') +
     groupHtml('未來 3 天內', '', buckets.soon) +
     groupHtml('未來 7 天內', '', buckets.week) +
-    groupHtml('更遠', '本月剩下', buckets.later);
+    groupHtml('更遠', later.length > LATER_CAP ? `本月剩下（顯示前 ${LATER_CAP} 件）` : '本月剩下', cappedLater);
 }
 
 function toggleMonth(){

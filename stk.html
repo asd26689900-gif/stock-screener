@@ -1,4 +1,5 @@
 <title>個股分析 — 盤後精選模組</title>
+<meta name="description" content="個股分析：查詢台股個股 K 線、技術指標、籌碼、營收與評分。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -6,10 +7,11 @@
 <div id="topbar"></div>
 
 <div class="container">
+  <h1 class="page-title">個股分析</h1>
   <div class="search-hero" id="searchHero">
     <div class="search-hero-label">個股搜尋</div>
     <div class="search-hero-row">
-      <input type="text" id="stkInput" placeholder="輸入股號或公司名稱（例：2330 或 台積電）" autocomplete="off" maxlength="20">
+      <input type="text" id="stkInput" placeholder="輸入股號或公司名稱（例：2330 或 台積電）" autocomplete="off" maxlength="20" aria-label="輸入股號或公司名稱">
       <button onclick="heroSearch()">查詢</button>
       <div class="search-dropdown" id="searchDropdown"></div>
     </div>
@@ -41,7 +43,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 // 頁面載入：hash 有值 → 藏 hero 直接查
 function syncHeroWithHash(){
@@ -170,7 +172,7 @@ async function doSearch(){
 
 function cls(v){return v>0?'up':v<0?'dn':'';}
 function sign(v){return v>0?'+'+v:v;}
-function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function fmt(v){ return fmtVal(v); }
 function scoreBadge(n){const p=n/10;return p>=.7?'badge-high':p>=.4?'badge-mid':'badge-low';}
 function scoreComment(t){if(t>=25)return'多項指標正向';if(t>=20)return'指標偏正向';if(t>=15)return'指標中性';if(t>=10)return'指標偏弱';return'多項指標偏空';}
 function scoreColor(t){if(t>=25)return'var(--green)';if(t>=20)return'var(--teal)';if(t>=15)return'var(--gold)';return'var(--red)';}
@@ -314,7 +316,7 @@ function renderExtLinks(sid,name){
 }
 
 function renderStock(sid,d){
-  const chg=d.change||0,chgPct=d.change_pct||0,chgSign=chg>=0?'▲':'▼';
+  const chg=d.change||0,chgPct=d.change_pct||0,chgSign=chg>0?'▲':chg<0?'▼':'';
   const rev=d.revenue||[];
   const latestRev=rev.length?rev[rev.length-1]:null;
   const chartData=getChartData();
@@ -324,7 +326,7 @@ function renderStock(sid,d){
     <div class="stk-id">${sid}</div><div class="stk-name">${d.name}</div>
     <div class="price-row">
       <span class="price-big ${cls(chg)}">${fmt(d.close)}</span>
-      <span class="price-change ${cls(chg)}">${chgSign}${Math.abs(chg)} (${chgPct>0?'+':''}${chgPct.toFixed(2)}%)</span>
+      <span class="price-change ${cls(chg)}">${chgSign}${Math.abs(chg)} (${fmtPct(chgPct,2)})</span>
       <span class="price-date">${I('calendar',12)} ${d.date}</span>
     </div>
     <div class="ohlcv">
@@ -367,7 +369,7 @@ function renderStock(sid,d){
   ${rev.length?`
   <div class="rev-grid">
     <div class="rev-card"><div class="rev-label">最新月營收</div><div class="rev-val">${latestRev?fmtRev(latestRev.rev):'—'}</div><div class="rev-sub">${latestRev?latestRev.m:''}</div></div>
-    <div class="rev-card"><div class="rev-label">年增率 YoY</div><div class="rev-val ${cls(latestRev?.yoy)}">${latestRev?(latestRev.yoy>=0?'+':'')+latestRev.yoy.toFixed(1)+'%':'—'}</div><div class="rev-sub">月增 ${latestRev?(latestRev.mom>=0?'+':'')+latestRev.mom.toFixed(1)+'%':'—'}</div></div>
+    <div class="rev-card"><div class="rev-label">年增率 YoY</div><div class="rev-val ${cls(latestRev?.yoy)}">${latestRev?fmtPct(latestRev.yoy,1):'—'}</div><div class="rev-sub">月增 ${latestRev?fmtPct(latestRev.mom,1):'—'}</div></div>
   </div>
   <div class="chart-box">
     <div class="chart-toolbar"><span class="chart-label">${I('chart',14)} 月營收走勢</span></div>
@@ -377,8 +379,8 @@ function renderStock(sid,d){
   <div class="chip-grid">
     <div class="chip-card"><div class="chip-label">主力買賣超</div><div class="chip-val ${cls(d.chip.main_net)}">${sign(fmt(d.chip.main_net))}張</div></div>
     <div class="chip-card"><div class="chip-label">散戶買賣超</div><div class="chip-val ${cls(d.chip.retail_net)}">${sign(fmt(d.chip.retail_net))}張</div></div>
-    <div class="chip-card"><div class="chip-label">籌碼集中度</div><div class="chip-val">${d.chip.concentration_pct}%</div><div class="chip-sub">集中股數 ${fmt(d.chip.concentration_shares)}張</div></div>
-    <div class="chip-card"><div class="chip-label">大戶 / 羊群持股</div><div class="chip-val">${d.chip.big_holder_pct}%</div><div class="chip-sub">羊群 ${d.chip.retail_holder_pct}%</div></div>
+    <div class="chip-card"><div class="chip-label">籌碼集中度</div><div class="chip-val">${d.chip.concentration_pct!=null?fmtPct(d.chip.concentration_pct,2):'—'}</div><div class="chip-sub">集中股數 ${d.chip.concentration_shares!=null?fmt(d.chip.concentration_shares)+'張':'—'}</div></div>
+    <div class="chip-card"><div class="chip-label">大戶 / 羊群持股</div><div class="chip-val">${d.chip.big_holder_pct!=null?fmtPct(d.chip.big_holder_pct,2):'—'}</div><div class="chip-sub">羊群 ${d.chip.retail_holder_pct!=null?fmtPct(d.chip.retail_holder_pct,2):'—'}</div></div>
   </div>
   <div id="scoreSection">${buildScoreHTML(d)}</div>`;
   if(hasChart){
@@ -421,8 +423,8 @@ function setOHLCBar(b, prev){
   if(!el||!b) return;
   const chg=prev?(b.c-prev.c):0;
   const chgP=prev&&prev.c?(chg/prev.c*100):0;
-  const cc=chg>=0?'up':'dn';
-  el.innerHTML=`<span>${b.d}</span><span>開 <b>${b.o.toFixed(2)}</b></span><span>高 <b class="${b.h>=b.o?'up':'dn'}">${b.h.toFixed(2)}</b></span><span>低 <b class="${b.l<=b.o?'up':'dn'}">${b.l.toFixed(2)}</b></span><span>收 <b>${b.c.toFixed(2)}</b></span><span>漲跌 <b class="${cc}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgP>=0?'+':''}${chgP.toFixed(2)}%)</b></span>`;
+  const cc=pctClass(chg);
+  el.innerHTML=`<span>${b.d}</span><span>開 <b>${b.o.toFixed(2)}</b></span><span>高 <b class="${pctClass(b.h-b.o)}">${b.h.toFixed(2)}</b></span><span>低 <b class="${pctClass(b.l-b.o)}">${b.l.toFixed(2)}</b></span><span>收 <b>${b.c.toFixed(2)}</b></span><span>漲跌 <b class="${cc}">${chg>0?'+':''}${chg.toFixed(2)} (${fmtPct(chgP,2)})</b></span>`;
 }
 
 function calcMA(data,n){
@@ -888,7 +890,9 @@ function drawRevChart(data){
   ctx.textAlign='center';
   data.forEach((d,i)=>{
     if(!d.rev)return;
-    const x=padL+i*bw;const color=d.yoy>=0?cUp:cDn;
+    const x=padL+i*bw;
+    const yoy=(typeof d.yoy==='number'&&Number.isFinite(d.yoy))?d.yoy:null;
+    const color=yoy===null?cText:(yoy>=0?cUp:cDn);
     const h=d.rev/vMax*plotH;const rx=2;
     const bx=x+4,by=yy(d.rev),bwi=bw-8,bhi=h;
     ctx.fillStyle=color;ctx.beginPath();
@@ -896,7 +900,7 @@ function drawRevChart(data){
     ctx.lineTo(bx+bwi,by+bhi);ctx.lineTo(bx,by+bhi);ctx.lineTo(bx,by+rx);ctx.quadraticCurveTo(bx,by,bx+rx,by);
     ctx.fill();
     ctx.fillStyle=color;ctx.font='9px monospace';
-    ctx.fillText((d.yoy>=0?'+':'')+d.yoy.toFixed(0)+'%',x+bw/2,yy(d.rev)-4);
+    ctx.fillText(yoy===null?'—':(yoy>=0?'+':'')+yoy.toFixed(0)+'%',x+bw/2,yy(d.rev)-4);
     ctx.fillStyle=cText;
     ctx.fillText(d.m.length>5?d.m.slice(-5):d.m,x+bw/2,H-padB+14);
   });
@@ -992,5 +996,5 @@ function resetScoreCfgUI(){
   renderScoreCfg();
 }
 
-function onAuthReady(){ if(location.hash) doSearch(); }
+function onDataReady(){ if(location.hash) doSearch(); }
 </script>

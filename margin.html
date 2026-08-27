@@ -1,4 +1,5 @@
 <title>融資融券 — 盤後精選模組</title>
+<meta name="description" content="融資融券餘額：追蹤散戶槓桿動向。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -7,7 +8,7 @@
 
 <div class="container">
   <div>
-    <div class="page-title">💳 融資融券餘額</div>
+  <h1 class="page-title">融資融券餘額</h1>
     <div class="page-desc">每日融資融券餘額變化，追蹤散戶槓桿動向。</div>
   </div>
   <div class="tab-bar">
@@ -23,7 +24,7 @@
 <script src="js/ui.js"></script>
 <script>
 let marginData=[],currentTab='margin_buy';
-function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function fmt(v){ return fmtVal(v); }
 
 async function loadData(){
   try{
@@ -81,7 +82,7 @@ function renderTable(){
       const v=getChg(r),bal=isMargin?r.m_today:r.s_today,prev=isMargin?r.m_prev:r.s_prev;
       return `<tr onclick="location.href='stk.html#${r.id}'">
         <td>${r.id}</td><td>${r.name}</td>
-        <td class="${v>0?'up':'dn'}">${v>0?'+':''}${fmt(v)}</td>
+        <td class="${pctClass(v)}">${v>0?'+':''}${fmtVal(v)}</td>
         <td>${fmt(bal)}</td><td>${fmt(prev)}</td></tr>`;
     }).join('')}${!top50.length?'<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:24px">無資料</td></tr>':''}</tbody>
   </table></div></div>`;

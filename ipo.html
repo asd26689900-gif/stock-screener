@@ -1,4 +1,5 @@
 <title>股票抽籤 — 盤後精選模組</title>
+<meta name="description" content="股票抽籤（公開申購）：承銷價、申購期間與中籤率一覽。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -7,7 +8,7 @@
 
 <div class="container">
   <div>
-    <div class="page-title">🎰 股票抽籤（公開申購）</div>
+    <h1 class="page-title">股票抽籤（公開申購）</h1>
     <div class="page-desc">近期公開申購資訊，含承銷價、市價、價差與中籤率。</div>
   </div>
   <div id="app"><div class="loading">載入中...</div></div>
@@ -16,7 +17,7 @@
 
 <script src="js/ui.js"></script>
 <script>
-function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function fmt(v){ return fmtVal(v); }
 function rocToAD(s){
   if(!s)return'';
   const p=s.split('/');
@@ -54,18 +55,21 @@ async function loadData(){
       // 過濾非股票（央債等中央登錄公債），頁面聚焦股票公開申購
       .filter(c=>c.id && !/^A/i.test(c.id));
 
-    document.getElementById('app').innerHTML=cards.map(c=>`
-      <div class="ipo-card${c.cancelled?' ipo-cancelled':''}">
-        <h3>🎯 ${c.id} ${c.name} ${c.market?`<span class="ipo-market">${c.market}</span>`:''}${c.cancelled?`<span class="ipo-tag">${c.cancelled}</span>`:''}</h3>
-        <div class="ipo-meta">
-          <div class="ipo-meta-item"><span class="ipo-meta-label">承銷價</span><span class="ipo-meta-val">${c.subPrice!=null?fmt(c.subPrice)+' 元':'—'}</span></div>
-          <div class="ipo-meta-item"><span class="ipo-meta-label">申購期間</span><span class="ipo-meta-val">${c.startDate} ~ ${c.endDate}</span></div>
-          <div class="ipo-meta-item"><span class="ipo-meta-label">抽籤日期</span><span class="ipo-meta-val">${c.drawDate}</span></div>
-          <div class="ipo-meta-item"><span class="ipo-meta-label">撥券日期</span><span class="ipo-meta-val">${c.settleDate}</span></div>
-          <div class="ipo-meta-item"><span class="ipo-meta-label">中籤率</span><span class="ipo-meta-val">${c.rate||'—'}</span></div>
-        </div>
-      </div>
-    `).join('')||'<div class="loading">目前無公開申購資訊</div>';
+    cards.sort((a,b)=>(b.drawDate||'').localeCompare(a.drawDate||''));
+    const rows=cards.map(c=>`
+      <tr class="${c.cancelled?'ipo-cancelled':''}">
+        <td>${c.id}</td>
+        <td>${c.name}${c.market?` <span class="ipo-market">${c.market}</span>`:''}${c.cancelled?` <span class="ipo-tag">${c.cancelled}</span>`:''}</td>
+        <td>${c.subPrice!=null?fmt(c.subPrice)+' 元':'—'}</td>
+        <td>${c.startDate} ~ ${c.endDate}</td>
+        <td>${c.drawDate}</td>
+        <td>${c.settleDate}</td>
+        <td>${c.rate||'—'}</td>
+      </tr>`).join('');
+    document.getElementById('app').innerHTML=`<div class="module"><div class="table-wrap"><table>
+      <thead><tr><th>代號</th><th>名稱</th><th>承銷價</th><th>申購期間</th><th>抽籤日期</th><th>撥券日期</th><th>中籤率</th></tr></thead>
+      <tbody>${rows||'<tr><td colspan="7" class="empty-row">目前無公開申購資訊</td></tr>'}</tbody>
+    </table></div></div>`;
   }catch(e){
     document.getElementById('app').innerHTML='<div class="loading">載入失敗，請稍後再試</div>';
   }

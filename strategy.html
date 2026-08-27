@@ -1,4 +1,5 @@
 <title>選股策略 — 盤後精選模組</title>
+<meta name="description" content="選股策略：四種不同角度的盤後資料篩選。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -6,7 +7,7 @@
 <div id="topbar"></div>
 
 <div class="container">
-  <div class="page-header"><h2>選股策略</h2><p>四種不同角度的盤後資料篩選，每日 21:30 後更新。本系統僅提供數據整理，不構成任何買賣建議。</p></div>
+  <div class="page-header"><h1 class="page-title">選股策略</h1><p>四種不同角度的盤後資料篩選，每日 21:30 後更新。本系統僅提供數據整理，不構成任何買賣建議。</p></div>
   <div class="tabs" id="tabs"></div>
   <div id="stratContainer"></div>
 </div>
@@ -15,7 +16,7 @@
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
-<script src="js/auth.js"></script>
+<script src="js/init.js"></script>
 <script>
 const STRATEGIES={
   trust_chain:{title:'投信連續有感買進',desc:'投信連續買超3日以上且累計張數顯著，搭配股價站上月線確認技術面支撐。',rules:['投信連買≥3日','累計買超>500張','收盤價>MA20','成交量>5日均量'],cols:['股號','名稱','收盤價','漲跌%','成交張','投信連買日','投信累買張']},
@@ -26,7 +27,7 @@ const STRATEGIES={
 const ORDER=['trust_chain','main_retail_split','inst_burst','rev_turn'];
 let stratData={};
 
-function fmt(v){return typeof v==='number'?v.toLocaleString('zh-TW'):v;}
+function fmt(v){ return fmtVal(v); }
 
 function renderTabs(){
   const el=document.getElementById('tabs');
@@ -38,7 +39,8 @@ function showStrat(key){
   const m=STRATEGIES[key],data=stratData[key]||[];
   const rows=data.length===0?`<tr class="empty-row"><td colspan="${m.cols.length}">今日無符合標的</td></tr>`:data.map(row=>'<tr onclick="location.href=\'stk.html#'+row[0]+'\'">' +row.map((v,i)=>{
     if(i<=1)return'<td>'+v+'</td>';
-    if(i===3){const c=(typeof v==='number'?v:parseFloat(v))>=0?'up':'dn';const d=typeof v==='number'?(v>=0?'+':'')+v.toFixed(1)+'%':v;return`<td class="${c}">${d}</td>`;}
+    if(i===3)return'<td class="'+pctClass(v)+'">'+fmtPct(v,2)+'</td>';
+    if(/MOM|YOY|乖離/.test(m.cols[i]||''))return'<td class="'+pctClass(v)+'">'+fmtPct(v,2)+'</td>';
     return'<td>'+fmt(v)+'</td>';}).join('')+'</tr>').join('');
   document.getElementById('stratContainer').innerHTML=`<div class="strat"><div class="strat-header"><div class="strat-title">${m.title}</div><div class="strat-desc">${m.desc}</div><div class="strat-rules">${m.rules.map(r=>'<span class="strat-rule">'+r+'</span>').join('')}</div></div><div class="table-wrap"><table><thead><tr>${m.cols.map(c=>'<th>'+c+'</th>').join('')}</tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
@@ -50,5 +52,5 @@ async function loadStrategies(){
   stratData={};data.forEach(r=>{stratData[r.strategy_key]=r.data;});
   renderTabs();showStrat(ORDER[0]);
 }
-function onAuthReady(){loadStrategies();}
+function onDataReady(){loadStrategies();}
 </script>
