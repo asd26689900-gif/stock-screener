@@ -47,6 +47,18 @@ def sane_pct(v, max_abs=10000.0):
 def roc_date(dt):
     return f"{dt.year - 1911}/{dt.month:02d}/{dt.day:02d}"
 
+def months_before(anchor, n):
+    """anchor 月份起往前共 n 個 (年, 月)，用月遞減避免 30 天跳月"""
+    out = []
+    y, m = anchor.year, anchor.month
+    for _ in range(n):
+        out.append((y, m))
+        m -= 1
+        if m == 0:
+            y -= 1
+            m = 12
+    return out
+
 # ═══════════════════════════════════════
 #  TWSE 個股日成交 (一次回傳一個月)
 # ═══════════════════════════════════════
@@ -318,44 +330,13 @@ if __name__ == "__main__":
         print(f"\n✅ 營收回填完成: 成功 {done} / 失敗 {errors}")
         sys.exit(0)
 
-    # ── extend 模式：查現有最早日期，往前再補 N 個月 ──
     today = datetime.now()
+    # 一般模式：從今天往回 N 個月
+    months = months_before(today, args.months) if not args.extend else []
     if args.extend:
-        print("🔄 延伸模式：查詢現有最早日期...")
-        resp = sb.table("stock_prices").select("date").order("date", desc=False).limit(1).execute()
-        if resp.data:
-            earliest = datetime.strptime(resp.data[0]["date"], "%Y-%m-%d")
-            # 已超過 max-years → 不再回填
-            cutoff = today - timedelta(days=args.max_years * 365)
-            if earliest <= cutoff:
-                print(f"   已達 {args.max_years} 年上限 ({earliest.date()})，跳過")
-                sys.exit(0)
-            # 往前推 args.months 個月
-            months = []
-            for i in range(1, args.months + 1):
-                dt = earliest - timedelta(days=30 * i)
-                ym = (dt.year, dt.month)
-                if ym not in months:
-                    months.append(ym)
-            print(f"   現有最早: {earliest.date()}, 往前補: {[f'{y}/{m:02d}' for y,m in months]}")
-        else:
-            # 沒資料 → 等同一般模式
-            print("   stock_prices 無資料，改用一般回填")
-            months = []
-            for i in range(args.months):
-                dt = today - timedelta(days=30*i)
-                ym = (dt.year, dt.month)
-                if ym not in months:
-                    months.append(ym)
+        print("🔄 延伸模式：依各股現有最早日期往前補")
     else:
-        # 一般模式：從今天往回
-        months = []
-        for i in range(args.months):
-            dt = today - timedelta(days=30*i)
-            ym = (dt.year, dt.month)
-            if ym not in months:
-                months.append(ym)
-    print(f"📅 回填月份: {[f'{y}/{m:02d}' for y,m in months]}")
+        print(f"📅 回填月份: {[f'{y}/{m:02d}' for y,m in months]}")
 
     total = len(stock_list)
     upserted = 0
@@ -363,6 +344,18 @@ if __name__ == "__main__":
 
     for idx, sid in enumerate(stock_list):
         mkt = market_map.get(sid, "twse")
+        if args.extend:
+            # 查該股自己的最早日期；已達上限就跳過，不影響其他股票
+            resp = sb.table("stock_prices").select("date").eq("stock_id", sid) \
+                .order("date", desc=False).limit(1).execute()
+            if resp.data:
+                earliest = datetime.strptime(resp.data[0]["date"], "%Y-%m-%d")
+                cutoff = today - timedelta(days=args.max_years * 365)
+                if earliest <= cutoff:
+                    continue
+                months = months_before(earliest, args.months)
+            else:
+                months = months_before(today, args.months)
         all_rows = []
         for y, m in months:
             if mkt == "tpex":

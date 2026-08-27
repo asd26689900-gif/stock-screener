@@ -423,7 +423,7 @@ end_str = iso_date(today)
 
 # 產生過去 N 天的工作日列表
 # 環境變數 FETCH_DAYS 可控制回溯天數（預設 90，本地測試可設 10）
-FETCH_CALENDAR_DAYS = int(os.environ.get("FETCH_DAYS", "30"))  # ponytail: 30天夠算MA20+策略
+FETCH_CALENDAR_DAYS = int(os.environ.get("FETCH_DAYS", "5"))  # ponytail: 歷史由 stock_prices 補，5天夠算MA5/量能
 
 def trading_days(n_calendar):
     days = []
@@ -434,6 +434,9 @@ def trading_days(n_calendar):
     return list(reversed(days))
 
 work_days = trading_days(FETCH_CALENDAR_DAYS)
+if len(work_days) < 3:
+    # ponytail: 連假時 5 天可能不足 3 個交易日，自動拉寬到至少 40 個日曆日
+    work_days = trading_days(FETCH_CALENDAR_DAYS * 8)
 print(f"📅 抓取區間: {iso_date(work_days[0])} ~ {iso_date(work_days[-1])} ({len(work_days)} 個工作日)", flush=True)
 
 # ── 1. 全市場每日行情（近60+交易日）──
