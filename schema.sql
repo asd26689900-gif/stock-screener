@@ -100,11 +100,11 @@ alter table stock_metrics enable row level security;
 alter table stock_prices enable row level security;
 
 -- 所有人可讀市場資料
-create policy "公開讀取" on daily_modules for select using (true);
-create policy "公開讀取" on daily_stk for select using (true);
-create policy "公開讀取" on daily_heatmap for select using (true);
-create policy "公開讀取" on daily_strategies for select using (true);
-create policy "公開讀取" on stock_metrics for select using (true);
-create policy "公開讀取" on stock_prices for select using (true);
+create policy if not exists "公開讀取" on daily_modules for select using (true);
+create policy if not exists "公開讀取" on daily_stk for select using (true);
+create policy if not exists "公開讀取" on daily_heatmap for select using (true);
+create policy if not exists "公開讀取" on daily_strategies for select using (true);
+create policy if not exists "公開讀取" on stock_metrics for select using (true);
+create policy if not exists "公開讀取" on stock_prices for select using (true);
 
 -- update.py 用 service_role key 寫入，不受 RLS 限制
