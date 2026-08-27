@@ -2,7 +2,7 @@
 盤後選股模組 — 每日自動更新腳本
 資料來源：TWSE/TPEX 官方 API（完全免費，不需 token）
 """
-import os, json, csv, io, math, requests, sys, time
+import os, json, csv, io, math, re, requests, sys, time
 from datetime import datetime, timedelta
 from collections import defaultdict
 
@@ -98,6 +98,7 @@ def fetch_twse_prices(date_dt):
                 "close": close,
                 "change": parse_num(line[9]),
                 "Trading_Volume": parse_num(line[3]),
+                "amount": parse_num(line[4]),
             })
         except: continue
     return rows
@@ -130,6 +131,7 @@ def fetch_tpex_prices(date_dt):
                 "close": close,
                 "change": chg,
                 "Trading_Volume": parse_num(line[7]),
+                "amount": parse_num(line[8]) if len(line) > 8 else 0,
             })
     return rows
 
@@ -1272,6 +1274,129 @@ else:
         ).execute()
     print(f"   stock_metrics: {len(metrics_rows)} 檔")
 
+    # 6. 每日焦點（市場總覽首頁）
+    print("   🔍 產生每日焦點...")
+
+    def is_etf(sid):
+        return bool(re.match(r"^(00|010)", sid or ""))
+
+    def is_active_etf(sid):
+        return is_etf(sid) and bool(re.search(r"[AD]$", sid or ""))
+
+    focus = {"date": end_str, "week_strong": [], "big_buyer": [], "institutional": {}, "etf": {}, "margin": {}}
+
+    # 本週強勢股：近 5 交易日漲幅 + 成交張數過濾（排除 ETF）
+    week_cands = []
+    for sid, data in stocks.items():
+        if is_etf(sid) or len(data) < 6: continue
+        p = data[-1]
+        base = data[-6].get("close")
+        if not p.get("close") or not base: continue
+        vol = int(p.get("Trading_Volume", 0) / 1000)
+        if vol < 3000: continue
+        chg5 = (p["close"] - base) / base * 100
+        if chg5 > 0:
+            week_cands.append([sid, name_map.get(sid, sid), round(p["close"], 2), round(chg5, 2), vol])
+    week_cands.sort(key=lambda x: x[3], reverse=True)
+    focus["week_strong"] = week_cands[:10]
+
+    # 大戶加碼股（每日近似：法人/主力連買且當日淨買超）
+    big_cands = []
+    for sid in stocks:
+        if is_etf(sid): continue
+        fd, fn = get_inst_consecutive(sid, "foreign")
+        td, tn = get_inst_consecutive(sid, "trust")
+        dd, dn = get_inst_consecutive(sid, "dealer")
+        main_net = int((fn + tn + dn) / 1000)
+        if (fd >= 3 or td >= 3 or dd >= 3) and main_net > 0:
+            p = latest_price(sid)
+            if p:
+                big_cands.append([sid, name_map.get(sid, sid), main_net, max(fd, td, dd), round(p["close"], 2)])
+    big_cands.sort(key=lambda x: x[2], reverse=True)
+    focus["big_buyer"] = big_cands[:10]
+
+    # 三大法人：當日排行（含資料日期）
+    inst_rows = []
+    inst_max_date = ""
+    for sid, recs in inst.items():
+        if not recs: continue
+        latest = sorted(recs, key=lambda x: x["date"])[-1]
+        inst_max_date = max(inst_max_date, latest["date"])
+        inst_rows.append([sid, name_map.get(sid, sid),
+                          latest.get("foreign_net", 0), latest.get("trust_net", 0), latest.get("dealer_net", 0)])
+    focus["institutional"] = {
+        "date": inst_max_date,
+        "foreign_top": sorted(inst_rows, key=lambda x: x[2], reverse=True)[:5],
+        "trust_top": sorted(inst_rows, key=lambda x: x[3], reverse=True)[:5],
+        "dealer_top": sorted(inst_rows, key=lambda x: x[4], reverse=True)[:5],
+        "both_buy": sum(1 for r in inst_rows if r[2] > 0 and r[3] > 0),
+    }
+
+    # ETF 動向（含主動式識別：代號尾碼 A/D）
+    etf_rows = []
+    for sid, data in stocks.items():
+        if not is_etf(sid): continue
+        p = data[-1]
+        if not p.get("close"): continue
+        prev = data[-2] if len(data) >= 2 else p
+        recs = sorted(inst.get(sid, []), key=lambda x: x["date"])
+        fn = tn = dn = 0
+        if recs:
+            lr = recs[-1]
+            fn, tn, dn = lr.get("foreign_net", 0), lr.get("trust_net", 0), lr.get("dealer_net", 0)
+        etf_rows.append([
+            sid, name_map.get(sid, sid), round(p["close"], 2), round(change_pct(p, prev), 2),
+            int(p.get("Trading_Volume", 0) / 1000), round((p.get("amount") or 0) / 1e8, 2),
+            int((fn + tn + dn) / 1000), is_active_etf(sid),
+        ])
+    etf_rows.sort(key=lambda x: x[5], reverse=True)
+    focus["etf"] = {
+        "top_amount": etf_rows[:10],
+        "active": [r for r in etf_rows if r[7]][:10],
+        "active_count": sum(1 for r in etf_rows if r[7]),
+    }
+
+    # 資券變化（TWSE 融資融券，22:00 後才有當日資料；非當日則留空由前端標示）
+    try:
+        end_dt = datetime.strptime(end_str, "%Y-%m-%d")
+        for i in range(10):
+            probe = end_dt - timedelta(days=i)
+            url = f"https://www.twse.com.tw/rwd/zh/marginTrading/MI_MARGN?response=json&date={ad_date(probe)}&selectType=STOCK"
+            mj = requests.get(url, headers=HEADERS, timeout=20).json()
+            if mj.get("stat") != "OK": continue
+            mrows = []
+            for t in mj.get("tables", []):
+                for line in (t.get("data") or [])[1:]:
+                    if len(line) < 14: continue
+                    sid = str(line[0]).strip()
+                    if not sid or not sid[0].isdigit(): continue
+                    mrows.append({
+                        "id": sid, "name": str(line[1]).strip(),
+                        "m_prev": parse_num(line[5]), "m_today": parse_num(line[6]),
+                        "s_prev": parse_num(line[11]), "s_today": parse_num(line[12]),
+                    })
+            if not mrows: continue
+            mdate = iso_date(probe)
+            if mdate == end_str:
+                def margin_top(rows, key, reverse=True, n=8):
+                    return sorted(rows, key=lambda r: r[key + "_today"] - r[key + "_prev"], reverse=reverse)[:n]
+                focus["margin"] = {
+                    "date": mdate,
+                    "m_up": margin_top(mrows, "m"),
+                    "m_dn": margin_top(mrows, "m", reverse=False),
+                    "s_up": margin_top(mrows, "s"),
+                    "s_dn": margin_top(mrows, "s", reverse=False),
+                }
+            break
+    except Exception as e:
+        print(f"   ⚠ 資券抓取失敗: {e}", flush=True)
+
+    try:
+        sb.table("daily_focus").upsert({"date": end_str, "data": focus}, on_conflict="date").execute()
+        print(f"   daily_focus: {end_str} 已寫入", flush=True)
+    except Exception as e:
+        print(f"   ⚠ daily_focus 寫入失敗: {e}", flush=True)
+
 total = sum(len(v) for v in results.values())
 strat_total = sum(len(v) for v in strategies.values())
 print(f"\n✅ 完成！")
@@ -1293,7 +1418,7 @@ except Exception as e:
 
 cutoff = (today - timedelta(days=30)).strftime("%Y-%m-%d")
 print(f"\n🧹 清理 {cutoff} 之前的選股舊資料...")
-for tbl in ["daily_heatmap", "daily_modules", "daily_strategies"]:
+for tbl in ["daily_heatmap", "daily_modules", "daily_strategies", "daily_focus"]:
     try:
         sb.table(tbl).delete().lt("date", cutoff).execute()
         print(f"   {tbl}: 已清理")
