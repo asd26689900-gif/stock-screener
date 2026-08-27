@@ -442,22 +442,23 @@ for row in all_prices:
 for sid in stocks:
     stocks[sid].sort(key=lambda x: x["date"])
 
-# ── name_map fallback：從 supabase 歷史 daily_heatmap 補齊 ──
-# 若這次 TWSE/TPEX fetch 名稱欄位為空，仍能顯示歷史抓過的名字，
-# 不會出現「名稱欄=股號」的 fallback 亂象。
+# ── name_map fallback：掃過去 5 天 daily_heatmap 撈有效名字 ──
+# 若這次 TWSE/TPEX 名稱欄位為空，用歷史抓過的名字補。
+# 掃多天可避免上一次跑剛好也是壞資料時 fallback 撈不到。
+# nm != sid 過濾防止 fallback 資料被再次撈回。
 if sb:
     try:
-        resp = sb.table("daily_heatmap").select("data").order("date", desc=True).limit(1).execute()
-        if resp.data and resp.data[0].get("data"):
-            filled = 0
-            for ind in resp.data[0]["data"].get("industries", []):
+        resp = sb.table("daily_heatmap").select("data").order("date", desc=True).limit(5).execute()
+        filled = 0
+        for record in (resp.data or []):
+            for ind in (record.get("data") or {}).get("industries", []):
                 for s in ind.get("stocks", []):
                     sid = s.get("id"); nm = s.get("name")
                     if sid and nm and nm != sid and sid not in name_map:
                         name_map[sid] = nm
                         filled += 1
-            if filled:
-                print(f"   name_map 從歷史補齊 {filled} 檔")
+        if filled:
+            print(f"   name_map 從歷史補齊 {filled} 檔")
     except Exception as e:
         print(f"   ⚠ name_map 歷史補齊失敗: {e}")
 
