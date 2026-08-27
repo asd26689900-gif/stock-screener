@@ -102,8 +102,17 @@ th,td{font-variant-numeric:tabular-nums}
 .nav-toggle{
   display:none;background:none;border:1px solid var(--border);border-radius:var(--radius);
   font-size:18px;padding:3px 9px;cursor:pointer;color:var(--text);
-  display:inline-flex;align-items:center;justify-content:center;height:32px;width:36px;
+  align-items:center;justify-content:center;height:32px;width:36px;
 }
+/* topbar 查股按鈕（跳到 stk.html 頁面內的搜尋 hero） */
+.topbar-search-cta{
+  display:inline-flex;align-items:center;gap:5px;
+  padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius);
+  font-size:12.5px;color:var(--text-secondary);text-decoration:none;background:var(--card);
+  transition:border-color .12s,color .12s;
+}
+.topbar-search-cta:hover{border-color:var(--gold);color:var(--gold);text-decoration:none}
+.topbar-search-cta svg{flex-shrink:0}
 @media(max-width:768px){
   .nav-toggle{display:inline-flex}
   .nav-links{display:none;width:100%;order:99;flex-direction:column;align-items:stretch;padding-top:6px}
@@ -385,6 +394,26 @@ tbody tr:hover{background:var(--hover)}
 .ctx-menu-input{display:flex;gap:4px;padding:4px 10px}
 .ctx-menu-input input{flex:1;font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:4px;background:var(--surface);color:var(--text)}
 .ctx-menu-input button{font-size:11px;padding:4px 10px;border:none;border-radius:4px;background:var(--gold);color:#fff;cursor:pointer}
+
+/* ─── 個股頁：搜尋 hero ─── */
+.search-hero{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;position:relative}
+.search-hero-label{font-size:10.5px;color:var(--text-secondary);letter-spacing:.08em;text-transform:uppercase;font-weight:700;margin-bottom:10px}
+.search-hero-row{display:flex;gap:10px;align-items:center;position:relative}
+.search-hero-row input{flex:1;font-family:var(--font-body);font-size:15px;padding:11px 14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);outline:none;transition:border-color .15s,box-shadow .15s}
+.search-hero-row input:focus{border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.search-hero-row input::placeholder{color:var(--text-secondary);opacity:.6}
+.search-hero-row button{padding:11px 22px;background:var(--gold);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;white-space:nowrap}
+.search-hero-row button:hover{opacity:.9}
+.search-hero-hint{margin-top:10px;font-size:11.5px;color:var(--text-secondary)}
+.search-hero-hint code{background:var(--gold-soft);color:var(--gold);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:11px;margin:0 3px;cursor:pointer;transition:opacity .15s}
+.search-hero-hint code:hover{opacity:.8}
+.search-dropdown{display:none;position:absolute;top:100%;left:0;right:0;z-index:200;background:var(--card);border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow-modal);max-height:320px;overflow-y:auto;margin-top:6px}
+.search-dropdown.show{display:block}
+.search-item{padding:9px 14px;cursor:pointer;display:flex;gap:10px;font-size:13px;color:var(--text)}
+.search-item:hover,.search-item.active{background:var(--gold-soft);color:var(--gold)}
+.search-item .sid{font-family:var(--font-mono);font-weight:700;min-width:50px}
+.search-item .sname{color:var(--text)}
+.search-item:hover .sname,.search-item.active .sname{color:var(--gold)}
 
 /* ─── 個股頁 ─── */
 .stk-header{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:14px}
