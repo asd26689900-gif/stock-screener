@@ -962,8 +962,8 @@ for sid in stocks:
     fund_check("本益比 >= 10", pe >= 10)
     fund_check("股價淨值比 >= 0.5", pb >= 0.5)
     fund_check("現金股利殖利率 > 3%", dy > 3)
-    fund_check("月營收創10個月以上新高", ri and ri.get("yoy", 0) > 30)
-    fund_check("最近一期月營收MOM > 0", ri and ri.get("mom", 0) > 0)
+    fund_check("月營收創10個月以上新高", bool(ri and ri.get("yoy") is not None and ri["yoy"] > 30))
+    fund_check("最近一期月營收MOM > 0", bool(ri and ri.get("mom") is not None and ri["mom"] > 0))
     fund_check("最近一期季度營業淨利 > 0", pe > 0)  # 有PE表示有獲利
     fund_check("最近一期季度稅後淨利 > 0", pe > 0)
     fund_check("最近一期季度每股盈餘 > 1", pe > 0 and close / pe > 1 if pe > 0 else False)
