@@ -442,6 +442,25 @@ for row in all_prices:
 for sid in stocks:
     stocks[sid].sort(key=lambda x: x["date"])
 
+# ── name_map fallback：從 supabase 歷史 daily_heatmap 補齊 ──
+# 若這次 TWSE/TPEX fetch 名稱欄位為空，仍能顯示歷史抓過的名字，
+# 不會出現「名稱欄=股號」的 fallback 亂象。
+if sb:
+    try:
+        resp = sb.table("daily_heatmap").select("data").order("date", desc=True).limit(1).execute()
+        if resp.data and resp.data[0].get("data"):
+            filled = 0
+            for ind in resp.data[0]["data"].get("industries", []):
+                for s in ind.get("stocks", []):
+                    sid = s.get("id"); nm = s.get("name")
+                    if sid and nm and nm != sid and sid not in name_map:
+                        name_map[sid] = nm
+                        filled += 1
+            if filled:
+                print(f"   name_map 從歷史補齊 {filled} 檔")
+    except Exception as e:
+        print(f"   ⚠ name_map 歷史補齊失敗: {e}")
+
 print(f"   總股票數: {len(stocks)}")
 
 # ── 1b. 寫入 stock_prices（每日累積真實 OHLCV）──
