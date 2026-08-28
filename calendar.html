@@ -118,11 +118,11 @@
 
   <!-- 篩選 -->
   <div class="filter-bar">
-    <div class="filter-pills" id="typePills">
-      <button class="filter-pill active" data-type="all">全部</button>
-      <button class="filter-pill" data-type="dividend">除權息</button>
-      <button class="filter-pill" data-type="ipo">股票抽籤</button>
-      <button class="filter-pill" data-type="earnings">財報</button>
+    <div class="slider-tabs" id="typePills" style="margin-bottom:0">
+      <button class="slider-tab active" data-type="all">全部</button>
+      <button class="slider-tab" data-type="dividend">除權息</button>
+      <button class="slider-tab" data-type="ipo">股票抽籤</button>
+      <button class="slider-tab" data-type="earnings">財報</button>
     </div>
     <label class="filter-toggle">
       <input type="checkbox" id="wlOnly">只看自選股
@@ -211,16 +211,18 @@ async function fetchIPO(){
     const j = await r.json();
     if(!j.data) return;
     j.data.forEach(row=>{
-      const drawDate = rocToAD(row[0]);
-      const startDate = rocToAD(row[1]);
-      const endDate = rocToAD(row[2]);
-      const id = (row[4]||'').trim();
-      const name = (row[5]||'').trim();
-      const subPrice = (row[7]||'').trim();
+      // publicForm 欄位：0序號 1抽籤日期 2證券名稱 3證券代號 4發行市場 5申購開始 6申購結束 9承銷價
+      const drawDate = rocToAD(row[1]);
+      const startDate = rocToAD(row[5]);
+      const endDate = rocToAD(row[6]);
+      const id = (row[3]||'').trim();
+      const name = (row[2]||'').trim();
+      const market = (row[4]||'').trim();
+      const subPrice = (row[9]||'').trim();
       if(!id) return;
-      if(startDate) events.push({date:startDate, id, name, type:'ipo', label:'抽籤開始', detail:`承銷價 ${subPrice} 元`});
-      if(endDate)   events.push({date:endDate,   id, name, type:'ipo', label:'抽籤截止', detail:`承銷價 ${subPrice} 元`});
-      if(drawDate)  events.push({date:drawDate,  id, name, type:'ipo', label:'抽籤日',   detail:`承銷價 ${subPrice} 元`});
+      if(startDate) events.push({date:startDate, id, name, type:'ipo', label: market||'抽籤開始', detail:`承銷價 ${subPrice} 元`});
+      if(endDate)   events.push({date:endDate,   id, name, type:'ipo', label: market||'抽籤截止', detail:`承銷價 ${subPrice} 元`});
+      if(drawDate)  events.push({date:drawDate,  id, name, type:'ipo', label: market||'抽籤日',   detail:`承銷價 ${subPrice} 元`});
     });
   }catch(e){/* silent */}
 }
@@ -498,10 +500,11 @@ function jumpToDate(dateStr){
 }
 
 document.getElementById('typePills').addEventListener('click', e => {
-  const btn = e.target.closest('.filter-pill');
+  const btn = e.target.closest('.slider-tab');
   if(!btn) return;
   filterType = btn.dataset.type;
-  document.querySelectorAll('.filter-pill').forEach(p => p.classList.toggle('active', p===btn));
+  document.querySelectorAll('#typePills .slider-tab').forEach(p => p.classList.toggle('active', p===btn));
+  sliderTabs(document.getElementById('typePills'));
   renderAll();
 });
 document.getElementById('wlOnly').addEventListener('change', e => {
@@ -542,6 +545,7 @@ function initIcons(){
   }catch(e){ watchlistIds = new Set(); }
 
   initIcons();
+  sliderTabs(document.getElementById('typePills'));
   await loadAll();
   renderAll();
 })();

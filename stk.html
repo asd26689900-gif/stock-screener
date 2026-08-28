@@ -255,11 +255,16 @@ async function fetchMinuteData(tf){
 // ── 個股簡介 ──
 function renderIntro(sid,d){
   const ind=d.industry||'';
-  const listing=sid.length<=4?'上市':'上櫃';
+  const isEtf=/^(00|010)/.test(sid);
+  const listing=isEtf?'ETF':(sid.length<=4?'上市':'上櫃');
+  const desc=isEtf
+    ? etfIntro(sid,d.name)
+    : (INDUSTRY_DESC[ind]||'產業資訊可參考公司年報與法人報告。');
   return `<div class="stk-intro">
-    ${ind?`<div class="stk-intro-industry">個股 ・ ${ind}</div>`:''}
+    ${isEtf?`<div class="stk-intro-industry">ETF ・ 指數股票型基金</div>`:(ind?`<div class="stk-intro-industry">個股 ・ ${ind}</div>`:'')}
     <div class="stk-intro-name">${sid} ${d.name}</div>
     <div class="stk-intro-meta">${listing} ・ 資料更新 ${d.date}</div>
+    <div class="stk-intro-desc">${esc(desc)}</div>
   </div>`;
 }
 
@@ -347,13 +352,15 @@ function renderStock(sid,d){
   <div class="chart-box">
     <div class="chart-toolbar">
       <span class="chart-label">${I('chart',14)} K線走勢圖</span>
-      <button class="tf-btn ${currentTF==='5m'?'active':''}" data-tf="5m" onclick="switchTF('5m')">5分</button>
-      <button class="tf-btn ${currentTF==='60m'?'active':''}" data-tf="60m" onclick="switchTF('60m')">60分</button>
-      <button class="tf-btn ${currentTF==='D'?'active':''}" data-tf="D" onclick="switchTF('D')">日</button>
-      <button class="tf-btn ${currentTF==='W'?'active':''}" data-tf="W" onclick="switchTF('W')">週</button>
-      <button class="tf-btn ${currentTF==='M'?'active':''}" data-tf="M" onclick="switchTF('M')">月</button>
       <input type="number" id="maInput" class="ma-input" min="2" max="250" step="1" placeholder="自訂MA" aria-label="自訂均線週期" onkeydown="if(event.key==='Enter')applyCustomMA()">
       <button class="tf-btn" onclick="applyCustomMA()" title="新增/清除自訂均線（留空清除）">MA＋</button>
+    </div>
+    <div class="slider-tabs" id="tfTabs" style="margin-top:-2px">
+      <button class="slider-tab ${currentTF==='5m'?'active':''}" data-tf="5m" onclick="switchTF('5m')">5分</button>
+      <button class="slider-tab ${currentTF==='60m'?'active':''}" data-tf="60m" onclick="switchTF('60m')">60分</button>
+      <button class="slider-tab ${currentTF==='D'?'active':''}" data-tf="D" onclick="switchTF('D')">日</button>
+      <button class="slider-tab ${currentTF==='W'?'active':''}" data-tf="W" onclick="switchTF('W')">週</button>
+      <button class="slider-tab ${currentTF==='M'?'active':''}" data-tf="M" onclick="switchTF('M')">月</button>
     </div>
     <div class="ohlcv-legend" id="ohlcvLegend"></div>
     <div class="ma-legend" id="maLegend"></div>
@@ -365,10 +372,12 @@ function renderStock(sid,d){
     </div>
     <div class="chart-toolbar" style="margin-top:8px;margin-bottom:0">
       <span class="chart-label" style="font-size:13px">技術指標</span>
-      <button class="ind-btn ${currentInd==='kd'?'active':''}" data-ind="kd" onclick="switchInd('kd')">KD</button>
-      <button class="ind-btn ${currentInd==='rsi'?'active':''}" data-ind="rsi" onclick="switchInd('rsi')">RSI</button>
-      <button class="ind-btn ${currentInd==='macd'?'active':''}" data-ind="macd" onclick="switchInd('macd')">MACD</button>
-      <button class="ind-btn ${showBOLL?'active':''}" onclick="toggleBOLL()">BOLL</button>
+    </div>
+    <div class="slider-tabs" id="indTabs" style="margin-top:-6px">
+      <button class="slider-tab ${currentInd==='kd'?'active':''}" data-ind="kd" onclick="switchInd('kd')">KD</button>
+      <button class="slider-tab ${currentInd==='rsi'?'active':''}" data-ind="rsi" onclick="switchInd('rsi')">RSI</button>
+      <button class="slider-tab ${currentInd==='macd'?'active':''}" data-ind="macd" onclick="switchInd('macd')">MACD</button>
+      <button class="toggle-chip ${showBOLL?'active':''}" onclick="toggleBOLL()" style="margin-left:auto">BOLL</button>
     </div>
     <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
   </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">${I('chart',14)} K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
@@ -416,6 +425,8 @@ function renderStock(sid,d){
       chartPanIdx=chartData.length; // drawChart 內部會 clamp 到最末段
     }
     drawChart(chartData);
+    sliderTabs(document.getElementById('tfTabs'));
+    sliderTabs(document.getElementById('indTabs'));
   }
   if(rev.length>1) drawRevChart(rev);
   if(d.fundamental&&d.fundamental.pe>0&&chartData.length>60) drawPeRiver(chartData,d.fundamental.pe);
@@ -424,7 +435,8 @@ function renderStock(sid,d){
 
 async function switchTF(tf){
   currentTF=tf; _cachedMAs=null;
-  document.querySelectorAll('.tf-btn').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
+  document.querySelectorAll('#tfTabs .slider-tab').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
+  sliderTabs(document.getElementById('tfTabs'));
   let bars;
   if(tf==='5m'||tf==='60m'){
     bars=await fetchMinuteData(tf);
@@ -449,9 +461,7 @@ function applyCustomMA(){
 }
 function toggleBOLL(){
   showBOLL=!showBOLL;
-  document.querySelectorAll('.ind-btn').forEach(b=>{
-    if(b.textContent.trim()==='BOLL') b.classList.toggle('active',showBOLL);
-  });
+  document.querySelectorAll('#indTabs .toggle-chip').forEach(b=>b.classList.toggle('active',showBOLL));
   scheduleChartRedraw();
 }
 
@@ -879,7 +889,8 @@ function drawCrosshair(e){
 
 function switchInd(ind){
   currentInd=ind;
-  document.querySelectorAll('.ind-btn').forEach(b=>b.classList.toggle('active',b.dataset.ind===ind));
+  document.querySelectorAll('#indTabs .slider-tab').forEach(b=>b.classList.toggle('active',b.dataset.ind===ind));
+  sliderTabs(document.getElementById('indTabs'));
   drawIndicator(ind);
 }
 

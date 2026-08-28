@@ -285,6 +285,22 @@ tbody tr:hover{background:var(--hover)}
 .tab-bar{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3px;width:fit-content}
 .tab-btn{padding:5px 14px;border:0;border-radius:4px;background:transparent;color:var(--text-secondary);font-size:12.5px;cursor:pointer}
 .tab-btn.active{background:var(--card);color:var(--ink);font-weight:600;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+
+/* ─── Linear Slider Tabs（全站統一） ─── */
+.slider-tabs{position:relative;display:flex;gap:2px;overflow-x:auto;border-bottom:1px solid var(--border-light);margin-bottom:10px;scrollbar-width:none;max-width:100%}
+.slider-tabs::-webkit-scrollbar{display:none}
+.slider-tab{padding:8px 13px;background:none;border:0;font-size:12.5px;font-family:var(--font-mono);color:var(--text-secondary);cursor:pointer;white-space:nowrap;transition:color .12s}
+.slider-tab:hover{color:var(--ink)}
+.slider-tab.active{color:var(--gold);font-weight:700}
+.slider-indicator{position:absolute;bottom:-1px;height:2px;background:var(--gold);border-radius:2px;transition:left .18s ease,width .18s ease}
+.toggle-chip{padding:4px 12px;border:1px solid var(--border);border-radius:99px;font-size:11px;font-family:var(--font-mono);cursor:pointer;background:var(--surface);color:var(--text-secondary)}
+.toggle-chip.active{background:var(--gold-soft);border-color:var(--gold);color:var(--gold);font-weight:700}
+
+/* 焦點區塊：可捲動長列表 */
+.scroll-table{max-height:430px;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.focus-head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.focus-head .focus-toggle{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-secondary);cursor:pointer;user-select:none;white-space:nowrap}
+.focus-head .focus-toggle input{accent-color:var(--gold);cursor:pointer;margin:0}
 .toggle-group{display:flex;gap:2px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:3px;width:fit-content}
 .toggle-group button{padding:5px 12px;border:0;border-radius:4px;background:transparent;color:var(--text-secondary);font-size:12px;cursor:pointer}
 .toggle-group button.active{background:var(--card);color:var(--gold);font-weight:700}
@@ -463,6 +479,7 @@ tr.ipo-cancelled{opacity:.55}
 .ma-tag.below{background:rgba(192,84,79,.12);color:var(--red)}
 .stk-intro{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;margin-bottom:14px}
 .stk-intro-industry{font-size:11.5px;color:var(--teal);font-weight:600;margin-bottom:4px}
+.stk-intro-desc{font-size:12.5px;color:var(--text-secondary);line-height:1.65;margin-top:8px;max-width:760px}
 .stk-intro-name{font-family:var(--font-display);font-size:15px;color:var(--ink);margin-bottom:3px}
 .stk-intro-meta{font-size:11.5px;color:var(--text-secondary);line-height:1.7}
 .ext-links{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
