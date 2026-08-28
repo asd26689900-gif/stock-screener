@@ -2,12 +2,13 @@
 // GET /api/chart?sid=2330&interval=5m&range=1d
 // interval: 1m,5m,15m,30m,60m,1d  range: 1d,5d,1mo,3mo
 export default async function handler(req, res) {
-  const { sid, interval = '5m', range = '1d' } = req.query;
+  const { sid, interval = '5m', range = '1d', market = 'tw' } = req.query;
   if (!sid) return res.status(400).json({ error: 'missing sid' });
 
-  // 嘗試 .TW (上市) 和 .TWO (上櫃)
-  // 指數（^開頭）直接用原代號，例如 ^TWII 加權指數
-  const suffixes = sid.startsWith('^') ? [''] : ['.TW', '.TWO'];
+  // market: tw（台股，嘗試 .TW/.TWO）、foreign（美股/日股，代號直接使用，如 AAPL、7203.T、^N225）
+  let suffixes;
+  if (market === 'foreign') suffixes = [''];
+  else suffixes = sid.startsWith('^') ? [''] : ['.TW', '.TWO'];
   let result = null;
 
   for (const suffix of suffixes) {
