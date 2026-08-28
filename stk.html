@@ -400,7 +400,7 @@ function renderStock(sid,d){
       <span class="date-label" style="margin-left:auto">PE ${d.fundamental.pe.toFixed(1)} ・ EPS≈${(chartData[chartData.length-1].c/d.fundamental.pe).toFixed(2)}</span>
     </div>
     <div class="rev-chart-wrap"><canvas id="peCanvas"></canvas></div>
-    <div class="ma-tags" style="margin-top:6px"><span class="ma-tag above">河流帶 = 最新 EPS × PE 10/15/20/25/30（歷史股價區間推算）</span></div>
+    <div class="ma-tags" style="margin-top:6px"><span class="ma-tag above">河流帶 = 最新本益比 × 歷史股價推算（非歷史 EPS，僅供參考）</span></div>
   </div>`:''}
   ${renderExtLinks(sid,d.name)}
   <div class="chart-box" id="stockNewsCard">
@@ -414,7 +414,7 @@ function renderStock(sid,d){
     <div class="chip-card"><div class="chip-label">主力買賣超</div><div class="chip-val ${cls(d.chip.main_net)}">${sign(fmt(d.chip.main_net))}張</div></div>
     <div class="chip-card"><div class="chip-label">散戶買賣超</div><div class="chip-val ${cls(d.chip.retail_net)}">${sign(fmt(d.chip.retail_net))}張</div></div>
     <div class="chip-card"><div class="chip-label">籌碼集中度</div><div class="chip-val">${d.chip.concentration_pct!=null?fmtPct(d.chip.concentration_pct,2):'—'}</div><div class="chip-sub">集中股數 ${d.chip.concentration_shares!=null?fmt(d.chip.concentration_shares)+'張':'—'}</div></div>
-    <div class="chip-card"><div class="chip-label">大戶 / 羊群持股</div><div class="chip-val">${d.chip.big_holder_pct!=null?fmtPct(d.chip.big_holder_pct,2):'—'}</div><div class="chip-sub">羊群 ${d.chip.retail_holder_pct!=null?fmtPct(d.chip.retail_holder_pct,2):'—'}</div></div>
+    <div class="chip-card"><div class="chip-label">大戶 / 羊群持股${d.chip.holder_src==='tdcc'?'（集保）':'（法人推估）'}</div><div class="chip-val">${d.chip.big_holder_pct!=null?fmtPct(d.chip.big_holder_pct,2):'—'}</div><div class="chip-sub">羊群 ${d.chip.retail_holder_pct!=null?fmtPct(d.chip.retail_holder_pct,2):'—'}${d.chip.holder_src==='tdcc'?' ・ 每週更新':' ・ 僅供參考'}</div></div>
   </div>
   <div id="scoreSection">${buildScoreHTML(d)}</div>`;
   if(hasChart){

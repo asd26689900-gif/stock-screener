@@ -1,21 +1,20 @@
-name: 新聞晨報
+name: 資料新鮮度檢查
 on:
   schedule:
-    # 08:30 台北 = 00:30 UTC：每日新聞爬蟲（晨報）
-    - cron: '30 0 * * *'
+    # 週一~五 16:45 台北 = 08:45 UTC（15:30 盤後更新完成後檢查）
+    - cron: '45 8 * * 1-5'
   workflow_dispatch:
 
 jobs:
-  news:
+  health:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
-      - run: pip install -r requirements.txt
-      - run: python -X utf8 -u news.py
+      - run: python -X utf8 -u health.py
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}

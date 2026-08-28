@@ -921,6 +921,20 @@ print(f"   產業分類: {len(sid_industry)} 檔")
 
 stk_analysis = {}
 
+# 讀取最新集保戶股權分散快照（大戶/羊群持股用真實資料；無快照時回退法人推估）
+tdcc_snaps = {}
+if sb:
+    try:
+        resp = sb.table("daily_modules").select("date,data").eq("module_key", "tdcc").order("date", desc=True).limit(4).execute()
+        for row in resp.data:
+            tdcc_snaps[row["date"]] = row["data"]
+    except Exception as e:
+        print(f"   ⚠ TDCC 快照讀取失敗: {e}", flush=True)
+tdcc_holder = {}
+if tdcc_snaps:
+    tdcc_holder = tdcc_snaps[max(tdcc_snaps)]
+    print(f"   集保大戶快照: {max(tdcc_snaps)} {len(tdcc_holder)} 檔", flush=True)
+
 # 讀取前一交易日 daily_stk 的營收歷史，跨日累積（避免每日重寫把歷史清空）
 prev_rev_map = {}
 if sb:
@@ -975,8 +989,10 @@ for sid in stocks:
 
     conc_pct = round(min(abs(main_net) / max(vol, 1) * 100, 50), 2)
     conc_shares = abs(main_net)
-    big_holder = round(50 + conc_pct * 0.7, 2)
-    retail_holder = round(100 - big_holder - 15, 2)
+    holder = tdcc_holder.get(sid)
+    holder_src = "tdcc" if holder else "est"
+    big_holder = round(holder.get("big_ratio", 0), 2) if holder else round(50 + conc_pct * 0.7, 2)
+    retail_holder = round(holder.get("retail_ratio", 0), 2) if holder else round(100 - big_holder - 15, 2)
 
     ri = get_rev_info(sid)
 
@@ -1084,7 +1100,13 @@ for sid in stocks:
         "ma": ma_list,
         "chip": {"main_net": main_net, "retail_net": retail_net,
                  "concentration_pct": conc_pct, "concentration_shares": conc_shares,
-                 "big_holder_pct": big_holder, "retail_holder_pct": retail_holder},
+                 "big_holder_pct": big_holder, "retail_holder_pct": retail_holder,
+                 "holder_src": holder_src},
+        "inst_hist": [{"date": rec["date"],
+                       "foreign_net": rec.get("foreign_net", 0),
+                       "trust_net": rec.get("trust_net", 0),
+                       "dealer_net": rec.get("dealer_net", 0)}
+                      for rec in sorted(inst.get(sid, []), key=lambda x: x["date"])],
         "scores": {"chip": chip_score, "fundamental": fund_score, "technical": tech_score},
         "criteria": {"chip": chip_criteria, "fundamental": fund_criteria, "technical": tech_criteria},
         # 評分原始值：前端「評分設定」可依此重算與自訂權重（舊資料無此欄位時自動沿用伺服器 pass）
@@ -1519,7 +1541,7 @@ print(f"   選股策略: {strat_total} 檔")
 
 # ── 清理舊資料（節省 Supabase 容量）──
 # stock_prices: 保留近10年
-# daily_stk: 保留（個股分析需要）
+# daily_stk: 保留 120 天（K線與河流圖用 stock_prices，分析只留近期即可）
 # 選股相關表只保留 30 天
 price_cutoff = (today - timedelta(days=3650)).strftime("%Y-%m-%d")
 try:
@@ -1527,6 +1549,13 @@ try:
     print(f"   stock_prices: 已清理 {price_cutoff} 之前的舊資料")
 except Exception as e:
     print(f"   stock_prices: 清理失敗 ({e})")
+
+stk_cutoff = (today - timedelta(days=120)).strftime("%Y-%m-%d")
+try:
+    sb.table("daily_stk").delete().lt("date", stk_cutoff).execute()
+    print(f"   daily_stk: 已清理 {stk_cutoff} 之前的分析資料")
+except Exception as e:
+    print(f"   daily_stk: 清理失敗 ({e})")
 
 cutoff = (today - timedelta(days=30)).strftime("%Y-%m-%d")
 print(f"\n🧹 清理 {cutoff} 之前的選股舊資料...")

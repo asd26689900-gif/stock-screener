@@ -80,6 +80,14 @@ export default async function handler(req, res) {
       return res.json(j);
     }
 
+    if (type === 'tpex_exright') {
+      // 上櫃除權除息預告表（TPEX OpenAPI，含公司名稱）
+      const url = 'https://www.tpex.org.tw/openapi/v1/tpex_exright_prepost';
+      const r = await fetch(url, { headers: { 'User-Agent': UA } });
+      const j = await r.json();
+      return res.json(j);
+    }
+
     return res.status(400).json({ error: 'unknown type' });
   } catch (e) {
     return res.status(500).json({ error: e.message });
