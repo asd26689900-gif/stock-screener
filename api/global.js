@@ -24,6 +24,14 @@ const JP_STOCKS = [
   { sym: '6954.T', name: '發那科' }, { sym: '8306.T', name: '三菱UFJ' }, { sym: '9432.T', name: 'NTT' },
   { sym: '4063.T', name: '信越化學' }, { sym: '7741.T', name: 'Hoya' }, { sym: '6367.T', name: '大金工業' },
 ];
+const EXTRA = [
+  { sym: 'USD/TWD=X', name: '美元/台幣' },
+  { sym: 'USD/JPY=X', name: '美元/日圓' },
+  { sym: 'BTC-USD', name: '比特幣' },
+  { sym: 'GC=F', name: '黃金期貨' },
+  { sym: 'CL=F', name: '西德州原油' },
+  { sym: 'HG=F', name: '銅期貨' },
+];
 
 async function fetchQuote(sym) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}?interval=1d&range=1mo`;
@@ -57,12 +65,13 @@ async function fetchQuote(sym) {
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'public, max-age=120');
   res.setHeader('Access-Control-Allow-Origin', '*');
-  const symbols = [...US_INDICES, ...US_STOCKS, ...JP_INDICES, ...JP_STOCKS].map(s => s.sym);
+  const symbols = [...US_INDICES, ...US_STOCKS, ...JP_INDICES, ...JP_STOCKS, ...EXTRA].map(s => s.sym);
   const map = await Promise.all(symbols.map(async sym => [sym, await fetchQuote(sym)]));
   const q = Object.fromEntries(map);
   const out = {
     us: { indices: US_INDICES.map(s => ({ ...s, ...(q[s.sym] || {}) })), stocks: US_STOCKS.map(s => ({ ...s, ...(q[s.sym] || {}) })) },
     jp: { indices: JP_INDICES.map(s => ({ ...s, ...(q[s.sym] || {}) })), stocks: JP_STOCKS.map(s => ({ ...s, ...(q[s.sym] || {}) })) },
+    extra: EXTRA.map(s => ({ ...s, ...(q[s.sym] || {}) })),
     updated_at: new Date().toISOString(),
   };
   res.json(out);

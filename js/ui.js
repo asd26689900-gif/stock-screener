@@ -37,6 +37,21 @@ function effectiveTheme() {
   if (t === 'light' || t === 'dark') return t;
   return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
+
+/* ─── PWA：manifest + Service Worker ─── */
+function initPWA(){
+  const link = document.createElement('link');
+  link.rel = 'manifest';
+  link.href = '/manifest.webmanifest';
+  document.head.appendChild(link);
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(()=>{});
+    });
+  }
+}
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initPWA);
+else initPWA();
 function initTheme() {
   let saved = null;
   try { saved = localStorage.getItem('screener:theme'); } catch (e) { /* ignore */ }

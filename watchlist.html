@@ -15,6 +15,7 @@
   <div class="add-bar">
     <input type="text" id="addInput" placeholder="股號或公司名（如 2330 或 台積電）" maxlength="20" autocomplete="off" aria-label="加入自選股號或公司名">
     <button onclick="addStock()">加入</button>
+    <button class="btn btn-sm" onclick="exportCSV()" title="匯出目前清單為 CSV">匯出 CSV</button>
   </div>
   <div id="app"><div class="empty-msg">尚未加入自選股</div></div>
 </div>
@@ -27,6 +28,7 @@
 <script>
 const WL_KEY='watchlists';
 let curList='我的自選';
+let wlMap={}, wlSparks=[];
 
 function getWL(){
   let w=JSON.parse(localStorage.getItem(WL_KEY)||'null');
@@ -203,6 +205,7 @@ async function loadWatchlist(){
   if(error||!data){app.innerHTML=errorBox('載入失敗','loadWatchlist()');return;}
 
   const map={};data.forEach(d=>{map[d.stock_id]=d;});
+  wlMap=map;
 
   // 事件提示橫幅
   const alerts=list.filter(sid=>eventMap[sid]&&eventMap[sid].length);
@@ -213,6 +216,7 @@ async function loadWatchlist(){
 
   // 抓迷你走勢（近30日收盤）
   const sparks=await Promise.all(list.map(fetchSpark));
+  wlSparks=sparks;
 
   const rows=list.map((sid,ri)=>{
     const d=map[sid];
@@ -243,4 +247,25 @@ async function loadWatchlist(){
 }
 
 function onDataReady(){renderTabs();loadWatchlist();}
+
+function exportCSV(){
+  if(!curList) return;
+  const ids = (getWL()[curList] || []).filter(sid=>wlMap[sid]);
+  if(!ids.length){ alert('沒有可匯出的資料'); return; }
+  const headers = ['股號','名稱','收盤價','漲跌%','成交張','MA5','MA20','外資連買日','投信連買日','YOY%'];
+  const lines = [headers.join(',')].concat(ids.map((sid,i)=>{
+    const d = wlMap[sid];
+    const vals = [sid, d.name, d.close, d.change_pct, d.volume, d.ma5, d.ma20, d.foreign_consec_days, d.trust_consec_days, d.rev_yoy];
+    return vals.map(v => {
+      if(v==null||v==='') return '';
+      return typeof v==='string' && /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+    }).join(',');
+  }));
+  const blob = new Blob(['\ufeff'+lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '自選股_'+curList+'.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 </script>

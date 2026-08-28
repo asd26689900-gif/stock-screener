@@ -118,6 +118,7 @@ let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd=
 let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;
 let _chartRAF=0, _chartEventsAttached=false, _cachedMAs=null, _cachedMADataLen=0;
 let showBOLL=false, customMA=null, _cachedCustomMA=0, _cachedBOLL=null, _cachedBOLLDataLen=0;
+let selectMode=false, selecting=false, selStartX=0, selCurX=0;
 let scoreCfgDraft=null;
 const TF_MAP = {
   '5m':  {interval:'5m',  range:'1mo',  label:'5分'},
@@ -335,11 +336,13 @@ function renderStock(sid,d){
   document.getElementById('app').innerHTML=`
   <div class="stk-header">
     <div class="stk-id">${sid}</div><div class="stk-name">${d.name}</div>
+    <button class="btn btn-sm" onclick="toggleLive()" title="Yahoo 即時報價（延遲約 15 分），每分鐘自動更新">${I('refresh',12)} 即時報價</button>
     <div class="price-row">
       <span class="price-big ${cls(chg)}">${fmt(d.close)}</span>
       <span class="price-change ${cls(chg)}">${chgSign}${Math.abs(chg)} (${fmtPct(chgPct,2)})</span>
       <span class="price-date">${I('calendar',12)} ${d.date}</span>
     </div>
+    <div id="liveStrip" style="display:none"></div>
     <div class="ohlcv">
       <div class="ohlcv-item"><div class="ohlcv-label">開盤</div><div class="ohlcv-val">${fmt(d.open)}</div></div>
       <div class="ohlcv-item"><div class="ohlcv-label">最高</div><div class="ohlcv-val">${fmt(d.high)}</div></div>
@@ -354,6 +357,7 @@ function renderStock(sid,d){
       <span class="chart-label">${I('chart',14)} K線走勢圖</span>
       <input type="number" id="maInput" class="ma-input" min="2" max="250" step="1" placeholder="自訂MA" aria-label="自訂均線週期" onkeydown="if(event.key==='Enter')applyCustomMA()">
       <button class="tf-btn" onclick="applyCustomMA()" title="新增/清除自訂均線（留空清除）">MA＋</button>
+      <button class="tf-btn" onclick="toggleSelectMode()" title="拖曳框選放大">框選</button>
     </div>
     <div class="slider-tabs" id="tfTabs" style="margin-top:-2px">
       <button class="slider-tab ${currentTF==='5m'?'active':''}" data-tf="5m" onclick="switchTF('5m')">5分</button>
@@ -393,6 +397,12 @@ function renderStock(sid,d){
     <div class="chart-toolbar"><span class="chart-label">${I('chart',14)} 月營收走勢</span></div>
     <div class="rev-chart-wrap"><canvas id="revCanvas"></canvas></div>
   </div>`:''}
+  ${(d.inst_hist&&d.inst_hist.length>1)?`
+  <div class="chart-box">
+    <div class="chart-toolbar"><span class="chart-label">${I('chart',14)} 法人累計買賣超（近 ${d.inst_hist.length} 日，張）</span></div>
+    <div class="ma-legend" id="instHistLegend"></div>
+    <div class="rev-chart-wrap"><canvas id="instHistCanvas"></canvas></div>
+  </div>`:''}
   ${(d.fundamental&&d.fundamental.pe>0&&chartData.length>60)?`
   <div class="chart-box">
     <div class="chart-toolbar">
@@ -403,6 +413,10 @@ function renderStock(sid,d){
     <div class="ma-tags" style="margin-top:6px"><span class="ma-tag above">河流帶 = 最新本益比 × 歷史股價推算（非歷史 EPS，僅供參考）</span></div>
   </div>`:''}
   ${renderExtLinks(sid,d.name)}
+  <div class="chart-box">
+    <div class="chart-toolbar"><span class="chart-label">同業比較 ・ ${esc(d.industry||'未分類')}</span><span class="date-label" style="margin-left:auto">點列可開啟個股</span></div>
+    <div id="peerBox"><div class="empty-msg">載入中...</div></div>
+  </div>
   <div class="chart-box" id="stockNewsCard">
     <div class="chart-toolbar">
       <span class="chart-label">個股新聞・公告</span>
@@ -429,8 +443,10 @@ function renderStock(sid,d){
     sliderTabs(document.getElementById('indTabs'));
   }
   if(rev.length>1) drawRevChart(rev);
+  if(d.inst_hist&&d.inst_hist.length>1) drawInstHist(d.inst_hist);
   if(d.fundamental&&d.fundamental.pe>0&&chartData.length>60) drawPeRiver(chartData,d.fundamental.pe);
   loadStockNews(sid,d.name);
+  loadPeers(sid,d.industry||'');
 }
 
 async function switchTF(tf){
@@ -462,6 +478,43 @@ function applyCustomMA(){
 function toggleBOLL(){
   showBOLL=!showBOLL;
   document.querySelectorAll('#indTabs .toggle-chip').forEach(b=>b.classList.toggle('active',showBOLL));
+  scheduleChartRedraw();
+}
+
+function toggleSelectMode(){
+  selectMode=!selectMode;
+  document.querySelectorAll('.chart-toolbar .tf-btn').forEach(b=>{
+    if(b.textContent.trim()==='框選') b.classList.toggle('active',selectMode);
+  });
+}
+function drawSelRect(rect){
+  const overlay=document.getElementById('kOverlay');
+  if(!overlay)return;
+  const octx=overlay.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  octx.setTransform(dpr,0,0,dpr,0,0);
+  octx.clearRect(0,0,overlay.width,overlay.height);
+  const x0=Math.min(selStartX,selCurX), x1=Math.max(selStartX,selCurX);
+  if(x1-x0<2)return;
+  octx.fillStyle='rgba(184,134,11,0.12)';
+  octx.fillRect(x0,0,x1-x0,rect.height);
+  octx.strokeStyle='#B8860B'; octx.lineWidth=1;
+  octx.strokeRect(x0,0,x1-x0,rect.height);
+}
+function applySelZoom(){
+  const L=chartLayout;
+  if(!L||!L.cw||!chartDataCache.length)return;
+  const x0=Math.min(selStartX,selCurX), x1=Math.max(selStartX,selCurX);
+  if(x1-x0<20)return; // 太短視為點擊，不放大
+  const n=chartDataCache.length;
+  let i0=Math.floor((x0-L.padL)/L.cw), i1=Math.ceil((x1-L.padL)/L.cw);
+  i0=Math.max(0,Math.min(n-1,i0)); i1=Math.max(i0+1,Math.min(n,i1));
+  chartZoom=Math.max(0.5,Math.min(20,n/(i1-i0)));
+  chartPanIdx=i0;
+  selectMode=false;
+  document.querySelectorAll('.chart-toolbar .tf-btn').forEach(b=>{
+    if(b.textContent.trim()==='框選') b.classList.remove('active');
+  });
   scheduleChartRedraw();
 }
 
@@ -654,6 +707,33 @@ function drawChart(data){
     ctx.globalAlpha=1;
   });
 
+  // 成交量 MA（5/20，全資料計算）
+  (function(){
+    const fullV=chartDataCache.map(d=>d.v||0);
+    const mk=n=>{
+      const r=[];
+      for(let i=0;i<fullV.length;i++){
+        if(i<n-1){r.push(null);continue;}
+        let s=0;for(let j=i-n+1;j<=i;j++)s+=fullV[j];
+        r.push(s/n);
+      }
+      return r;
+    };
+    const vma5=mk(5), vma20=mk(20);
+    [[vma5,'#2962FF'],[vma20,'#FF9800']].forEach(([arr,col])=>{
+      ctx.strokeStyle=col;ctx.lineWidth=1;
+      ctx.beginPath();let st=false;
+      for(let gi=vStart;gi<vEnd;gi++){
+        const v=arr[gi];
+        if(v===null)continue;
+        const x=padL+(gi-vStart)*cw+cw/2;
+        const yv=volTop+volH-(v/vMax*volH);
+        if(!st){ctx.moveTo(x,yv);st=true;}else ctx.lineTo(x,yv);
+      }
+      ctx.stroke();
+    });
+  })();
+
   // MA 均線（快取，只在資料或自訂週期變時重算）
   const maPeriods=customMA?MA_PERIODS.concat([customMA]):MA_PERIODS;
   if(!_cachedMAs||_cachedMADataLen!==data.length||_cachedCustomMA!==(customMA||0)){
@@ -776,10 +856,22 @@ function setupChartEvents(canvas){
   container.addEventListener('mousedown',e=>{
     if(e.button!==0)return;
     e.preventDefault(); // 防止瀏覽器文字選取搶走拖曳
+    if(selectMode){
+      const rect=canvas.getBoundingClientRect();
+      selecting=true; selStartX=selCurX=e.clientX-rect.left;
+      container.style.cursor='ew-resize';
+      return;
+    }
     chartIsDragging=true;chartDragStartX=e.clientX;chartDragStartPan=chartPanIdx;
     container.style.cursor='grabbing';
   });
   document.addEventListener('mousemove',e=>{
+    if(selecting){
+      const rect=canvas.getBoundingClientRect();
+      selCurX=e.clientX-rect.left;
+      drawSelRect(rect);
+      return;
+    }
     if(chartIsDragging){
       const dx=e.clientX-chartDragStartX;
       if(!chartLayout.cw)return;
@@ -790,6 +882,12 @@ function setupChartEvents(canvas){
     drawCrosshair(e);
   });
   document.addEventListener('mouseup',()=>{
+    if(selecting){
+      selecting=false;
+      container.style.cursor='crosshair';
+      applySelZoom();
+      return;
+    }
     if(chartIsDragging){chartIsDragging=false;container.style.cursor='crosshair';}
   });
 
@@ -1105,13 +1203,154 @@ function drawPeRiver(data,pe){
 async function loadStockNews(sid,name){
   const box=document.getElementById('stockNewsBox');
   if(!box)return;
+  const render = items => {
+    if(!items.length){ box.innerHTML='<div class="empty-msg">暫無相關新聞</div>'; return; }
+    box.innerHTML='<div class="news-list">'+items.map(n=>`<a class="news-item" href="${esc(n.link)}" target="_blank" rel="noopener"><span class="news-src">${esc(n.source||'新聞')}</span><span class="news-title">${esc(n.title)}</span><span class="news-time">${(n.published_at||'').slice(11,16)}</span></a>`).join('')+'</div>';
+  };
+  try{
+    // 優先讀每日預抓的個股新聞（08:30 排程）
+    if(sb){
+      const {data}=await sb.from('daily_news').select('title,link,source,published_at').eq('query','stock:'+sid).order('published_at',{ascending:false}).limit(8);
+      if(data&&data.length){ render(data); return; }
+    }
+  }catch(e){ /* fallthrough */ }
   try{
     const r=await fetch('/api/stocknews?sym='+encodeURIComponent(sid)+'&name='+encodeURIComponent(name));
     const j=await r.json();
-    if(!j.items||!j.items.length){box.innerHTML='<div class="empty-msg">暫無相關新聞</div>';return;}
-    box.innerHTML='<div class="news-list">'+j.items.map(n=>`<a class="news-item" href="${esc(n.link)}" target="_blank" rel="noopener"><span class="news-src">${esc(n.source||'新聞')}</span><span class="news-title">${esc(n.title)}</span><span class="news-time">${(n.published_at||'').slice(11,16)}</span></a>`).join('')+'</div>';
+    render(j.items||[]);
   }catch(e){
     box.innerHTML='<div class="empty-msg">新聞載入失敗</div>';
+  }
+}
+
+// ══════════════════════════════════════
+// 盤中即時報價（Yahoo 延遲約 15 分，每分鐘更新）
+// ══════════════════════════════════════
+let liveTimer=null, liveOn=false;
+async function toggleLive(){
+  liveOn=!liveOn;
+  const strip=document.getElementById('liveStrip');
+  if(!strip) return;
+  if(!liveOn){
+    strip.style.display='none';
+    if(liveTimer){ clearInterval(liveTimer); liveTimer=null; }
+    return;
+  }
+  strip.style.display='';
+  await refreshLive();
+  if(liveTimer) clearInterval(liveTimer);
+  liveTimer=setInterval(refreshLive, 60000);
+}
+async function refreshLive(){
+  const strip=document.getElementById('liveStrip');
+  if(!strip||!currentSid) return;
+  try{
+    const r=await fetch('/api/chart?sid='+encodeURIComponent(currentSid)+'&interval=5m&range=1d');
+    const j=await r.json();
+    const bars=(j.bars||[]).filter(b=>b.c!=null);
+    if(!bars.length) throw new Error('no data');
+    const b=bars[bars.length-1];
+    const prev=bars.length>1?bars[bars.length-2].c:b.c;
+    const chg=b.c-prev, pct=prev?chg/prev*100:0;
+    const cls2=pctClass(chg);
+    strip.innerHTML=`<div class="live-box">
+      <span class="live-label">即時報價（延遲約 15 分）</span>
+      <b class="live-price ${cls2}">${fmt(b.c)}</b>
+      <span class="${cls2}">${chg>0?'+':''}${fmt(chg)} (${fmtPct(pct,2)})</span>
+      <span class="live-time">${String(b.d).slice(11,16)} 更新・每分鐘自動更新</span>
+    </div>`;
+  }catch(e){
+    strip.innerHTML='<div class="empty-msg" style="padding:8px">即時報價暫不可用（非交易時段或資料延遲）</div>';
+  }
+}
+
+// ══════════════════════════════════════
+// 法人累計買賣超（外資/投信/自營，近 N 日累計，張）
+// ══════════════════════════════════════
+function drawInstHist(hist){
+  const canvas=document.getElementById('instHistCanvas');
+  if(!canvas) return;
+  const cs=getComputedStyle(document.documentElement);
+  const cGrid=cs.getPropertyValue('--border-light').trim()||'#EBE7E0';
+  const cText=cs.getPropertyValue('--text-secondary').trim()||'#6B7280';
+  const cZero=cs.getPropertyValue('--border').trim()||'#D8D2C6';
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth||700, H=220;
+  const padL=58,padR=10,padT=14,padB=26;
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
+  const colors={f:'#2962FF', t:'#FF9800', d:'#9C27B0'};
+  const keys=[['f','foreign_net','外資'],['t','trust_net','投信'],['d','dealer_net','自營']];
+  const cum={f:0,t:0,d:0};
+  const series=hist.map(r=>{
+    cum.f+=r.foreign_net/1000; cum.t+=r.trust_net/1000; cum.d+=r.dealer_net/1000;
+    return {d:r.date, f:Math.round(cum.f), t:Math.round(cum.t), d:Math.round(cum.d)};
+  });
+  const all=series.flatMap(s=>[s.f,s.t,s.d]);
+  const vMax=Math.max(...all,0), vMin=Math.min(...all,0);
+  const span=(vMax-vMin)||1;
+  const y=v=>padT+(1-(v-vMin)/span)*(H-padT-padB);
+  const x=i=>padL+(i*(W-padL-padR))/(series.length-1);
+  ctx.font='10px monospace'; ctx.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const v=vMin+span*i/4, yy=y(v);
+    ctx.strokeStyle=cGrid; ctx.lineWidth=0.5;
+    ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(W-padR,yy); ctx.stroke();
+    ctx.fillStyle=cText; ctx.fillText(Math.round(v)+'張', padL-4, yy+3);
+  }
+  // 零軸
+  if(vMin<0&&vMax>0){
+    ctx.strokeStyle=cZero; ctx.setLineDash([4,3]); ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(padL,y(0)); ctx.lineTo(W-padR,y(0)); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  keys.forEach(([k,key,label])=>{
+    ctx.strokeStyle=colors[k]; ctx.lineWidth=1.6;
+    ctx.beginPath();
+    series.forEach((s,i)=>{ const xx=x(i), yy=y(s[k]); i===0?ctx.moveTo(xx,yy):ctx.lineTo(xx,yy); });
+    ctx.stroke();
+  });
+  // 日期
+  ctx.fillStyle=cText; ctx.font='9px monospace'; ctx.textAlign='center';
+  const step=Math.max(1,Math.floor(series.length/6));
+  for(let i=0;i<series.length;i+=step){
+    ctx.fillText(series[i].d.slice(5), x(i), H-8);
+  }
+  // 圖例
+  const legend=keys.map(([k,,label])=>{
+    const last=series[series.length-1][k];
+    return `<span><span style="display:inline-block;width:14px;height:2px;background:${colors[k]};margin-right:4px;vertical-align:middle;border-radius:1px"></span>${label} ${last>0?'+':''}${fmt(last)}</span>`;
+  }).join('');
+  const lc=document.getElementById('instHistLegend');
+  if(lc) lc.innerHTML=legend;
+}
+
+// ══════════════════════════════════════
+// 同業比較（同產業 6 檔）
+// ══════════════════════════════════════
+async function loadPeers(sid, industry){
+  const box=document.getElementById('peerBox');
+  if(!box||!industry||!sb) return;
+  try{
+    const {data:hm}=await sb.from('daily_heatmap').select('data').order('date',{ascending:false}).limit(1).single();
+    const ind=(hm?.data?.industries||[]).find(x=>x.name===industry);
+    const ids=(ind?.stocks||[]).map(s=>s.id).filter(x=>x&&x!==sid).slice(0,12);
+    if(!ids.length){ box.innerHTML='<div class="empty-msg">無同業資料</div>'; return; }
+    const {data:metrics}=await sb.from('stock_metrics').select('stock_id,name,close,change_pct,volume,foreign_net_shares,rev_yoy').in('stock_id',ids);
+    if(!metrics||!metrics.length){ box.innerHTML='<div class="empty-msg">無同業資料</div>'; return; }
+    metrics.sort((a,b)=>(b.change_pct||0)-(a.change_pct||0));
+    const rows=metrics.slice(0,6).map(m=>`<tr onclick="location.href='stk.html#${m.stock_id}'">
+      <td>${m.stock_id}</td><td>${m.name||'—'}</td>
+      <td>${fmt(m.close)}</td>
+      <td class="${pctClass(m.change_pct)}">${fmtPct(m.change_pct,2)}</td>
+      <td>${fmt(m.volume)}</td>
+      <td class="${pctClass(m.foreign_net_shares)}">${m.foreign_net_shares>0?'+':''}${fmt(m.foreign_net_shares||0)}</td>
+      <td class="${m.rev_yoy!=null?pctClass(m.rev_yoy):''}">${m.rev_yoy!=null?fmtPct(m.rev_yoy,1):'—'}</td>
+    </tr>`).join('');
+    box.innerHTML=`<div class="table-wrap"><table><thead><tr><th>股號</th><th>名稱</th><th>收盤</th><th>漲跌%</th><th>成交張</th><th>外資買賣超(張)</th><th>營收YoY</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }catch(e){
+    box.innerHTML='<div class="empty-msg">同業比較載入失敗</div>';
   }
 }
 

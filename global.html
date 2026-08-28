@@ -33,6 +33,9 @@
   <div class="section-title">日股</div>
   <div id="jpIdx"><div class="loading">載入中...</div></div>
   <div id="jpHeat"><div class="loading">載入中...</div></div>
+
+  <div class="section-title">匯率・原物料・加密貨幣</div>
+  <div id="exHeat"><div class="loading">載入中...</div></div>
 </div>
 
 <div id="footer"></div>
@@ -94,11 +97,12 @@ async function load(){
     document.getElementById('usHeat').innerHTML=heat(j.us.stocks);
     document.getElementById('jpIdx').innerHTML=indexCards(j.jp.indices);
     document.getElementById('jpHeat').innerHTML=heat(j.jp.stocks);
+    document.getElementById('exHeat').innerHTML=heat(j.extra||[]);
     document.querySelectorAll('.g-spark').forEach(c=>{
       try{ spark(c, JSON.parse(c.dataset.c||'[]')); }catch(e){}
     });
   }catch(e){
-    ['usIdx','usHeat','jpIdx','jpHeat'].forEach(id=>{
+    ['usIdx','usHeat','jpIdx','jpHeat','exHeat'].forEach(id=>{
       document.getElementById(id).innerHTML='<div class="empty-msg">全球行情載入失敗</div>';
     });
   }
