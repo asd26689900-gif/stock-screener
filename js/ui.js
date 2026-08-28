@@ -117,6 +117,8 @@ function renderChrome() {
 }
 
 /* ─── 格式化 ─── */
+function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 function fmtNum(v) {
   if (v === null || v === undefined || v === '') return '—';
   if (typeof v === 'number') return v.toLocaleString('zh-TW');
