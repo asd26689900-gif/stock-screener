@@ -1,0 +1,17 @@
+{
+  "name": "盤後精選模組 — 台股選股",
+  "short_name": "盤後精選",
+  "description": "台股市場總覽、每日焦點、多因子選股與全球股市。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F2EC",
+  "theme_color": "#B8860B",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

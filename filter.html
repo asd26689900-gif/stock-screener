@@ -48,10 +48,19 @@
         <label>5日乖離率 % 範圍</label>
         <div class="filter-row"><input type="number" id="f_bias_min" placeholder="-3" step="0.1" aria-label="最低乖離率"> <span>~</span> <input type="number" id="f_bias_max" placeholder="7" step="0.1" aria-label="最高乖離率"></div>
       </div>
+      <div class="filter-group">
+        <label>大戶持股（400張以上）% ≥</label>
+        <div class="filter-row"><input type="number" id="f_tdcc_min" placeholder="如 60" step="0.1" aria-label="最低大戶持股比率"></div>
+      </div>
+      <div class="filter-group">
+        <label>大戶持股週增減 pp ≥</label>
+        <div class="filter-row"><input type="number" id="f_tdcc_delta_min" placeholder="如 0.5" step="0.1" aria-label="最低大戶持股週增減"></div>
+      </div>
     </div>
     <div class="filter-actions">
       <button class="btn-filter" onclick="doFilter()">篩選</button>
       <button class="btn-reset" onclick="resetFilters()">清除條件</button>
+      <button class="btn-reset" onclick="exportCSV()">匯出 CSV</button>
       <span class="result-count" id="resultCount"></span>
     </div>
   </div>
@@ -79,12 +88,15 @@ const COLS = [
   {key:'rev_mom',label:'MOM%'},
   {key:'rev_consec_grow',label:'連續成長月'},
   {key:'bias_5',label:'乖離率%'},
+  {key:'tdcc_big',label:'大戶%'},
+  {key:'tdcc_delta',label:'週增減pp'},
 ];
 
 let sortCol = 'volume';
 let sortAsc = false;
 let lastData = [];
 let limit = 200;
+let tdccMap = null;
 
 function getVal(id){ const v=document.getElementById(id).value; return v===''?null:parseFloat(v); }
 
@@ -110,12 +122,46 @@ async function doFilter(){
     if(v!==null) q = q[op](col, v);
   }
 
-  const {data,error} = await q;
+  let {data,error} = await q;
   if(error){document.getElementById('results').innerHTML='<div class="empty-msg">查詢失敗: '+error.message+'</div>';return;}
+
+  // 集保大戶條件（快照每週更新；無快照時略過）
+  const tdccMin = getVal('f_tdcc_min'), tdccDeltaMin = getVal('f_tdcc_delta_min');
+  if((tdccMin!==null||tdccDeltaMin!==null) && (data||[]).length){
+    const m = await ensureTdcc();
+    if(m){
+      data = data.filter(r=>{
+        const v = m[r.stock_id];
+        if(!v) return false;
+        if(tdccMin!==null && v.ratio < tdccMin) return false;
+        if(tdccDeltaMin!==null && (v.delta==null || v.delta < tdccDeltaMin)) return false;
+        return true;
+      }).map(r=>({...r, tdcc_big: m[r.stock_id].ratio, tdcc_delta: m[r.stock_id].delta}));
+    }
+  }
 
   lastData = data || [];
   document.getElementById('resultCount').textContent = lastData.length + ' 檔符合';
   renderTable();
+}
+
+async function ensureTdcc(){
+  if(tdccMap) return tdccMap;
+  try{
+    const {data}=await sb.from('daily_modules').select('date,data').eq('module_key','tdcc').order('date',{ascending:false}).limit(2);
+    if(!data||!data.length) return null;
+    const snaps={}; data.forEach(r=>snaps[r.date]=r.data);
+    const dates=Object.keys(snaps).sort();
+    const cur=snaps[dates[dates.length-1]], prev=dates.length>1?snaps[dates[0]]:null;
+    tdccMap={};
+    Object.entries(cur).forEach(([sid,a])=>{
+      tdccMap[sid]={
+        ratio: Math.round((a.big_ratio||0)*100)/100,
+        delta: prev&&prev[sid] ? Math.round(((a.big_ratio||0)-(prev[sid].big_ratio||0))*100)/100 : null
+      };
+    });
+    return tdccMap;
+  }catch(e){ return null; }
 }
 
 function renderTable(){
@@ -133,6 +179,7 @@ function renderTable(){
       if(c.key==='stock_id'||c.key==='name') return '<td>'+v+'</td>';
       if(c.key==='change_pct') return `<td class="${pctClass(v)}">${fmtPct(v,2)}</td>`;
       if(c.key==='rev_yoy'||c.key==='rev_mom'||c.key==='bias_5') return '<td class="'+pctClass(v)+'">'+fmtPct(v,2)+'</td>';
+      if(c.key==='tdcc_big'||c.key==='tdcc_delta') return v!=null?'<td class="'+pctClass(v)+'">'+fmtPct(v,2)+'</td>':'<td>—</td>';
       if(typeof v==='number') return '<td>'+fmtVal(v)+'</td>';
       return '<td>'+(v??'—')+'</td>';
     }).join('') + '<td>'+starBtn(row.stock_id)+'</td></tr>';
@@ -140,6 +187,23 @@ function renderTable(){
 
   const more = lastData.length >= limit ? `<div class="load-more-wrap"><button class="btn" onclick="loadMore()">載入更多</button></div>` : '';
   document.getElementById('results').innerHTML = `<div class="table-wrap"><table><thead><tr>${ths}<th></th></tr></thead><tbody>${rows}</tbody></table></div>${more}`;
+}
+
+function exportCSV(){
+  if(!lastData.length){ alert('沒有可匯出的資料'); return; }
+  const headers = ['股號','名稱','收盤價','漲跌%','成交張','外資連買日','投信連買日','YOY%','MOM%','連續成長月','乖離率%','大戶%','週增減pp'];
+  const keys = ['stock_id','name','close','change_pct','volume','foreign_consec_days','trust_consec_days','rev_yoy','rev_mom','rev_consec_grow','bias_5','tdcc_big','tdcc_delta'];
+  const lines = [headers.join(',')].concat(lastData.map(r=>keys.map(k=>{
+    const v = r[k];
+    if(v==null||v==='') return '';
+    return typeof v==='string' && /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v;
+  }).join(',')));
+  const blob = new Blob(['\ufeff'+lines.join('\n')], {type:'text/csv;charset=utf-8'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = '篩選結果.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
 }
 
 function loadMore(){

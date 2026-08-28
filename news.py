@@ -61,6 +61,44 @@ def fetch_rss(query):
         print(f"   ⚠ RSS 失敗({query}): {e}", flush=True)
         return []
 
+def fetch_stock_news():
+    """為成交量前 100 檔股票預抓個股新聞（query='stock:代號'）"""
+    if not sb:
+        return 0
+    try:
+        rows = sb.table("stock_metrics").select("stock_id,name").order("volume", desc=True).limit(100).execute().data
+    except Exception as e:
+        print(f"   ⚠ stock_metrics 查詢失敗: {e}", flush=True)
+        return 0
+    total = 0
+    for i, r in enumerate(rows):
+        sid = str(r.get("stock_id", "")).strip()
+        name = str(r.get("name") or sid).strip()
+        if not sid:
+            continue
+        items = fetch_rss(f"{name} 重大訊息 OR 公告")
+        if len(items) < 3:
+            items = items + fetch_rss(name)
+        if not items:
+            continue
+        rows2 = [{
+            "date": date.today().isoformat(),
+            "query": f"stock:{sid}",
+            "title": it["title"],
+            "link": it["link"],
+            "source": it["source"],
+            "snippet": it["snippet"],
+            "published_at": it["published_at"],
+        } for it in items[:6]]
+        try:
+            sb.table("daily_news").upsert(rows2, on_conflict="link").execute()
+            total += len(rows2)
+        except Exception:
+            pass
+        time.sleep(0.4)
+    print(f"   個股新聞: {total} 筆（前 {len(rows)} 檔）", flush=True)
+    return total
+
 def main():
     if not sb:
         print("⚠ SUPABASE_URL / SUPABASE_SERVICE_KEY 未設定，僅測試抓取", flush=True)
@@ -90,6 +128,8 @@ def main():
             total += len(rows)
             print(f"   [{i+1}/{len(QUERIES)}] {q}: {len(rows)} 筆（未寫入）", flush=True)
         time.sleep(1)
+
+    fetch_stock_news()
 
     if sb:
         try:

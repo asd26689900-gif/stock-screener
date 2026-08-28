@@ -29,8 +29,12 @@
       <button class="slider-tab" data-tf="1d" onclick="switchTwii('1d')">日</button>
     </div>
     <div class="ohlcv-legend" id="twiiLegend"></div>
-    <div class="twii-canvas"><canvas id="twiiCanvas"></canvas></div>
+  <div class="twii-canvas"><canvas id="twiiCanvas"></canvas></div>
   </div>
+
+  <!-- 類股漲跌 -->
+  <div class="section-title">類股漲跌</div>
+  <div id="sectorStrip"><div class="loading">載入中...</div></div>
 
   <!-- 每日焦點 -->
   <div class="section-title">每日焦點</div>
@@ -171,6 +175,18 @@ async function switchTwii(tf){
 /* ── 每日焦點 ── */
 let focusData=null, strongTF='week', instTF='foreign', instShowEtf=true;
 
+async function loadSectors(){
+  const box=document.getElementById('sectorStrip');
+  if(!box||!sb) return;
+  box.className='sector-strip';
+  try{
+    const {data}=await sb.from('daily_heatmap').select('data').order('date',{ascending:false}).limit(1).single();
+    const inds=(data&&data.data&&data.data.industries||[]).slice(0,14);
+    if(!inds.length){ box.innerHTML='<div class="empty-msg">無類股資料</div>'; return; }
+    box.innerHTML=inds.map(i=>`<a class="sector-chip ${i.avg_chg>0?'up':i.avg_chg<0?'dn':''}" href="heatmap.html" title="${esc(i.name)} 類股均漲跌">${esc(i.name)} <b>${fmtPct(i.avg_chg,2)}</b></a>`).join('');
+  }catch(e){ box.innerHTML=''; }
+}
+
 function miniTable(headers, rows, linkCol=0){
   if(!rows||!rows.length) return '<div class="empty-msg" style="padding:18px">尚無資料</div>';
   return `<div class="scroll-table"><div class="table-wrap"><table><thead><tr>${headers.map(h=>'<th>'+h+'</th>').join('')}</tr></thead><tbody>${
@@ -295,8 +311,13 @@ let dataLoaded = false;
 function onDataReady(){
   if(!dataLoaded){
     dataLoaded=true;
-    loadFocus(); loadNews(); loadMarket(); loadTwii(twiiTF).then(drawTwii);
+    loadFocus(); loadNews(); loadMarket(); loadSectors(); loadTwii(twiiTF).then(drawTwii);
     sliderTabs(document.getElementById('twiiTabs'));
   }
 }
+// 大盤走勢每 5 分鐘自動更新（Yahoo 延遲約 15 分）
+setInterval(()=>{
+  twiiCache={};
+  loadTwii(twiiTF).then(drawTwii);
+}, 5*60*1000);
 </script>
