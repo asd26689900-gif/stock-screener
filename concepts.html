@@ -76,7 +76,7 @@ async function loadConcepts(){
   const allIds = [...new Set(CONCEPTS.flatMap(c => c.ids))];
 
   const { data, error } = await sb.from('stock_metrics')
-    .select('stock_id,name,close,change_pct,volume')
+    .select('stock_id,name,close,change_pct,volume,foreign_net_shares,rev_yoy')
     .in('stock_id', allIds);
 
   if(error || !data){ document.getElementById('app').innerHTML=errorBox('載入失敗','loadConcepts()'); return; }
@@ -89,13 +89,25 @@ async function loadConcepts(){
     if(!stocks.length) return null;
     const avgChg = stocks.reduce((s, d) => s + (d.change_pct || 0), 0) / stocks.length;
     const leader = stocks.reduce((best, d) => (d.change_pct||0) > (best.change_pct||0) ? d : best, stocks[0]);
-    return { ...c, stocks, avgChg, leader, count: stocks.length };
+    const upCount = stocks.filter(d => (d.change_pct||0) > 0).length;
+    const dnCount = stocks.filter(d => (d.change_pct||0) < 0).length;
+    return { ...c, stocks, avgChg, leader, count: stocks.length, upCount, dnCount };
   }).filter(Boolean);
 
   // 按漲跌幅排序
   cards.sort((a, b) => b.avgChg - a.avgChg);
 
-  const html = '<div class="concept-grid">' + cards.map(c => {
+  const upTotal = cards.filter(c => c.avgChg > 0).length;
+  const dnTotal = cards.filter(c => c.avgChg < 0).length;
+  const best = cards[0], worst = cards[cards.length-1];
+  const summary = `<div class="summary-grid">
+    <div class="summary-card"><div class="summary-label">題材總數</div><div class="summary-val">${cards.length}<span class="unit">組</span></div><div class="summary-sub">${CONCEPTS.length} 組題材定義</div></div>
+    <div class="summary-card"><div class="summary-label">上漲題材</div><div class="summary-val up">${upTotal}<span class="unit">組</span></div><div class="summary-sub">下跌 ${dnTotal} 組</div></div>
+    <div class="summary-card"><div class="summary-label">最強題材</div><div class="summary-val" style="font-size:15px">${best?best.title:'—'}</div><div class="summary-sub ${best?pctClass(best.avgChg):''}">${best?fmtPct(best.avgChg,2):'—'}</div></div>
+    <div class="summary-card"><div class="summary-label">最弱題材</div><div class="summary-val" style="font-size:15px">${worst?worst.title:'—'}</div><div class="summary-sub ${worst?pctClass(worst.avgChg):''}">${worst?fmtPct(worst.avgChg,2):'—'}</div></div>
+  </div>`;
+
+  const html = summary + '<div class="concept-grid">' + cards.map(c => {
     const cls = pctClass(c.avgChg);
     const arrow = c.avgChg > 0 ? '▲' : c.avgChg < 0 ? '▼' : '';
     const borderColor = c.avgChg > 0 ? 'var(--red)' : c.avgChg < 0 ? 'var(--green)' : 'var(--border)';
@@ -110,6 +122,7 @@ async function loadConcepts(){
       <div class="card-desc">${c.desc}</div>
       <div class="card-bottom">
         <span class="card-count">${c.count} 檔</span>
+        <span class="card-updn"><b class="up">漲 ${c.upCount}</b> / <b class="dn">跌 ${c.dnCount}</b></span>
         <span class="card-leader">領漲 <span class="lname">${c.leader.name||c.leader.stock_id}</span> <span class="${lCls}">${fmtPct(lChg,2)}</span></span>
       </div>
     </div>`;
@@ -126,11 +139,15 @@ function showDetail(key){
   const rows = stocks.map(d => {
     const chg = d.change_pct || 0;
     const cls = pctClass(chg);
+    const fn = d.foreign_net_shares||0;
+    const ry = d.rev_yoy;
     return `<tr onclick="location.href='stk.html#${d.stock_id}'">
       <td>${d.stock_id}</td><td>${d.name||'—'}</td>
       <td>${fmt(d.close)}</td>
       <td class="${cls}">${fmtPct(chg,2)}</td>
       <td>${fmt(d.volume)}</td>
+      <td class="${pctClass(fn)}">${fn>0?'+':''}${fmt(fn)}</td>
+      <td class="${ry!=null?pctClass(ry):''}">${ry!=null?fmtPct(ry,1):'—'}</td>
     </tr>`;
   }).join('');
 
@@ -143,7 +160,7 @@ function showDetail(key){
  <button class="detail-close" onclick="closeDetail()" aria-label="關閉"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
     </div>
     <p style="font-size:13px;color:var(--text-secondary);margin-bottom:14px">${c.desc}</p>
-    <table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th></tr></thead>
+    <table><thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th><th>外資買賣超(張)</th><th>營收YoY</th></tr></thead>
     <tbody>${rows}</tbody></table>
   </div>`;
   document.getElementById('detailModal').classList.add('show');

@@ -317,6 +317,7 @@ tr.ipo-cancelled{opacity:.55}
 .card-desc{padding:10px 14px;font-size:12px;color:var(--text-secondary);min-height:54px}
 .card-bottom{display:flex;justify-content:space-between;padding:8px 14px;border-top:1px solid var(--border-light);font-size:11px;color:var(--text-secondary)}
 .card-count{font-weight:700}
+.card-updn{font-family:var(--font-mono)}
 .card-leader{font-family:var(--font-mono)}
 .concept-detail{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:16px;overflow:hidden}
 .detail-header{display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border-light)}
@@ -448,6 +449,8 @@ tr.ipo-cancelled{opacity:.55}
 }
 .ohlcv-legend b{font-weight:700;color:var(--ink)}
 .ma-legend{display:flex;gap:12px;font-size:11px;font-family:var(--font-mono);flex-wrap:wrap;margin-bottom:6px}
+.ma-input{width:74px;padding:3px 8px;font-size:11px;font-family:var(--font-mono);background:var(--surface);border:1px solid var(--border);border-radius:4px;color:var(--text);text-align:center}
+.ma-input:focus{outline:none;border-color:var(--gold)}
 .chart-canvas{position:relative;overflow:hidden;cursor:crosshair;user-select:none;-webkit-user-select:none;touch-action:none}
 .chart-canvas canvas{display:block}
 .chart-overlay{position:absolute;top:0;left:0;pointer-events:none}

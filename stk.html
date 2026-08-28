@@ -1,5 +1,5 @@
 <title>個股分析 — 盤後精選模組</title>
-<meta name="description" content="個股分析：查詢台股個股 K 線、技術指標、籌碼、營收與評分。">
+<meta name="description" content="個股分析：K 線、技術指標（KD/RSI/MACD/布林通道）、自訂均線、本益比河流圖、個股新聞、籌碼、營收與評分。">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta charset="utf-8">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -117,6 +117,7 @@ window.addEventListener('hashchange', syncHeroWithHash);
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
 let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;
 let _chartRAF=0, _chartEventsAttached=false, _cachedMAs=null, _cachedMADataLen=0;
+let showBOLL=false, customMA=null, _cachedCustomMA=0, _cachedBOLL=null, _cachedBOLLDataLen=0;
 let scoreCfgDraft=null;
 const TF_MAP = {
   '5m':  {interval:'5m',  range:'1mo',  label:'5分'},
@@ -285,10 +286,15 @@ function renderIndCards(d){
   const kdHint=kd.k[last]>80?'超買區':kd.k[last]<20?'超賣區':'中性';
   const rsiHint=rsi6[last]>80?'超買':rsi6[last]<20?'超賣':'中性';
   const macdHint=macd.dif[last]>macd.macd[last]?'多方動能':'空方動能';
+  const boll=calcBOLL(data);
+  const bu=boll.up[last],bm=boll.mid[last],bl=boll.low[last];
+  const lastC=data[last].c;
+  const bollHint=bu!=null?(lastC>bu?'突破上軌':lastC<bl?'跌破下軌':'區間內'):'—';
   return `<div class="ind-grid">
     <div class="ind-card"><div class="ind-card-label">KD</div><div class="ind-card-val">${kv}</div><div class="ind-card-sub">D ${dv}・${kdHint}</div></div>
     <div class="ind-card"><div class="ind-card-label">RSI(6)</div><div class="ind-card-val">${r6}</div><div class="ind-card-sub">RSI(14) ${r14}・${rsiHint}</div></div>
     <div class="ind-card"><div class="ind-card-label">MACD</div><div class="ind-card-val">${m}</div><div class="ind-card-sub">Signal ${sig}・${macdHint}</div></div>
+    <div class="ind-card"><div class="ind-card-label">BOLL(20,2)</div><div class="ind-card-val">${bm!=null?bm.toFixed(1):'—'}</div><div class="ind-card-sub">上 ${bu!=null?bu.toFixed(1):'—'} 下 ${bl!=null?bl.toFixed(1):'—'}・${bollHint}</div></div>
   </div>`;
 }
 
@@ -346,6 +352,8 @@ function renderStock(sid,d){
       <button class="tf-btn ${currentTF==='D'?'active':''}" data-tf="D" onclick="switchTF('D')">日</button>
       <button class="tf-btn ${currentTF==='W'?'active':''}" data-tf="W" onclick="switchTF('W')">週</button>
       <button class="tf-btn ${currentTF==='M'?'active':''}" data-tf="M" onclick="switchTF('M')">月</button>
+      <input type="number" id="maInput" class="ma-input" min="2" max="250" step="1" placeholder="自訂MA" aria-label="自訂均線週期" onkeydown="if(event.key==='Enter')applyCustomMA()">
+      <button class="tf-btn" onclick="applyCustomMA()" title="新增/清除自訂均線（留空清除）">MA＋</button>
     </div>
     <div class="ohlcv-legend" id="ohlcvLegend"></div>
     <div class="ma-legend" id="maLegend"></div>
@@ -360,6 +368,7 @@ function renderStock(sid,d){
       <button class="ind-btn ${currentInd==='kd'?'active':''}" data-ind="kd" onclick="switchInd('kd')">KD</button>
       <button class="ind-btn ${currentInd==='rsi'?'active':''}" data-ind="rsi" onclick="switchInd('rsi')">RSI</button>
       <button class="ind-btn ${currentInd==='macd'?'active':''}" data-ind="macd" onclick="switchInd('macd')">MACD</button>
+      <button class="ind-btn ${showBOLL?'active':''}" onclick="toggleBOLL()">BOLL</button>
     </div>
     <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
   </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">${I('chart',14)} K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
@@ -375,7 +384,23 @@ function renderStock(sid,d){
     <div class="chart-toolbar"><span class="chart-label">${I('chart',14)} 月營收走勢</span></div>
     <div class="rev-chart-wrap"><canvas id="revCanvas"></canvas></div>
   </div>`:''}
+  ${(d.fundamental&&d.fundamental.pe>0&&chartData.length>60)?`
+  <div class="chart-box">
+    <div class="chart-toolbar">
+      <span class="chart-label">${I('chart',14)} 本益比河流圖</span>
+      <span class="date-label" style="margin-left:auto">PE ${d.fundamental.pe.toFixed(1)} ・ EPS≈${(chartData[chartData.length-1].c/d.fundamental.pe).toFixed(2)}</span>
+    </div>
+    <div class="rev-chart-wrap"><canvas id="peCanvas"></canvas></div>
+    <div class="ma-tags" style="margin-top:6px"><span class="ma-tag above">河流帶 = 最新 EPS × PE 10/15/20/25/30（歷史股價區間推算）</span></div>
+  </div>`:''}
   ${renderExtLinks(sid,d.name)}
+  <div class="chart-box" id="stockNewsCard">
+    <div class="chart-toolbar">
+      <span class="chart-label">個股新聞・公告</span>
+      <span class="date-label" style="margin-left:auto">Google 新聞聚合</span>
+    </div>
+    <div id="stockNewsBox"><div class="empty-msg">載入新聞中...</div></div>
+  </div>
   <div class="chip-grid">
     <div class="chip-card"><div class="chip-label">主力買賣超</div><div class="chip-val ${cls(d.chip.main_net)}">${sign(fmt(d.chip.main_net))}張</div></div>
     <div class="chip-card"><div class="chip-label">散戶買賣超</div><div class="chip-val ${cls(d.chip.retail_net)}">${sign(fmt(d.chip.retail_net))}張</div></div>
@@ -393,6 +418,8 @@ function renderStock(sid,d){
     drawChart(chartData);
   }
   if(rev.length>1) drawRevChart(rev);
+  if(d.fundamental&&d.fundamental.pe>0&&chartData.length>60) drawPeRiver(chartData,d.fundamental.pe);
+  loadStockNews(sid,d.name);
 }
 
 async function switchTF(tf){
@@ -411,12 +438,30 @@ async function switchTF(tf){
   drawChart(bars);
 }
 
+function applyCustomMA(){
+  const inp=document.getElementById('maInput');
+  const v=inp?inp.value.trim():'';
+  const n=v?parseInt(v,10):null;
+  if(n&&(n<2||n>250)){if(inp)inp.value='';return;}
+  customMA=n;
+  _cachedMAs=null;_cachedCustomMA=0;
+  scheduleChartRedraw();
+}
+function toggleBOLL(){
+  showBOLL=!showBOLL;
+  document.querySelectorAll('.ind-btn').forEach(b=>{
+    if(b.textContent.trim()==='BOLL') b.classList.toggle('active',showBOLL);
+  });
+  scheduleChartRedraw();
+}
+
 // ══════════════════════════════════════
 // K 線圖 (Canvas) — XQ 風格
 // ══════════════════════════════════════
 let chartDataCache=[];
 const MA_COLORS=['#2962FF','#FF9800','#9C27B0','#8B8780'];
 const MA_PERIODS=[5,10,20,60];
+const MA_CUSTOM_COLOR='#607D8B';
 
 function setOHLCBar(b, prev){
   const el=document.getElementById('ohlcvLegend');
@@ -435,6 +480,20 @@ function calcMA(data,n){
     r.push(s/n);
   }
   return r;
+}
+function calcBOLL(data,n=20,k=2){
+  const mid=[],up=[],low=[];
+  for(let i=0;i<data.length;i++){
+    if(i<n-1){mid.push(null);up.push(null);low.push(null);continue;}
+    let s=0;
+    for(let j=i-n+1;j<=i;j++)s+=data[j].c;
+    const m=s/n;
+    let v=0;
+    for(let j=i-n+1;j<=i;j++)v+=(data[j].c-m)*(data[j].c-m);
+    const sd=Math.sqrt(v/n);
+    mid.push(m);up.push(m+k*sd);low.push(m-k*sd);
+  }
+  return {mid,up,low};
 }
 function calcKD(data){
   const k=[],d=[];
@@ -585,11 +644,15 @@ function drawChart(data){
     ctx.globalAlpha=1;
   });
 
-  // MA 均線（快取，只在資料變時重算）
-  if(!_cachedMAs||_cachedMADataLen!==data.length){_cachedMAs=MA_PERIODS.map(p=>calcMA(data,p));_cachedMADataLen=data.length;}
+  // MA 均線（快取，只在資料或自訂週期變時重算）
+  const maPeriods=customMA?MA_PERIODS.concat([customMA]):MA_PERIODS;
+  if(!_cachedMAs||_cachedMADataLen!==data.length||_cachedCustomMA!==(customMA||0)){
+    _cachedMAs=maPeriods.map(p=>calcMA(data,p));
+    _cachedMADataLen=data.length;_cachedCustomMA=customMA||0;
+  }
   const mas=_cachedMAs;
   mas.forEach((maArr,mi)=>{
-    ctx.strokeStyle=MA_COLORS[mi];ctx.lineWidth=1.5;
+    ctx.strokeStyle=mi<MA_COLORS.length?MA_COLORS[mi]:MA_CUSTOM_COLOR;ctx.lineWidth=1.5;
     ctx.beginPath();let started=false;
     for(let gi=vStart;gi<vEnd;gi++){
       const v=maArr[gi];
@@ -601,13 +664,59 @@ function drawChart(data){
     ctx.stroke();
   });
 
+  // 布林通道 BOLL(20,2)：上/中/下軌 + 區間填色
+  if(showBOLL){
+    if(!_cachedBOLL||_cachedBOLLDataLen!==data.length){_cachedBOLL=calcBOLL(data);_cachedBOLLDataLen=data.length;}
+    const b=_cachedBOLL;
+    ctx.fillStyle='rgba(96,125,139,0.07)';
+    ctx.beginPath();let bs=false;
+    for(let gi=vStart;gi<vEnd;gi++){
+      if(b.up[gi]===null)continue;
+      const x=padL+(gi-vStart)*cw+cw/2;
+      if(!bs){ctx.moveTo(x,yP(b.up[gi]));bs=true;}
+      else ctx.lineTo(x,yP(b.up[gi]));
+    }
+    for(let gi=vEnd-1;gi>=vStart;gi--){
+      if(b.low[gi]===null)continue;
+      const x=padL+(gi-vStart)*cw+cw/2;
+      ctx.lineTo(x,yP(b.low[gi]));
+    }
+    ctx.closePath();ctx.fill();
+    [['up',b.up],['low',b.low]].forEach(([tag,arr])=>{
+      ctx.strokeStyle='#78909C';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+      ctx.beginPath();let s2=false;
+      for(let gi=vStart;gi<vEnd;gi++){
+        const v=arr[gi];
+        if(v===null)continue;
+        const x=padL+(gi-vStart)*cw+cw/2;
+        if(!s2){ctx.moveTo(x,yP(v));s2=true;}
+        else ctx.lineTo(x,yP(v));
+      }
+      ctx.stroke();ctx.setLineDash([]);
+    });
+    ctx.strokeStyle='#90A4AE';ctx.lineWidth=1;
+    ctx.beginPath();let s3=false;
+    for(let gi=vStart;gi<vEnd;gi++){
+      const v=b.mid[gi];
+      if(v===null)continue;
+      const x=padL+(gi-vStart)*cw+cw/2;
+      if(!s3){ctx.moveTo(x,yP(v));s3=true;}
+      else ctx.lineTo(x,yP(v));
+    }
+    ctx.stroke();
+  }
+
   // MA 圖例
   const legend=document.getElementById('maLegend');
   if(legend){
     legend.innerHTML=mas.map((maArr,mi)=>{
       const last=maArr.filter(v=>v!==null).pop();
-      return `<span><span style="display:inline-block;width:14px;height:2px;background:${MA_COLORS[mi]};margin-right:4px;vertical-align:middle;border-radius:1px"></span>MA${MA_PERIODS[mi]} ${last!=null?last.toFixed(1):'—'}</span>`;
-    }).join('');
+      return `<span><span style="display:inline-block;width:14px;height:2px;background:${mi<MA_COLORS.length?MA_COLORS[mi]:MA_CUSTOM_COLOR};margin-right:4px;vertical-align:middle;border-radius:1px"></span>MA${maPeriods[mi]} ${last!=null?last.toFixed(1):'—'}</span>`;
+    }).join('')+(showBOLL&&_cachedBOLL?(()=>{
+      const lastIdx=data.length-1;
+      const u=_cachedBOLL.up[lastIdx],m=_cachedBOLL.mid[lastIdx],l=_cachedBOLL.low[lastIdx];
+      return `<span style="color:#78909C">BOLL(20,2) 上 ${u!=null?u.toFixed(1):'—'} 中 ${m!=null?m.toFixed(1):'—'} 下 ${l!=null?l.toFixed(1):'—'}</span>`;
+    })():'');
   }
 
   // 最新價虛線 + 右側標籤
@@ -904,6 +1013,95 @@ function drawRevChart(data){
     ctx.fillStyle=cText;
     ctx.fillText(d.m.length>5?d.m.slice(-5):d.m,x+bw/2,H-padB+14);
   });
+}
+
+// ══════════════════════════════════════
+// 本益比河流圖：以最新 PE × EPS 推算出 PE 10/15/20/25/30 水位帶
+// ══════════════════════════════════════
+function drawPeRiver(data,pe){
+  const canvas=document.getElementById('peCanvas');
+  if(!canvas)return;
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.parentElement.clientWidth||700,H=240;
+  const padL=58,padR=52,padT=12,padB=24;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);ctx.clearRect(0,0,W,H);
+  const cs=getComputedStyle(document.documentElement);
+  const cUp=cs.getPropertyValue('--red').trim()||'#C0544F';
+  const cDn=cs.getPropertyValue('--green').trim()||'#4A8B6E';
+  const cGrid=cs.getPropertyValue('--border-light').trim()||'#EBE7E0';
+  const cText=cs.getPropertyValue('--text-secondary').trim()||'#6B7280';
+  const cBg=cs.getPropertyValue('--card').trim()||'#FFFFFF';
+  const n=Math.min(data.length,250);
+  const slice=data.slice(-n);
+  const last=slice[slice.length-1];
+  const eps=last.c/pe;
+  const levels=[10,15,20,25,30];
+  const prices=slice.map(d=>d.c);
+  const lo=Math.min(...prices,10*eps)*0.97, hi=Math.max(...prices,30*eps)*1.01;
+  const y=v=>padT+(1-(v-lo)/(hi-lo))*(H-padT-padB);
+  const x=i=>padL+(i*(W-padL-padR))/(slice.length-1);
+  // 標示目前股價落在哪個 PE 帶
+  for(let li=1;li<levels.length;li++){
+    const prevLv=levels[li-1],lv=levels[li];
+    if(last.c>=prevLv*eps&&last.c<lv*eps){
+      ctx.fillStyle='rgba(192,84,79,0.08)';
+      ctx.fillRect(padL,y(lv*eps),W-padL-padR,y(prevLv*eps)-y(lv*eps));
+    }
+  }
+  ctx.font='10px monospace';ctx.textAlign='right';
+  // PE 水位線
+  levels.forEach(lv=>{
+    const yy=y(lv*eps);
+    const edge=lv===10||lv===30;
+    ctx.strokeStyle=edge?'#C9A86A':'rgba(140,140,140,0.45)';
+    ctx.lineWidth=edge?1.2:0.8;
+    ctx.setLineDash(edge?[]:[4,3]);
+    ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=cText;
+    ctx.fillText('PE'+lv,padL-4,yy+3);
+    ctx.textAlign='left';
+    ctx.fillText((lv*eps).toFixed(1),W-padR+4,yy+3);
+    ctx.textAlign='right';
+  });
+  // 股價線
+  const up=last.c>=slice[0].c;
+  const lineColor=up?cUp:cDn;
+  ctx.strokeStyle=lineColor;ctx.lineWidth=1.6;
+  ctx.beginPath();
+  slice.forEach((d,i)=>{const xx=x(i),yy=y(d.c);i===0?ctx.moveTo(xx,yy):ctx.lineTo(xx,yy);});
+  ctx.stroke();
+  // 最新價標記
+  const lx=x(slice.length-1),ly=y(last.c);
+  ctx.fillStyle=cBg;ctx.strokeStyle=lineColor;ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(lx,ly,4,0,Math.PI*2);ctx.fill();ctx.stroke();
+  // X 軸日期
+  ctx.fillStyle=cText;ctx.font='10px monospace';ctx.textAlign='center';
+  const step=Math.max(1,Math.floor(slice.length/6));
+  for(let i=0;i<slice.length;i+=step){
+    const lbl=slice[i].d.length>5?slice[i].d.slice(5):slice[i].d;
+    ctx.fillText(lbl,x(i),H-8);
+  }
+  ctx.fillStyle=cText;ctx.textAlign='right';
+  ctx.fillText('目前 PE '+pe.toFixed(1),W-padR,padT-2);
+}
+
+// ══════════════════════════════════════
+// 個股新聞・公告（Google News 聚合，經 Vercel 代理）
+// ══════════════════════════════════════
+async function loadStockNews(sid,name){
+  const box=document.getElementById('stockNewsBox');
+  if(!box)return;
+  try{
+    const r=await fetch('/api/stocknews?sym='+encodeURIComponent(sid)+'&name='+encodeURIComponent(name));
+    const j=await r.json();
+    if(!j.items||!j.items.length){box.innerHTML='<div class="empty-msg">暫無相關新聞</div>';return;}
+    box.innerHTML='<div class="news-list">'+j.items.map(n=>`<a class="news-item" href="${esc(n.link)}" target="_blank" rel="noopener"><span class="news-src">${esc(n.source||'新聞')}</span><span class="news-title">${esc(n.title)}</span><span class="news-time">${(n.published_at||'').slice(11,16)}</span></a>`).join('')+'</div>';
+  }catch(e){
+    box.innerHTML='<div class="empty-msg">新聞載入失敗</div>';
+  }
 }
 
 /* ─── 評分區塊（支援使用者自訂條件與權重） ─── */
