@@ -148,7 +148,8 @@ function drawTwii(bars){
   // 最新價虛線 + 標籤
   const last=bars[bars.length-1];
   const lc=last.c;
-  const up=lc>=bars[0].c;
+  const prevC=bars.length>1?bars[bars.length-2].c:lc;
+  const up=lc>=prevC;
   const col=up?cUp:cDn;
   const ly=y(lc);
   ctx.strokeStyle=col; ctx.globalAlpha=0.65; ctx.lineWidth=0.8; ctx.setLineDash([4,3]);
@@ -157,7 +158,7 @@ function drawTwii(bars){
   ctx.fillStyle=col; ctx.font='700 13px monospace'; ctx.textAlign='right';
   ctx.fillText(lc.toFixed(2), W-padR-2, ly-5);
   const legend=document.getElementById('twiiLegend');
-  if(legend) legend.innerHTML=`<span>加權指數</span><span>開 <b>${last.o.toFixed(2)}</b></span><span>高 <b class="${pctClass(last.h-last.o)}">${last.h.toFixed(2)}</b></span><span>低 <b class="${pctClass(last.l-last.o)}">${last.l.toFixed(2)}</b></span><span>收 <b>${lc.toFixed(2)}</b></span><span class="${up?'up':'dn'}">${fmtPct(lc-bars[0].c,2)}</span>`;
+  if(legend) legend.innerHTML=`<span>加權指數</span><span>開 <b>${last.o.toFixed(2)}</b></span><span>高 <b class="${pctClass(last.h-last.o)}">${last.h.toFixed(2)}</b></span><span>低 <b class="${pctClass(last.l-last.o)}">${last.l.toFixed(2)}</b></span><span>收 <b>${lc.toFixed(2)}</b></span><span class="${up?'up':'dn'}">${fmtPct(lc-prevC,2)}</span>`;
 }
 async function switchTwii(tf){
   twiiTF=tf;
