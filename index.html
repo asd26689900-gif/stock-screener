@@ -27,6 +27,8 @@
       <button class="slider-tab active" data-tf="5m" onclick="switchTwii('5m')">5分</button>
       <button class="slider-tab" data-tf="60m" onclick="switchTwii('60m')">60分</button>
       <button class="slider-tab" data-tf="1d" onclick="switchTwii('1d')">日</button>
+      <button class="slider-tab" data-tf="1wk" onclick="switchTwii('1wk')">週</button>
+      <button class="slider-tab" data-tf="1mo" onclick="switchTwii('1mo')">月</button>
     </div>
     <div class="ohlcv-legend" id="twiiLegend"></div>
   <div class="twii-canvas"><canvas id="twiiCanvas"></canvas></div>
@@ -86,7 +88,7 @@ let twiiTF='5m', twiiCache={};
 async function loadTwii(tf){
   const key=tf;
   if(twiiCache[key]) return twiiCache[key];
-  const range=tf==='5m'?'1d':tf==='60m'?'1mo':'6mo';
+  const range=tf==='5m'?'1d':tf==='60m'?'1mo':tf==='1d'?'6mo':tf==='1wk'?'3y':'5y';
   try{
     const r=await fetch('/api/chart?sid=%5ETWII&interval='+tf+'&range='+range);
     const j=await r.json();

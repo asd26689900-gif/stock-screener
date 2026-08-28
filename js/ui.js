@@ -68,38 +68,33 @@ function toggleTheme(btn) {
 /* ─── 頂欄 + 頁尾 ─── */
 const NAV_GROUPS = [
   {
-    label: '常用',
+    label: '市場',
     items: [
       ['index.html', 'chart', '市場總覽'],
       ['stk.html', 'stk', '個股分析'],
-      ['modules.html', 'sliders', '選股模組'],
-      ['watchlist.html', 'star', '自選股'],
+      ['global.html', 'refresh', '全球股市'],
+      ['heatmap.html', 'heatmap', '產業熱力圖'],
+      ['history.html', 'history', '歷史漲跌幅'],
     ],
   },
   {
-    label: '資金',
+    label: '籌碼',
     items: [
       ['institutional.html', 'institutional', '法人買賣超'],
       ['margin.html', 'margin', '融資融券'],
       ['etf.html', 'etf', 'ETF 總覽'],
-      ['global.html', 'refresh', '全球股市'],
-    ],
-  },
-  {
-    label: '選股',
-    items: [
-      ['filter.html', 'filter', '自訂篩選'],
-      ['strategy.html', 'strategy', '選股策略'],
-      ['concepts.html', 'concepts', '題材概念股'],
+      ['watchlist.html', 'star', '自選股'],
     ],
   },
   {
     label: '工具',
     items: [
-      ['heatmap.html', 'heatmap', '產業熱力圖'],
+      ['modules.html', 'sliders', '選股模組'],
+      ['filter.html', 'filter', '自訂篩選'],
+      ['strategy.html', 'strategy', '選股策略'],
+      ['concepts.html', 'concepts', '題材概念股'],
       ['calendar.html', 'calendar', '投資行事曆'],
       ['ipo.html', 'ipo', '股票抽籤'],
-      ['history.html', 'history', '歷史漲跌幅'],
       ['tools.html', 'tools', '股票計算機'],
     ],
   },
@@ -192,9 +187,12 @@ function renderChrome() {
     tb.className = 'topbar';
     const nav = NAV_GROUPS.map(g => `
       <div class="nav-group">
-        ${g.items.map(([href, key, label]) =>
-          `<a href="${href}" class="${key === page ? 'active' : ''}">${label}</a>`
-        ).join('')}
+        <button class="nav-group-btn" type="button">${g.label}<span class="nav-caret">${I('chev', 12)}</span></button>
+        <div class="nav-drop">
+          ${g.items.map(([href, key, label]) =>
+            `<a href="${href}" class="${key === page ? 'active' : ''}">${label}</a>`
+          ).join('')}
+        </div>
       </div>`).join('');
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
@@ -209,6 +207,23 @@ function renderChrome() {
     const links = document.getElementById('navLinks');
     toggle.addEventListener('click', () => links.classList.toggle('show'));
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
+    document.querySelectorAll('.nav-group-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const g = btn.parentElement;
+        const wasOpen = g.classList.contains('open');
+        document.querySelectorAll('.nav-group.open').forEach(x => x.classList.remove('open'));
+        if (!wasOpen) g.classList.add('open');
+      });
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.nav-group.open').forEach(x => x.classList.remove('open'));
+    });
+    document.querySelectorAll('.nav-drop a').forEach(a => {
+      a.addEventListener('click', () => {
+        document.querySelectorAll('.nav-group.open').forEach(x => x.classList.remove('open'));
+      });
+    });
     const ts = document.getElementById('topSearch');
     if (ts) ts.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;

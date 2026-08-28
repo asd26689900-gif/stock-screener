@@ -66,16 +66,29 @@ th,td{font-variant-numeric:tabular-nums}
 .topbar .brand span{color:var(--gold)}
 .topbar .spacer{flex:1}
 .nav-links{display:flex;align-items:center;gap:4px}
-.nav-group{display:flex;align-items:center;gap:4px;position:relative}
-.nav-group + .nav-group::before{
-  content:'';width:1px;height:16px;background:var(--border);margin:0 6px;
-}
-.nav-links a{
+.nav-group{position:relative}
+.nav-group-btn{
   font-size:12.5px;color:var(--text-secondary);text-decoration:none;
   padding:5px 9px;border-radius:var(--radius);
-  background:none;border:0;font-family:inherit;
+  background:none;border:0;font-family:inherit;cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
 }
-.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.nav-group-btn:hover{color:var(--gold);background:var(--gold-soft)}
+.nav-group.open .nav-group-btn{color:var(--gold);background:var(--gold-soft)}
+.nav-group.open .nav-caret{transform:rotate(90deg)}
+.nav-caret{display:inline-flex;transition:transform .15s}
+.nav-drop{
+  position:absolute;top:calc(100% + 6px);left:0;min-width:178px;z-index:120;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-modal);padding:5px;display:none;
+  max-height:min(70vh,560px);overflow-y:auto;
+}
+.nav-group.open .nav-drop{display:block}
+.nav-drop a{
+  display:block;padding:7px 12px;font-size:12.5px;color:var(--text-secondary);
+  text-decoration:none;border-radius:var(--radius);white-space:nowrap;
+}
+.nav-drop a:hover,.nav-drop a.active{color:var(--gold);background:var(--gold-soft)}
 .nav-star{color:var(--gold)}
 .top-search{margin-left:auto}
 .top-search input{
@@ -101,7 +114,8 @@ th,td{font-variant-numeric:tabular-nums}
   .nav-links{display:none;width:100%;order:99;flex-direction:column;align-items:stretch;padding-top:6px}
   .nav-links.show{display:flex}
   .nav-group{flex-direction:column;align-items:stretch;gap:0}
-  .nav-group + .nav-group::before{display:none}
+  .nav-group-btn{width:100%;justify-content:space-between;padding:10px 8px}
+  .nav-drop{position:static;display:block;max-height:none;box-shadow:none;border:0;background:transparent;padding:0 4px 4px 10px}
   .top-search{margin-left:0;order:98;flex:1}
   .top-search input{width:100%}
   .top-search input:focus{width:100%}
