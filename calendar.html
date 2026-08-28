@@ -227,6 +227,30 @@ async function fetchIPO(){
   }catch(e){/* silent */}
 }
 
+async function fetchTpexExright(){
+  // 上櫃除權除息預告表（TPEX OpenAPI）
+  try{
+    const r = await fetch('/api/twse-proxy?type=tpex_exright');
+    const j = await r.json();
+    if(!Array.isArray(j)) return;
+    j.forEach(row=>{
+      const roc = (row.ExRrightsExDividendDate||'').trim();
+      if(roc.length !== 7) return;
+      const dateStr = `${parseInt(roc.slice(0,3))+1911}-${roc.slice(3,5)}-${roc.slice(5,7)}`;
+      const id = (row.SecuritiesCompanyCode||'').trim();
+      const name = (row.CompanyName||'').trim().replace(/股份有限公司$/, '');
+      if(!id) return;
+      const type = (row.ExRrightsExDividend||'').includes('權') ? '除權' : '除息';
+      const cash = parseFloat(row.CashDividend||'0');
+      const stock = parseFloat(row.StockDividendRatio||'0');
+      let detail = [];
+      if(cash > 0) detail.push(`現金股利 ${cash} 元`);
+      if(stock > 0) detail.push(`股票股利 ${stock}`);
+      events.push({date:dateStr, id, name, type:'dividend', label:`上櫃${type}`, detail: detail.join(' ・ ')});
+    });
+  }catch(e){/* silent */}
+}
+
 async function fetchEarnings(){
   // 已公告季報：per-stock event，出表日期即公告日
   try{
@@ -285,6 +309,7 @@ async function loadAll(){
   await Promise.all([
     ...months.map(([yy, mm]) => fetchDividend(yy, mm)),
     fetchIPO(),
+    fetchTpexExright(),
     fetchEarnings(),
   ]);
   generateStatutoryEarnings();

@@ -217,7 +217,7 @@ function instTableHtml(inst){
 function instBody(){
   const inst=focusData.institutional||{};
   return `<div class="slider-tabs" id="instTabs">
-    <button class="slider-tab ${instTF==='foreign'?'active':''}" data-k="foreign" onclick="switchInst('foreign')">外資買超</button>
+    <button class="slider-tab ${instTF==='foreign'?'active':''}" data-k="foreign" onclick="switchInst('foreign')">外資買超（含自營）</button>
     <button class="slider-tab ${instTF==='trust'?'active':''}" data-k="trust" onclick="switchInst('trust')">投信買超</button>
     <button class="slider-tab ${instTF==='dealer'?'active':''}" data-k="dealer" onclick="switchInst('dealer')">自營買超</button>
   </div><div id="instTable">${instTableHtml(inst)}</div>

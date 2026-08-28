@@ -15,7 +15,7 @@
   <!-- ─── 控制列 ─── -->
   <div class="controls">
     <div class="toggle-group" id="instToggle">
-      <button class="active" onclick="setInst('foreign')">外資</button>
+      <button class="active" onclick="setInst('foreign')">外資（含自營）</button>
       <button onclick="setInst('trust')">投信</button>
       <button onclick="setInst('dealer')">自營商</button>
     </div>
@@ -63,7 +63,7 @@
 <script src="js/init.js"></script>
 <script>
 let allData=[], curInst='foreign';
-const instLabels={foreign:'外資',trust:'投信',dealer:'自營商'};
+const instLabels={foreign:'外資（含自營）',trust:'投信',dealer:'自營商'};
 
 function fmt(v){ return fmtVal(v); }
 function cls(v){return v>0?'up':v<0?'dn':'';}
