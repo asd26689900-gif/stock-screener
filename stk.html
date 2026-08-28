@@ -1281,13 +1281,13 @@ function drawInstHist(hist){
   canvas.style.width=W+'px'; canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d'); ctx.scale(dpr,dpr); ctx.clearRect(0,0,W,H);
   const colors={f:'#2962FF', t:'#FF9800', d:'#9C27B0'};
-  const keys=[['f','foreign_net','外資'],['t','trust_net','投信'],['d','dealer_net','自營']];
+  const keys=[['f','foreign_net','外資'],['t','trust_net','投信'],['dl','dealer_net','自營']];
   const cum={f:0,t:0,d:0};
   const series=hist.map(r=>{
     cum.f+=r.foreign_net/1000; cum.t+=r.trust_net/1000; cum.d+=r.dealer_net/1000;
-    return {d:r.date, f:Math.round(cum.f), t:Math.round(cum.t), d:Math.round(cum.d)};
+    return {date:r.date, f:Math.round(cum.f), t:Math.round(cum.t), dl:Math.round(cum.d)};
   });
-  const all=series.flatMap(s=>[s.f,s.t,s.d]);
+  const all=series.flatMap(s=>[s.f,s.t,s.dl]);
   const vMax=Math.max(...all,0), vMin=Math.min(...all,0);
   const span=(vMax-vMin)||1;
   const y=v=>padT+(1-(v-vMin)/span)*(H-padT-padB);
@@ -1315,7 +1315,7 @@ function drawInstHist(hist){
   ctx.fillStyle=cText; ctx.font='9px monospace'; ctx.textAlign='center';
   const step=Math.max(1,Math.floor(series.length/6));
   for(let i=0;i<series.length;i+=step){
-    ctx.fillText(series[i].d.slice(5), x(i), H-8);
+    ctx.fillText(series[i].date.slice(5), x(i), H-8);
   }
   // 圖例
   const legend=keys.map(([k,,label])=>{
