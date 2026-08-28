@@ -84,7 +84,7 @@ async function loadData(date){
 
 async function loadDates(){
   if(!sb) return;
-  const {data}=await sb.from('daily_modules').select('date').order('date',{ascending:false}).limit(100);
+  const {data}=await sb.from('daily_modules').select('date,created_at').order('date',{ascending:false}).limit(100);
   if(!data) return;
   const dates=[...new Set(data.map(r=>r.date))];
   const picker=document.getElementById('datePicker');
@@ -93,7 +93,10 @@ async function loadDates(){
     document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+picker.value;
     loadData(picker.value);
   });
-  if(dates.length) document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+dates[0];
+  if(dates.length){
+    const row=data.find(r=>r.date===dates[0]);
+    document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+dates[0]+(row&&row.created_at?' ・ 更新 '+fmtDT(row.created_at):'');
+  }
 }
 
 function toggleAllModules(){

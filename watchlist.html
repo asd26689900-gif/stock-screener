@@ -10,6 +10,7 @@
   <div class="page-header">
   <h1 class="page-title">自選股</h1>
     <p>加入常關注的股票，一頁查看最新數據。資料儲存在瀏覽器中，換裝置需重新加入。</p>
+    <span class="date-label" id="wlDate" style="margin-top:6px"></span>
   </div>
   <div class="wl-tabs" id="wlTabs"></div>
   <div class="add-bar">
@@ -206,6 +207,8 @@ async function loadWatchlist(){
 
   const map={};data.forEach(d=>{map[d.stock_id]=d;});
   wlMap=map;
+  const wlDate=data.find(d=>d.date);
+  if(wlDate) document.getElementById('wlDate').innerHTML=I('calendar',13)+' 資料日期 '+wlDate.date+'（每日盤後更新）';
 
   // 事件提示橫幅
   const alerts=list.filter(sid=>eventMap[sid]&&eventMap[sid].length);

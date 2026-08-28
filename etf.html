@@ -42,14 +42,15 @@ function etfTable(rows){
 
 async function load(){
   if(!sb) return;
-  const {data}=await sb.from('daily_focus').select('date,data').order('date',{ascending:false}).limit(1);
+  const {data}=await sb.from('daily_focus').select('date,data,created_at').order('date',{ascending:false}).limit(1);
   const f=data&&data[0]?data[0].data:{};
+  const upd=data&&data[0]&&data[0].created_at?` ・ 更新 ${fmtDT(data[0].created_at)}`:'';
   const etf=f.etf||{};
   const all=etf.all||[];
   const active=all.filter(r=>r[7]);
   const rest=all.filter(r=>!r[7]).sort((a,b)=>b[5]-a[5]);
   document.getElementById('summaryCards').innerHTML=`
-    <div class="summary-card"><div class="summary-label">ETF 檔數</div><div class="summary-val">${all.length}<span class="unit">檔</span></div><div class="summary-sub">${f.date||''}</div></div>
+    <div class="summary-card"><div class="summary-label">ETF 檔數</div><div class="summary-val">${all.length}<span class="unit">檔</span></div><div class="summary-sub">${f.date||''}${upd}</div></div>
     <div class="summary-card"><div class="summary-label">主動式 ETF</div><div class="summary-val">${active.length}<span class="unit">檔</span></div><div class="summary-sub">代號尾碼 A / D</div></div>
     <div class="summary-card"><div class="summary-label">成交額最大</div><div class="summary-val">${all[0]?all[0][1]:'—'}</div><div class="summary-sub">${all[0]?fmt(all[0][5])+' 億':'—'}</div></div>`;
   document.getElementById('activeBox').innerHTML=etfTable(active.slice(0,20));

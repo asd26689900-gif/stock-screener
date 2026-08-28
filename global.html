@@ -23,6 +23,7 @@
   <div class="page-header">
     <h1 class="page-title">全球股市</h1>
     <p class="page-desc">美股與日股主要指數、熱門個股行情與熱力圖。</p>
+    <span class="date-label" id="gUpd" style="margin-top:6px">更新時間讀取中...</span>
   </div>
   <p class="g-note">資料來源：Yahoo Finance（延遲約 15 分）。美股為前一日收盤、日股為當日行情。</p>
 
@@ -93,6 +94,7 @@ async function load(){
   try{
     const r=await fetch('/api/global', { cache: 'no-store' });
     const j=await r.json();
+    document.getElementById('gUpd').innerHTML=I('calendar',13)+' 更新 '+fmtDT(j.updated_at)+'（美股為前一日收盤、日股為當日行情）';
     document.getElementById('usIdx').innerHTML=indexCards(j.us.indices);
     document.getElementById('usHeat').innerHTML=heat(j.us.stocks);
     document.getElementById('jpIdx').innerHTML=indexCards(j.jp.indices);

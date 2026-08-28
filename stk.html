@@ -253,22 +253,6 @@ async function fetchMinuteData(tf){
   }catch(e){return [];}
 }
 
-// ── 個股簡介 ──
-function renderIntro(sid,d){
-  const ind=d.industry||'';
-  const isEtf=/^(00|010)/.test(sid);
-  const listing=isEtf?'ETF':(sid.length<=4?'上市':'上櫃');
-  const desc=isEtf
-    ? etfIntro(sid,d.name)
-    : (INDUSTRY_DESC[ind]||'產業資訊可參考公司年報與法人報告。');
-  return `<div class="stk-intro">
-    ${isEtf?`<div class="stk-intro-industry">ETF ・ 指數股票型基金</div>`:(ind?`<div class="stk-intro-industry">個股 ・ ${ind}</div>`:'')}
-    <div class="stk-intro-name">${sid} ${d.name}</div>
-    <div class="stk-intro-meta">${listing} ・ 資料更新 ${d.date}</div>
-    <div class="stk-intro-desc">${esc(desc)}</div>
-  </div>`;
-}
-
 // ── 均線狀態標籤 ──
 function renderMATags(d){
   if(!d.ma||!d.ma.length) return '';
@@ -280,8 +264,8 @@ function renderMATags(d){
   return `<div class="ma-tags">${tags}</div>`;
 }
 
-// ── 技術指標摘要卡片 ──
-function renderIndCards(d){
+// ── 技術指標 + 基本面 精簡列 ──
+function renderMetricStrip(d){
   const data=getChartData();
   if(data.length<15) return '';
   const kd=calcKD(data), rsi6=calcRSI(data,6), rsi14=calcRSI(data,14), macd=calcMACD(data);
@@ -289,30 +273,20 @@ function renderIndCards(d){
   const kv=kd.k[last].toFixed(1), dv=kd.d[last].toFixed(1);
   const r6=rsi6[last].toFixed(1), r14=rsi14[last].toFixed(1);
   const m=macd.dif[last].toFixed(2), sig=macd.macd[last].toFixed(2);
-  const kdHint=kd.k[last]>80?'超買區':kd.k[last]<20?'超賣區':'中性';
-  const rsiHint=rsi6[last]>80?'超買':rsi6[last]<20?'超賣':'中性';
-  const macdHint=macd.dif[last]>macd.macd[last]?'多方動能':'空方動能';
   const boll=calcBOLL(data);
   const bu=boll.up[last],bm=boll.mid[last],bl=boll.low[last];
   const lastC=data[last].c;
-  const bollHint=bu!=null?(lastC>bu?'突破上軌':lastC<bl?'跌破下軌':'區間內'):'—';
-  return `<div class="ind-grid">
-    <div class="ind-card"><div class="ind-card-label">KD</div><div class="ind-card-val">${kv}</div><div class="ind-card-sub">D ${dv}・${kdHint}</div></div>
-    <div class="ind-card"><div class="ind-card-label">RSI(6)</div><div class="ind-card-val">${r6}</div><div class="ind-card-sub">RSI(14) ${r14}・${rsiHint}</div></div>
-    <div class="ind-card"><div class="ind-card-label">MACD</div><div class="ind-card-val">${m}</div><div class="ind-card-sub">Signal ${sig}・${macdHint}</div></div>
-    <div class="ind-card"><div class="ind-card-label">BOLL(20,2)</div><div class="ind-card-val">${bm!=null?bm.toFixed(1):'—'}</div><div class="ind-card-sub">上 ${bu!=null?bu.toFixed(1):'—'} 下 ${bl!=null?bl.toFixed(1):'—'}・${bollHint}</div></div>
-  </div>`;
-}
-
-// ── 基本面卡片 ──
-function renderFundCards(d){
   const f=d.fundamental;
-  if(!f||(!f.pe&&!f.pb&&!f.dividend_yield)) return '';
-  return `<div class="fund-grid">
-    <div class="ind-card"><div class="ind-card-label">本益比 PE</div><div class="ind-card-val">${f.pe?f.pe.toFixed(1):'—'}</div></div>
-    <div class="ind-card"><div class="ind-card-label">殖利率</div><div class="ind-card-val">${f.dividend_yield?f.dividend_yield.toFixed(2)+'%':'—'}</div></div>
-    <div class="ind-card"><div class="ind-card-label">股價淨值比 PB</div><div class="ind-card-val">${f.pb?f.pb.toFixed(2):'—'}</div></div>
-  </div>`;
+  const cells=[
+    ['KD', kv, `D ${dv}・${kd.k[last]>80?'超買':kd.k[last]<20?'超賣':'中性'}`],
+    ['RSI(6)', r6, `RSI14 ${r14}`],
+    ['MACD', m, `Sig ${sig}・${macd.dif[last]>macd.macd[last]?'多方':'空方'}`],
+    ['BOLL(20,2)', bm!=null?bm.toFixed(1):'—', bu!=null?`上${bu.toFixed(1)}/下${bl.toFixed(1)}・${lastC>bu?'突破上軌':lastC<bl?'跌破下軌':'區間內'}`:'—'],
+  ];
+  if(f&&f.pe) cells.push(['本益比', f.pe.toFixed(1), '']);
+  if(f&&f.dividend_yield) cells.push(['殖利率', f.dividend_yield.toFixed(2)+'%', '']);
+  if(f&&f.pb) cells.push(['股價淨值比', f.pb.toFixed(2), '']);
+  return `<div class="metric-strip">${cells.map(([l,v,s])=>`<div class="metric-cell"><div class="metric-label">${l}</div><div class="metric-val">${v}</div>${s?`<div class="metric-sub">${s}</div>`:''}</div>`).join('')}</div>`;
 }
 
 // ── 相關連結 ──
@@ -333,24 +307,35 @@ function renderStock(sid,d){
   const latestRev=rev.length?rev[rev.length-1]:null;
   const chartData=getChartData();
   const hasChart=chartData.length>2;
+  const isEtf=/^(00|010)/.test(sid);
+  const ind=d.industry||'';
+  const listing=isEtf?'ETF':(sid.length<=4?'上市':'上櫃');
+  const desc=isEtf
+    ? etfIntro(sid,d.name)
+    : (INDUSTRY_DESC[ind]||'產業資訊可參考公司年報與法人報告。');
   document.getElementById('app').innerHTML=`
-  <div class="stk-header">
-    <div class="stk-id">${sid}</div><div class="stk-name">${d.name}</div>
-    <button class="btn btn-sm" onclick="toggleLive()" title="Yahoo 即時報價（延遲約 15 分），每分鐘自動更新">${I('refresh',12)} 即時報價</button>
-    <div class="price-row">
+  <div class="stk-hero">
+    <div class="stk-hero-top">
+      <div class="stk-hero-title">
+        <span class="stk-id">${sid}</span>
+        <span class="stk-name">${d.name}</span>
+        ${isEtf?`<span class="stk-tag">ETF</span>`:''}
+        ${ind?`<span class="stk-tag">${ind}</span>`:''}
+        <span class="stk-tag muted">${listing}</span>
+      </div>
+      <div class="stk-hero-actions">
+        <span class="stk-upd">更新 ${d.date}</span>
+        <button class="btn btn-sm" onclick="toggleLive()" title="Yahoo 即時報價（延遲約 15 分），每分鐘自動更新">${I('refresh',12)} 即時報價</button>
+      </div>
+    </div>
+    <div class="stk-hero-price">
       <span class="price-big ${cls(chg)}">${fmt(d.close)}</span>
       <span class="price-change ${cls(chg)}">${chgSign}${Math.abs(chg)} (${fmtPct(chgPct,2)})</span>
-      <span class="price-date">${I('calendar',12)} ${d.date}</span>
+      <span class="stk-hero-ohlcv">開 ${fmt(d.open)} ・ 高 ${fmt(d.high)} ・ 低 ${fmt(d.low)} ・ 量 ${fmt(d.volume)}張</span>
     </div>
+    <div class="stk-hero-desc">${esc(desc)}</div>
     <div id="liveStrip" style="display:none"></div>
-    <div class="ohlcv">
-      <div class="ohlcv-item"><div class="ohlcv-label">開盤</div><div class="ohlcv-val">${fmt(d.open)}</div></div>
-      <div class="ohlcv-item"><div class="ohlcv-label">最高</div><div class="ohlcv-val">${fmt(d.high)}</div></div>
-      <div class="ohlcv-item"><div class="ohlcv-label">最低</div><div class="ohlcv-val">${fmt(d.low)}</div></div>
-      <div class="ohlcv-item"><div class="ohlcv-label">成交張</div><div class="ohlcv-val">${fmt(d.volume)}</div></div>
-    </div>
   </div>
-  ${renderIntro(sid,d)}
   ${hasChart?`
   <div class="chart-box">
     <div class="chart-toolbar">
@@ -386,8 +371,7 @@ function renderStock(sid,d){
     <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
   </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">${I('chart',14)} K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
   ${renderMATags(d)}
-  ${renderIndCards(d)}
-  ${renderFundCards(d)}
+  ${renderMetricStrip(d)}
   ${rev.length?`
   <div class="rev-grid">
     <div class="rev-card"><div class="rev-label">最新月營收</div><div class="rev-val">${latestRev?fmtRev(latestRev.rev):'—'}</div><div class="rev-sub">${latestRev?latestRev.m:''}</div></div>
