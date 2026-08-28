@@ -596,7 +596,7 @@ print(f"   合併後總股票數: {len(stocks)}")
 
 # ── 2. 三大法人買賣超（近 20 交易日）──
 print("⏳ 抓取法人買賣超 (TWSE+TPEX)...")
-inst_days = work_days[-15:]  # 最近 15 個工作日（加速）
+inst_days = trading_days(max(FETCH_CALENDAR_DAYS, 21))[-15:]  # 最近 15 個交易日
 inst = defaultdict(list)  # {stock_id: [{date, foreign_net, trust_net, dealer_net}]}
 for i, d in enumerate(inst_days):
     rows = fetch_twse_inst(d) + fetch_tpex_inst(d)
