@@ -70,6 +70,7 @@ const NAV_GROUPS = [
       ['ipo.html', 'ipo', '股票抽籤'],
       ['etf.html', 'etf', 'ETF 總覽'],
       ['history.html', 'history', '歷史漲跌幅'],
+      ['global.html', 'refresh', '全球股市'],
     ],
   },
   {

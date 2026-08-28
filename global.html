@@ -1,0 +1,108 @@
+<title>全球股市 — 盤後精選模組</title>
+<meta name="description" content="美股與日股主要指數、熱門個股行情與熱力圖（Yahoo Finance 即時）。">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<style>
+  .g-note{font-size:11.5px;color:var(--text-secondary);margin:-8px 0 14px}
+  .g-heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px}
+  .g-tile{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--border);border-radius:var(--radius);padding:10px 12px;text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:2px;transition:border-color .12s}
+  .g-tile:hover{border-color:var(--gold)}
+  .g-tile.up{border-left-color:var(--red)}
+  .g-tile.dn{border-left-color:var(--green)}
+  .g-sym{font-family:var(--font-mono);font-weight:700;font-size:12px}
+  .g-name{font-size:10.5px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .g-price{font-family:var(--font-mono);font-size:15px;font-weight:700}
+  .g-chg{font-family:var(--font-mono);font-size:11px}
+  .g-spark{display:block;margin-top:3px}
+</style>
+<div id="topbar"></div>
+
+<div class="container">
+  <div class="page-header">
+    <h1 class="page-title">全球股市</h1>
+    <p class="page-desc">美股與日股主要指數、熱門個股行情與熱力圖。</p>
+  </div>
+  <p class="g-note">資料來源：Yahoo Finance（延遲約 15 分）。美股為前一日收盤、日股為當日行情。</p>
+
+  <div class="section-title">美股</div>
+  <div id="usIdx"><div class="loading">載入中...</div></div>
+  <div id="usHeat"><div class="loading">載入中...</div></div>
+
+  <div class="section-title">日股</div>
+  <div id="jpIdx"><div class="loading">載入中...</div></div>
+  <div id="jpHeat"><div class="loading">載入中...</div></div>
+</div>
+
+<div id="footer"></div>
+
+<script src="js/ui.js"></script>
+<script>
+function fmt(v){ return fmtVal(v); }
+
+function spark(canvas, closes){
+  if(!canvas||!closes||closes.length<2) return;
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.width, H=canvas.height;
+  canvas.style.width=W+'px'; canvas.style.height=H+'px';
+  canvas.width=W*dpr; canvas.height=H*dpr;
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const cs=getComputedStyle(document.documentElement);
+  const cUp=cs.getPropertyValue('--red').trim()||'#C0544F';
+  const cDn=cs.getPropertyValue('--green').trim()||'#4A8B6E';
+  const up=closes[closes.length-1]>=closes[0];
+  ctx.strokeStyle=up?cUp:cDn; ctx.lineWidth=1.2;
+  const lo=Math.min(...closes), hi=Math.max(...closes);
+  const pad=2;
+  const y=v=>pad+(1-(v-lo)/((hi-lo)||1))*(H-pad*2);
+  const x=i=>pad+(i*(W-pad*2))/(closes.length-1);
+  ctx.beginPath();
+  closes.forEach((c,i)=>{ i===0?ctx.moveTo(x(i),y(c)):ctx.lineTo(x(i),y(c)); });
+  ctx.stroke();
+}
+
+function indexCards(list){
+  return `<div class="summary-grid">${list.map(s=>{
+    if(!s.price) return '';
+    const cls=pctClass(s.chgPct);
+    return `<div class="summary-card"><div class="summary-label">${s.name}</div><div class="summary-val ${cls}">${fmt(s.price)}</div><div class="summary-sub ${cls}">${s.chg>0?'+':''}${fmt(s.chg)} ・ ${fmtPct(s.chgPct,2)} ・ ${s.date}</div></div>`;
+  }).join('')}</div>`;
+}
+
+function heat(list){
+  const tiles=list.map(s=>{
+    if(!s.price) return '';
+    const cls=s.chgPct>0?'up':s.chgPct<0?'dn':'';
+    return `<a class="g-tile ${cls}" href="https://tw.stock.yahoo.com/quote/${encodeURIComponent(s.sym)}" target="_blank" rel="noopener">
+      <div><span class="g-sym">${s.sym}</span> <span class="g-name">${s.name}</span></div>
+      <div class="g-price">${fmt(s.price)}</div>
+      <div class="g-chg ${cls}">${s.chg>0?'+':''}${fmt(s.chg)} ・ ${fmtPct(s.chgPct,2)}</div>
+      <canvas class="g-spark" data-c='${JSON.stringify(s.spark||[])}' width="92" height="26"></canvas>
+    </a>`;
+  }).join('');
+  return `<div class="g-heat">${tiles||'<div class="empty-msg">無資料</div>'}</div>`;
+}
+
+async function load(){
+  try{
+    const r=await fetch('/api/global', { cache: 'no-store' });
+    const j=await r.json();
+    document.getElementById('usIdx').innerHTML=indexCards(j.us.indices);
+    document.getElementById('usHeat').innerHTML=heat(j.us.stocks);
+    document.getElementById('jpIdx').innerHTML=indexCards(j.jp.indices);
+    document.getElementById('jpHeat').innerHTML=heat(j.jp.stocks);
+    document.querySelectorAll('.g-spark').forEach(c=>{
+      try{ spark(c, JSON.parse(c.dataset.c||'[]')); }catch(e){}
+    });
+  }catch(e){
+    ['usIdx','usHeat','jpIdx','jpHeat'].forEach(id=>{
+      document.getElementById(id).innerHTML='<div class="empty-msg">全球行情載入失敗</div>';
+    });
+  }
+}
+load();
+setInterval(load, 5*60*1000);
+</script>
