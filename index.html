@@ -158,7 +158,7 @@ function drawTwii(bars){
   ctx.fillStyle=col; ctx.font='700 13px monospace'; ctx.textAlign='right';
   ctx.fillText(lc.toFixed(2), W-padR-2, ly-5);
   const legend=document.getElementById('twiiLegend');
-  if(legend) legend.innerHTML=`<span>加權指數</span><span>開 <b>${last.o.toFixed(2)}</b></span><span>高 <b class="${pctClass(last.h-last.o)}">${last.h.toFixed(2)}</b></span><span>低 <b class="${pctClass(last.l-last.o)}">${last.l.toFixed(2)}</b></span><span>收 <b>${lc.toFixed(2)}</b></span><span class="${up?'up':'dn'}">${fmtPct(lc-prevC,2)}</span>`;
+  if(legend) legend.innerHTML=`<span>加權指數</span><span>開 <b>${last.o.toFixed(2)}</b></span><span>高 <b class="${pctClass(last.h-last.o)}">${last.h.toFixed(2)}</b></span><span>低 <b class="${pctClass(last.l-last.o)}">${last.l.toFixed(2)}</b></span><span>收 <b>${lc.toFixed(2)}</b></span><span class="${up?'up':'dn'}">${prevC?fmtPct((lc-prevC)/prevC*100,2):'—'}</span>`;
 }
 async function switchTwii(tf){
   twiiTF=tf;
