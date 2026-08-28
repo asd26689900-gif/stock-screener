@@ -78,7 +78,7 @@ th,td{font-variant-numeric:tabular-nums}
 .nav-group.open .nav-caret{transform:rotate(90deg)}
 .nav-caret{display:inline-flex;transition:transform .15s}
 .nav-drop{
-  position:absolute;top:calc(100% + 6px);left:0;min-width:178px;z-index:120;
+  position:absolute;top:calc(100% + 6px);left:0;min-width:150px;width:max-content;max-width:280px;z-index:120;
   background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
   box-shadow:var(--shadow-modal);padding:5px;display:none;
   max-height:min(70vh,560px);overflow-y:auto;
