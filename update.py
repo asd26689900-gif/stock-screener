@@ -1326,22 +1326,38 @@ else:
     def is_active_etf(sid):
         return is_etf(sid) and bool(re.search(r"[AD]$", sid or ""))
 
-    focus = {"date": end_str, "week_strong": [], "big_buyer": {}, "institutional": {}, "etf": {}, "margin": {}}
+    focus = {"date": end_str, "strong": {"day": [], "week": [], "month": []},
+             "big_buyer": {}, "institutional": {}, "etf": {}, "margin": {}}
 
-    # 本週強勢股：近 5 交易日漲幅 + 成交張數過濾（排除 ETF）
-    week_cands = []
+    # 強勢股：日/週/月漲幅排行 + 成交張數過濾（排除 ETF），各 30 檔
+    def gain_pct(cur, base):
+        return (cur - base) / base * 100 if base else 0
+    day_cands, week_cands, month_cands = [], [], []
     for sid, data in stocks.items():
-        if is_etf(sid) or len(data) < 6: continue
+        if is_etf(sid) or len(data) < 21: continue
         p = data[-1]
-        base = data[-6].get("close")
-        if not p.get("close") or not base: continue
+        c = p.get("close")
+        if not c: continue
         vol = int(p.get("Trading_Volume", 0) / 1000)
         if vol < 3000: continue
-        chg5 = (p["close"] - base) / base * 100
-        if chg5 > 0:
-            week_cands.append([sid, name_map.get(sid, sid), round(p["close"], 2), round(chg5, 2), vol])
-    week_cands.sort(key=lambda x: x[3], reverse=True)
-    focus["week_strong"] = week_cands[:10]
+        base = lambda n: data[-1 - n].get("close")
+        if len(data) >= 2:
+            d1 = gain_pct(c, base(1))
+            if d1 > 0:
+                day_cands.append([sid, name_map.get(sid, sid), round(c, 2), round(d1, 2), vol])
+        if len(data) >= 6:
+            w5 = gain_pct(c, base(5))
+            if w5 > 0:
+                week_cands.append([sid, name_map.get(sid, sid), round(c, 2), round(w5, 2), vol])
+        if len(data) >= 21:
+            m20 = gain_pct(c, base(20))
+            if m20 > 0:
+                month_cands.append([sid, name_map.get(sid, sid), round(c, 2), round(m20, 2), vol])
+    focus["strong"] = {
+        "day": sorted(day_cands, key=lambda x: x[3], reverse=True)[:30],
+        "week": sorted(week_cands, key=lambda x: x[3], reverse=True)[:30],
+        "month": sorted(month_cands, key=lambda x: x[3], reverse=True)[:30],
+    }
 
     # 大戶加碼股：集保分散表（每週六凌晨更新）本週 vs 上週 400張以上持股比率增減
     # 每週快照存 daily_modules.module_key='tdcc'；快照不足兩週時回退法人近似
@@ -1392,7 +1408,7 @@ else:
             big_rows.append([sid, name_map.get(sid, sid), round(p["close"], 2),
                              round(agg.get("big_ratio", 0), 2), delta])
         big_rows.sort(key=lambda x: x[4], reverse=True)
-        focus["big_buyer"] = {"date": cur_d, "rows": big_rows[:10], "fallback": False}
+        focus["big_buyer"] = {"date": cur_d, "rows": big_rows[:30], "fallback": False}
         print(f"   大戶加碼（集保 {cur_d}）: {len(big_rows)} 檔", flush=True)
     else:
         # 回退：法人/主力連買且當日淨買超
@@ -1408,7 +1424,7 @@ else:
                 if p:
                     big_cands.append([sid, name_map.get(sid, sid), main_net, max(fd, td, dd), round(p["close"], 2)])
         big_cands.sort(key=lambda x: x[2], reverse=True)
-        focus["big_buyer"] = {"date": end_str, "rows": big_cands[:10], "fallback": True}
+        focus["big_buyer"] = {"date": end_str, "rows": big_cands[:30], "fallback": True}
 
     # 三大法人：當日排行（含資料日期）
     inst_rows = []
@@ -1421,9 +1437,9 @@ else:
                           latest.get("foreign_net", 0), latest.get("trust_net", 0), latest.get("dealer_net", 0)])
     focus["institutional"] = {
         "date": inst_max_date,
-        "foreign_top": sorted(inst_rows, key=lambda x: x[2], reverse=True)[:5],
-        "trust_top": sorted(inst_rows, key=lambda x: x[3], reverse=True)[:5],
-        "dealer_top": sorted(inst_rows, key=lambda x: x[4], reverse=True)[:5],
+        "foreign_top": sorted(inst_rows, key=lambda x: x[2], reverse=True)[:30],
+        "trust_top": sorted(inst_rows, key=lambda x: x[3], reverse=True)[:30],
+        "dealer_top": sorted(inst_rows, key=lambda x: x[4], reverse=True)[:30],
         "both_buy": sum(1 for r in inst_rows if r[2] > 0 and r[3] > 0),
     }
 
@@ -1447,8 +1463,8 @@ else:
     etf_rows.sort(key=lambda x: x[5], reverse=True)
     focus["etf"] = {
         "all": etf_rows,
-        "top_amount": etf_rows[:10],
-        "active": [r for r in etf_rows if r[7]][:10],
+        "top_amount": etf_rows[:30],
+        "active": [r for r in etf_rows if r[7]][:30],
         "active_count": sum(1 for r in etf_rows if r[7]),
     }
 
@@ -1474,7 +1490,7 @@ else:
             if not mrows: continue
             mdate = iso_date(probe)
             if mdate == end_str:
-                def margin_top(rows, key, reverse=True, n=8):
+                def margin_top(rows, key, reverse=True, n=30):
                     return sorted(rows, key=lambda r: r[key + "_today"] - r[key + "_prev"], reverse=reverse)[:n]
                 focus["margin"] = {
                     "date": mdate,

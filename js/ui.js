@@ -55,7 +55,8 @@ const NAV_GROUPS = [
   {
     label: '選股',
     items: [
-      ['index.html', 'index', '選股模組'],
+      ['index.html', 'chart', '市場總覽'],
+      ['modules.html', 'sliders', '選股模組'],
       ['filter.html', 'filter', '自訂篩選'],
       ['stk.html', 'stk', '個股分析'],
     ],
@@ -81,6 +82,85 @@ const NAV_GROUPS = [
     ],
   },
 ];
+
+/* ─── Linear Slider Tabs ─── */
+function sliderTabs(root){
+  if(!root) return;
+  let ind = root.querySelector(':scope > .slider-indicator');
+  if(!ind){
+    ind = document.createElement('span');
+    ind.className = 'slider-indicator';
+    root.appendChild(ind);
+  }
+  const move = () => {
+    const a = root.querySelector('.slider-tab.active');
+    if(!a){ ind.style.display = 'none'; return; }
+    ind.style.display = '';
+    ind.style.left = a.offsetLeft + 'px';
+    ind.style.width = a.offsetWidth + 'px';
+  };
+  move();
+  if(window.ResizeObserver){
+    if(root._sliderRO) root._sliderRO.disconnect();
+    root._sliderRO = new ResizeObserver(move);
+    root._sliderRO.observe(root);
+  }
+  return move;
+}
+
+/* ─── 產業基本介紹（個股分析頁，≤3 行） ─── */
+const INDUSTRY_DESC = {
+  '水泥': '水泥與預拌混凝土業者，需求與國內營建、公共工程景氣息息相關。',
+  '食品': '食品製造與通路，內需消費穩定，原物料成本影響毛利。',
+  '塑膠': '塑膠原料與石化下游加工，報價受油價與中國供需影響。',
+  '紡織纖維': '成衣、布料與纖維供應鏈，受品牌客戶訂單與庫存週期影響。',
+  '電機機械': '工具機、自動化與重電設備，景氣連動資本支出。',
+  '電器電纜': '家電與電線電纜，台電強韌電網計畫挹注需求。',
+  '玻璃陶瓷': '平板玻璃、玻纖與陶瓷，房市與電子材料需求為主。',
+  '造紙': '紙漿與紙製品，報價循環與內需包裝需求。',
+  '鋼鐵': '煉鋼與鋼品加工，受鐵礦砂價格、中國供給與基建需求影響。',
+  '橡膠': '輪胎與橡膠製品，車市需求與原料成本為主。',
+  '汽車': '整車與零組件，電動化與中國車市為成長主軸。',
+  '建材營造': '建商與營造廠，受房市景氣、土建成本與利率影響。',
+  '航運': '貨櫃、散裝與航空，運價循環與全球貿易量連動。',
+  '觀光餐旅': '飯店、餐飲與旅遊，內需消費與跨境旅遊復甦。',
+  '金融保險': '金控、銀行與保險，受利率循環與資本市場影響。',
+  '貿易百貨': '零售通路與貿易，內需消費為主要動能。',
+  '其他': '其他產業，可參考公司年報與法人報告。',
+  '化學': '特用化學與材料，下游涵蓋電子、生技與傳產。',
+  '生技醫療': '新藥、醫材與 CDMO，受藥證進度與研發支出影響。',
+  '油電燃氣': '石油、天然氣與電力，獲利與能源價格高度相關。',
+  '半導體': 'IC 設計、晶圓代工、記憶體與封測，AI 需求與庫存循環為主要動能。',
+  '電腦及週邊設備': 'PC/伺服器與周邊，AI 伺服器與商用換機需求成長。',
+  '光電': '面板、光學與 LED，供需與新應用（車載/AI）為主。',
+  '通信網路': '網通設備與電信服務，5G/AI 資料中心帶動升級需求。',
+  '電子零組件': '連接器、PCB、被動元件等零組件，與終端出貨連動。',
+  '電子通路': '半導體與電子元件通路商，營收與下游庫存高度相關。',
+  '資訊服務': '系統整合與軟體服務，雲端與數位轉型需求成長。',
+  '其他電子': '電子代工與多角化集團，營收規模大、獲利看產品組合。',
+  '綠能環保': '太陽能、風電與環保工程，政策與電價為主要驅動。',
+  '數位雲端': '雲端服務與網路平台，訂閱制與數據中心需求成長。',
+  '運動休閒': '運動用品、健身與戶外，品牌庫存與消費力道為主。',
+  '居家生活': '傢俱、衛浴與家居用品，內需與出口並重。',
+  '存託憑證': '外國企業在台發行之存託憑證，股價與原股連動。',
+};
+
+function etfIntro(sid, name){
+  const active = /[AD]$/.test(sid || '');
+  const lev = /[LR]$/.test(sid || '');
+  let kind = active ? '主動式 ETF（經理人主動選股/選債）' : (lev ? '槓桿/反向型 ETF' : '指數股票型基金（ETF）');
+  let theme = '';
+  if(/債/.test(name || '')) theme = '投資標的為債券';
+  else if(/高股息|股利/.test(name || '')) theme = '聚焦高股息與股利收益';
+  else if(/半導體/.test(name || '')) theme = '主題為半導體產業';
+  else if(/科技|AI|電腦|電動/.test(name || '')) theme = '主題為科技/AI 相關產業';
+  else if(/美國|美股|那斯達克|S&P|標普/.test(name || '')) theme = '追蹤美國股市指數';
+  else if(/中國|滬深|恒生|A股/.test(name || '')) theme = '追蹤中國/香港市場指數';
+  else if(/日本|日經/.test(name || '')) theme = '追蹤日本股市指數';
+  else if(/美元|人民幣|美債/.test(name || '')) theme = '以外幣計價之海外資產';
+  else theme = '追蹤特定指數或主題';
+  return `${name} 為${kind}，${theme}。報價與淨值、折溢價及市場供需相關。`;
+}
 
 function renderChrome() {
   const page = document.body.dataset.page || '';
