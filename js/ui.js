@@ -215,10 +215,7 @@ function renderChrome() {
     document.querySelectorAll('.nav-group-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        const g = btn.parentElement;
-        const wasOpen = g.classList.contains('open');
-        document.querySelectorAll('.nav-group.open').forEach(x => x.classList.remove('open'));
-        if (!wasOpen) g.classList.add('open');
+        btn.parentElement.classList.toggle('open'); // 可同時開多組，開工具不會關選股
       });
     });
     document.addEventListener('click', () => {
