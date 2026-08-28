@@ -90,7 +90,9 @@ th,td{font-variant-numeric:tabular-nums}
 }
 .nav-drop a:hover,.nav-drop a.active{color:var(--gold);background:var(--gold-soft)}
 .nav-star{color:var(--gold)}
-.top-search{margin-left:auto}
+.nav-watch{display:inline-flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text-secondary);text-decoration:none;padding:5px 9px;border-radius:var(--radius);white-space:nowrap;flex-shrink:0}
+.nav-watch:hover{color:var(--gold);background:var(--gold-soft)}
+.nav-watch.active{color:var(--gold);background:var(--gold-soft)}
 .top-search input{
   width:150px;padding:6px 11px;border:1px solid var(--border);border-radius:var(--radius);
   background:var(--surface);color:var(--text);font-size:12.5px;font-family:var(--font-mono);
@@ -119,6 +121,7 @@ th,td{font-variant-numeric:tabular-nums}
   .top-search{margin-left:0;order:98;flex:1}
   .top-search input{width:100%}
   .top-search input:focus{width:100%}
+  .nav-watch .nav-watch-txt{display:none}
 }
 
 /* ─── 頁面容器 ─── */
