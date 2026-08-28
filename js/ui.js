@@ -78,21 +78,25 @@ const NAV_GROUPS = [
     ],
   },
   {
+    label: '選股',
+    items: [
+      ['modules.html', 'sliders', '選股模組'],
+      ['strategy.html', 'strategy', '選股策略'],
+      ['concepts.html', 'concepts', '題材概念股'],
+    ],
+  },
+  {
     label: '籌碼',
     items: [
       ['institutional.html', 'institutional', '法人買賣超'],
       ['margin.html', 'margin', '融資融券'],
       ['etf.html', 'etf', 'ETF 總覽'],
-      ['watchlist.html', 'star', '自選股'],
     ],
   },
   {
     label: '工具',
     items: [
-      ['modules.html', 'sliders', '選股模組'],
       ['filter.html', 'filter', '自訂篩選'],
-      ['strategy.html', 'strategy', '選股策略'],
-      ['concepts.html', 'concepts', '題材概念股'],
       ['calendar.html', 'calendar', '投資行事曆'],
       ['ipo.html', 'ipo', '股票抽籤'],
       ['tools.html', 'tools', '股票計算機'],
@@ -199,6 +203,7 @@ function renderChrome() {
       <button class="nav-toggle" id="navToggle" aria-label="選單">${I('menu', 18)}</button>
       <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}</nav>
       <div class="spacer"></div>
+      <a class="nav-watch" href="watchlist.html"><span class="nav-star">${I('star', 12)}</span><span class="nav-watch-txt">自選股</span></a>
       <div class="top-search">
         <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
       </div>
