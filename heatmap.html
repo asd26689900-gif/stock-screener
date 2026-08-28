@@ -118,9 +118,9 @@ function drillDown(ind){
 
 async function loadHeatmap(){
   if(!sb)return;
-  const{data}=await sb.from('daily_heatmap').select('date,data').order('date',{ascending:false}).limit(1).single();
+  const{data}=await sb.from('daily_heatmap').select('date,data,created_at').order('date',{ascending:false}).limit(1).single();
   if(!data)return;
-  document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+data.date;
+  document.getElementById('dateLabel').innerHTML=I('calendar',13)+' 資料日期 '+data.date+(data.created_at?' ・ 更新 '+fmtDT(data.created_at):'');
   hmData=data.data||{};
   showIndustry();
 }

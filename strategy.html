@@ -7,7 +7,7 @@
 <div id="topbar"></div>
 
 <div class="container">
-  <div class="page-header"><h1 class="page-title">選股策略</h1><p>四種不同角度的盤後資料篩選，每日 21:30 後更新。本系統僅提供數據整理，不構成任何買賣建議。</p></div>
+  <div class="page-header"><h1 class="page-title">選股策略</h1><p>四種不同角度的盤後資料篩選，每日 21:30 後更新。本系統僅提供數據整理，不構成任何買賣建議。</p><span class="date-label" id="stratDate" style="margin-top:6px"></span></div>
   <div class="tabs" id="tabs"></div>
   <div id="stratContainer"></div>
 </div>
@@ -47,9 +47,11 @@ function showStrat(key){
 
 async function loadStrategies(){
   if(!sb)return;
-  const{data}=await sb.from('daily_strategies').select('strategy_key,data').order('date',{ascending:false}).limit(4);
+  const{data}=await sb.from('daily_strategies').select('strategy_key,data,date,created_at').order('date',{ascending:false}).limit(4);
   if(!data)return;
   stratData={};data.forEach(r=>{stratData[r.strategy_key]=r.data;});
+  const el=document.getElementById('stratDate');
+  if(el&&data.length) el.innerHTML=I('calendar',13)+' 資料日期 '+data[0].date+(data[0].created_at?' ・ 更新 '+fmtDT(data[0].created_at):'');
   renderTabs();showStrat(ORDER[0]);
 }
 function onDataReady(){loadStrategies();}

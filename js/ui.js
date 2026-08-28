@@ -68,33 +68,39 @@ function toggleTheme(btn) {
 /* ─── 頂欄 + 頁尾 ─── */
 const NAV_GROUPS = [
   {
-    label: '選股',
+    label: '常用',
     items: [
       ['index.html', 'chart', '市場總覽'],
-      ['modules.html', 'sliders', '選股模組'],
-      ['filter.html', 'filter', '自訂篩選'],
       ['stk.html', 'stk', '個股分析'],
+      ['modules.html', 'sliders', '選股模組'],
+      ['watchlist.html', 'star', '自選股'],
     ],
   },
   {
-    label: '數據',
+    label: '資金',
     items: [
       ['institutional.html', 'institutional', '法人買賣超'],
       ['margin.html', 'margin', '融資融券'],
-      ['calendar.html', 'calendar', '投資行事曆'],
-      ['ipo.html', 'ipo', '股票抽籤'],
       ['etf.html', 'etf', 'ETF 總覽'],
-      ['history.html', 'history', '歷史漲跌幅'],
       ['global.html', 'refresh', '全球股市'],
+    ],
+  },
+  {
+    label: '選股',
+    items: [
+      ['filter.html', 'filter', '自訂篩選'],
+      ['strategy.html', 'strategy', '選股策略'],
+      ['concepts.html', 'concepts', '題材概念股'],
     ],
   },
   {
     label: '工具',
     items: [
       ['heatmap.html', 'heatmap', '產業熱力圖'],
+      ['calendar.html', 'calendar', '投資行事曆'],
+      ['ipo.html', 'ipo', '股票抽籤'],
+      ['history.html', 'history', '歷史漲跌幅'],
       ['tools.html', 'tools', '股票計算機'],
-      ['concepts.html', 'concepts', '題材概念股'],
-      ['strategy.html', 'strategy', '選股策略'],
     ],
   },
 ];
@@ -179,7 +185,7 @@ function etfIntro(sid, name){
 }
 
 function renderChrome() {
-  const page = document.body.dataset.page || '';
+  const page = (location.pathname.split('/').pop() || 'index').replace(/\.html$/, '') || 'index';
   const tb = document.getElementById('topbar');
   const ft = document.getElementById('footer');
   if (tb) {
@@ -193,23 +199,39 @@ function renderChrome() {
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
       <button class="nav-toggle" id="navToggle" aria-label="選單">${I('menu', 18)}</button>
-      <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
-        <div class="nav-group">
-          <a href="watchlist.html" class="${page === 'watchlist' ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span> 自選股</a>
-        </div>
-      </nav>
+      <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}</nav>
       <div class="spacer"></div>
+      <div class="top-search">
+        <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
+      </div>
       <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
     const toggle = document.getElementById('navToggle');
     const links = document.getElementById('navLinks');
     toggle.addEventListener('click', () => links.classList.toggle('show'));
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
+    const ts = document.getElementById('topSearch');
+    if (ts) ts.addEventListener('keydown', e => {
+      if (e.key !== 'Enter') return;
+      const v = ts.value.trim();
+      if (!v) return;
+      location.href = 'stk.html#' + encodeURIComponent(v);
+    });
   }
   if (ft) {
     ft.innerHTML = `
       盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>
-      每日自動更新：盤後 15:00（第一次）、22:00（第二次）`;
+      自動更新時程：08:30 新聞 / 15:30 行情・焦點 / 17:30 法人 / 22:00 資券 / 週六 06:30 集保大戶`;
   }
+}
+
+/* 更新時間格式化（台北時區） */
+function fmtDT(iso){
+  if(!iso) return '';
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return '';
+  const tw = new Date(d.getTime() + 8*3600000);
+  const p = n => String(n).padStart(2,'0');
+  return `${tw.getUTCFullYear()}-${p(tw.getUTCMonth()+1)}-${p(tw.getUTCDate())} ${p(tw.getUTCHours())}:${p(tw.getUTCMinutes())}`;
 }
 
 /* ─── 格式化 ─── */

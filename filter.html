@@ -141,7 +141,8 @@ async function doFilter(){
   }
 
   lastData = data || [];
-  document.getElementById('resultCount').textContent = lastData.length + ' 檔符合';
+  const dDate = lastData.length && lastData[0].date ? `（資料 ${lastData[0].date}）` : '';
+  document.getElementById('resultCount').textContent = lastData.length + ' 檔符合' + dDate;
   renderTable();
 }
 

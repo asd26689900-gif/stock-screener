@@ -180,10 +180,11 @@ async function loadSectors(){
   if(!box||!sb) return;
   box.className='sector-strip';
   try{
-    const {data}=await sb.from('daily_heatmap').select('data').order('date',{ascending:false}).limit(1).single();
+    const {data}=await sb.from('daily_heatmap').select('date,data,created_at').order('date',{ascending:false}).limit(1).single();
     const inds=(data&&data.data&&data.data.industries||[]).slice(0,14);
     if(!inds.length){ box.innerHTML='<div class="empty-msg">無類股資料</div>'; return; }
-    box.innerHTML=inds.map(i=>`<a class="sector-chip ${i.avg_chg>0?'up':i.avg_chg<0?'dn':''}" href="heatmap.html" title="${esc(i.name)} 類股均漲跌">${esc(i.name)} <b>${fmtPct(i.avg_chg,2)}</b></a>`).join('');
+    box.innerHTML=inds.map(i=>`<a class="sector-chip ${i.avg_chg>0?'up':i.avg_chg<0?'dn':''}" href="heatmap.html" title="${esc(i.name)} 類股均漲跌">${esc(i.name)} <b>${fmtPct(i.avg_chg,2)}</b></a>`).join('')
+      + `<span class="sector-upd">更新 ${esc(data.date)}${data.created_at?' '+fmtDT(data.created_at).slice(11):''}</span>`;
   }catch(e){ box.innerHTML=''; }
 }
 
@@ -252,7 +253,7 @@ function renderFocus(f){
   if(!f||!f.data){ box.innerHTML='<div class="empty-msg">今日焦點尚未產生（盤後更新）</div>'; return; }
   focusData=f.data;
   const d=focusData;
-  const dateTag=`<span class="date-label">${esc(d.date||'')}</span>`;
+  const dateTag=`<span class="date-label">${esc(d.date||'')}${f.created_at?` ・ 更新 ${fmtDT(f.created_at)}`:''}</span>`;
   const cards=[];
   cards.push(focusCard('強勢股', strongBody(), dateTag));
   const bb=d.big_buyer;
@@ -289,7 +290,7 @@ function renderFocus(f){
 }
 async function loadFocus(){
   if(!sb) return;
-  const {data}=await sb.from('daily_focus').select('date,data').order('date',{ascending:false}).limit(1);
+  const {data}=await sb.from('daily_focus').select('date,data,created_at').order('date',{ascending:false}).limit(1);
   renderFocus(data&&data[0]?data[0]:null);
 }
 
@@ -299,7 +300,7 @@ async function loadNews(){
   if(!sb){ box.innerHTML=''; return; }
   const {data}=await sb.from('daily_news').select('title,link,source,published_at,snippet').order('published_at',{ascending:false}).limit(10);
   if(!data||!data.length){ box.innerHTML='<div class="empty-msg">今日新聞尚未爬取（08:30 更新）</div>'; return; }
-  box.innerHTML=`<div class="news-list">${data.map(n=>`
+  box.innerHTML=`<div class="focus-foot" style="padding:8px 14px;border-bottom:1px solid var(--border-light)">每日 08:30 自動更新 ・ 保留 14 天</div><div class="news-list">${data.map(n=>`
     <a class="news-item" href="${esc(n.link)}" target="_blank" rel="noopener">
       <span class="news-src">${esc(n.source||'新聞')}</span>
       <span class="news-title">${esc(n.title)}</span>
