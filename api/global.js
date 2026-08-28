@@ -25,8 +25,9 @@ const JP_STOCKS = [
   { sym: '4063.T', name: '信越化學' }, { sym: '7741.T', name: 'Hoya' }, { sym: '6367.T', name: '大金工業' },
 ];
 const EXTRA = [
-  { sym: 'USD/TWD=X', name: '美元/台幣' },
-  { sym: 'USD/JPY=X', name: '美元/日圓' },
+  { sym: 'TWD=X', name: '美元/台幣' },
+  { sym: 'JPY=X', name: '美元/日圓' },
+  { sym: 'EURUSD=X', name: '歐元/美元' },
   { sym: 'BTC-USD', name: '比特幣' },
   { sym: 'GC=F', name: '黃金期貨' },
   { sym: 'CL=F', name: '西德州原油' },
