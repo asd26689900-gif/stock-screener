@@ -36,6 +36,7 @@ const ICON_PATHS = {
   pie: '<path d="M21.21 15.89A10 10 0 118 2.83M22 12A10 10 0 0012 2v10z"/>',
   funnel: '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>',
   arrowUp: '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
+  edit: '<path d="M17 3a2.828 2.828 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
 };
 function I(name, size = 14) {
   const p = ICON_PATHS[name] || '';
@@ -209,12 +210,6 @@ function renderChrome() {
         <button class="nav-group-btn" type="button" aria-haspopup="true" aria-expanded="false">${g.label}<span class="nav-caret">${I('chev', 12)}</span></button>
       </div>`).join('');
     const isActive = href => norm(href) === path;
-    const NAV_ICON = {
-      index: 'chart', stk: 'analysis', global: 'refresh', heatmap: 'heat',
-      history: 'clock', disposition: 'shield', modules: 'sliders', strategy: 'target',
-      concepts: 'layers', institutional: 'coins', margin: 'scale', etf: 'pie',
-      filter: 'funnel', calendar: 'calendar', ipo: 'gift', tools: 'calculator',
-    };
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
       <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
@@ -282,18 +277,31 @@ function renderChrome() {
         ${NAV_GROUPS.map(g => `
           <div class="side-sec">
             <div class="side-sec-label">${g.label}</div>
-            ${g.items.map(([href, key, label]) => {
-              const ico = NAV_ICON[key] ? I(NAV_ICON[key], 15) : '';
-              return `<a href="${href}" class="side-link ${isActive(href) ? 'active' : ''}"><span class="side-ico">${ico}</span><span class="side-txt">${label}</span></a>`;
-            }).join('')}
+            ${g.items.map(([href, key, label]) =>
+              `<a href="${href}" class="side-link ${isActive(href) ? 'active' : ''}">${label}</a>`
+            ).join('')}
           </div>`).join('')}
-        <a href="watchlist.html" class="side-link side-watch ${isActive('watchlist.html') ? 'active' : ''}"><span class="side-ico">${I('star', 15)}</span><span class="side-txt">自選股</span></a>
+        <a href="watchlist.html" class="side-link side-watch ${isActive('watchlist.html') ? 'active' : ''}">自選股</a>
       </div>`;
   }
   if (ft) {
     ft.innerHTML = `
-      盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>
-      自動更新時程：08:30 新聞 / 15:30 行情・焦點 / 17:30 法人 / 19:00 處置預警・重大資訊 / 22:00 資券 / 週六 06:30 集保大戶`;
+      <div class="footer-inner">
+        <div class="footer-brand">盤後精選<span>模組</span></div>
+        <p class="footer-desc">每日盤後自動整理台股公開資訊，免費使用。本站僅整理數據，不構成投資建議，亦非投顧服務。</p>
+        <div class="footer-schedule">
+          <span class="fs-label">自動更新時程</span>
+          <div class="fs-items">
+            <span>08:30 新聞</span>
+            <span>15:30 行情・焦點</span>
+            <span>17:30 法人</span>
+            <span>19:00 處置預警・重大資訊</span>
+            <span>22:00 資券</span>
+            <span>週六 06:30 集保大戶</span>
+          </div>
+        </div>
+        <p class="footer-copy">© ${new Date().getFullYear()} 盤後精選模組</p>
+      </div>`;
   }
 }
 

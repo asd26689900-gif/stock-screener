@@ -151,6 +151,86 @@ function removeStock(sid){
 
 function fmt(v){ return fmtVal(v); }
 
+/* ─── 持股損益（成本價/股數 存瀏覽器，隨現價計算） ─── */
+const HOLD_KEY='screener:holdings';
+function getHoldings(){ try{ return JSON.parse(localStorage.getItem(HOLD_KEY)||'{}'); }catch(e){ return {}; } }
+function saveHoldings(h){ try{ localStorage.setItem(HOLD_KEY, JSON.stringify(h)); }catch(e){} }
+function editHolding(sid){
+  const old=document.getElementById('holdModal');
+  if(old) old.remove();
+  const h=getHoldings()[sid]||{cost:'',qty:''};
+  const ov=document.createElement('div');
+  ov.className='modal-overlay';
+  ov.id='holdModal';
+  ov.innerHTML=`<div class="modal" role="dialog" aria-modal="true" aria-label="設定成本">
+    <button class="modal-close" onclick="document.getElementById('holdModal').remove()" aria-label="關閉">${I('x',16)}</button>
+    <div class="modal-title">設定成本 ・ ${sid}</div>
+    <p class="page-desc">輸入買進成本價與股數，即可計算未實現損益。清空股數可移除該筆。</p>
+    <label class="cfg-dim-name" style="display:block;margin-bottom:6px">成本價（元）</label>
+    <input class="wl-modal-input" id="holdCost" type="number" min="0" step="0.01" placeholder="例如 150.5" value="${h.cost||''}">
+    <label class="cfg-dim-name" style="display:block;margin-bottom:6px">股數</label>
+    <input class="wl-modal-input" id="holdQty" type="number" min="0" step="1" placeholder="例如 1000（一張=1000股）" value="${h.qty||''}">
+    <div class="cfg-actions">
+      <button class="btn" onclick="document.getElementById('holdModal').remove()">取消</button>
+      <button class="btn btn-primary" id="holdOk">儲存</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  const qty=document.getElementById('holdQty'), cost=document.getElementById('holdCost');
+  const submit=()=>{
+    const q=parseFloat(qty.value)||0, c=parseFloat(cost.value)||0;
+    const hh=getHoldings();
+    if(q>0&&c>0) hh[sid]={cost:c, qty:q};
+    else delete hh[sid];
+    saveHoldings(hh);
+    ov.remove();
+    loadWatchlist();
+    toast(q>0&&c>0?'已設定 '+sid+' 成本':'已移除 '+sid+' 成本');
+  };
+  document.getElementById('holdOk').addEventListener('click', submit);
+  qty.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  cost.addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
+  cost.focus();
+  ov.addEventListener('click', e=>{ if(e.target===ov) ov.remove(); });
+  document.addEventListener('keydown', function esc(e){ if(e.key==='Escape'){ ov.remove(); document.removeEventListener('keydown', esc); } });
+}
+function holdingsHTML(map){
+  const list=getList();
+  const h=getHoldings();
+  const rows=list.filter(sid=>h[sid]&&h[sid].qty>0&&map[sid]).map(sid=>{
+    const d=map[sid], x=h[sid];
+    const cost=x.cost||0, qty=x.qty||0;
+    const market=d.close*qty, total=cost*qty;
+    const pl=market-total, pct=total>0?pl/total*100:0;
+    const cls=pctClass(pl);
+    return `<tr onclick="location.href='stk.html#${sid}'">
+      <td>${sid}</td><td>${d.name||'—'}</td>
+      <td>${fmt(cost)}</td><td>${fmt(qty)}</td>
+      <td>${fmt(d.close)}</td><td>${fmt(Math.round(market))}</td>
+      <td class="${cls}">${pl>=0?'+':''}${fmt(Math.round(pl))}</td>
+      <td class="${cls}">${fmtPct(pct,2)}</td>
+      <td><button class="btn-del" onclick="event.stopPropagation();editHolding('${sid}')" title="修改成本">${I('edit',13)}</button></td>
+    </tr>`;
+  });
+  if(!rows.length) return '';
+  let mkt=0,costT=0;
+  list.forEach(sid=>{
+    const x=h[sid]; if(!x||!x.qty||!map[sid]) return;
+    mkt+=map[sid].close*x.qty; costT+=(x.cost||0)*x.qty;
+  });
+  const plT=mkt-costT, pctT=costT>0?plT/costT*100:0, clsT=pctClass(plT);
+  return `<div class="section-title" style="margin-top:4px">持股損益</div>
+    <div class="summary-grid" style="margin-bottom:14px">
+      <div class="summary-card"><div class="summary-label">總市值</div><div class="summary-val">${fmtVal(Math.round(mkt))}</div></div>
+      <div class="summary-card"><div class="summary-label">總成本</div><div class="summary-val">${fmtVal(Math.round(costT))}</div></div>
+      <div class="summary-card"><div class="summary-label">未實現損益</div><div class="summary-val ${clsT}">${plT>=0?'+':''}${fmtVal(Math.round(plT))}</div></div>
+      <div class="summary-card"><div class="summary-label">總報酬率</div><div class="summary-val ${clsT}">${fmtPct(pctT,2)}</div></div>
+    </div>
+    <div class="table-wrap" style="margin-bottom:20px"><table>
+      <thead><tr><th>股號</th><th>名稱</th><th>成本價</th><th>股數</th><th>現價</th><th>市值</th><th>損益</th><th>報酬率</th><th></th></tr></thead>
+      <tbody>${rows.join('')}</tbody></table></div>`;
+}
+
 // 事件提示：抓除權息資料，比對自選股
 let eventMap={}; // stock_id → [{type,date,detail}]
 async function fetchEvents(){
@@ -240,11 +320,11 @@ async function loadWatchlist(){
       <td class="${fcCls}">${fc>0?'連買'+fc+'日':fc<0?'連賣'+Math.abs(fc)+'日':'—'}</td>
       <td class="${tcCls}">${tc>0?'連買'+tc+'日':tc<0?'連賣'+Math.abs(tc)+'日':'—'}</td>
       <td class="${pctClass(d.rev_yoy)}">${fmtPct(d.rev_yoy,1)}</td>
-      <td><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">${I('trash',14)}</button></td>
+      <td><button class="btn-del" onclick="event.stopPropagation();editHolding('${sid}')" title="設定成本/股數">${I('edit',14)}</button><button class="btn-del" onclick="event.stopPropagation();removeStock('${sid}')" title="移除">${I('trash',14)}</button></td>
     </tr>`;
   }).join('');
 
-  app.innerHTML=alertHtml+`<div class="table-wrap"><table>
+  app.innerHTML=holdingsHTML(map)+alertHtml+`<div class="table-wrap"><table>
     <thead><tr><th>股號</th><th>名稱</th><th>收盤價</th><th>漲跌%</th><th>成交張</th><th>MA5</th><th>MA20</th><th>近30日</th><th>外資動向</th><th>投信動向</th><th>營收YoY</th><th></th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
