@@ -212,13 +212,12 @@ function renderChrome() {
     const isActive = href => norm(href) === path;
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-      <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
-        <div class="nav-group nav-watch"><a href="watchlist.html" class="${isActive('watchlist.html') ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span>自選股</a></div>
-      </nav>
+      <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}</nav>
       <div class="spacer"></div>
       <div class="top-search">
         <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
       </div>
+      <a class="nav-watch ${isActive('watchlist.html') ? 'active' : ''}" href="watchlist.html"><span class="nav-star">${I('star', 12)}</span>自選股</a>
       <button class="theme-toggle" id="guideBtn" title="使用說明" aria-label="使用說明">${I('help', 15)}</button>
       <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>
       <div class="mega-panel" id="megaPanel" hidden>
@@ -281,7 +280,6 @@ function renderChrome() {
               `<a href="${href}" class="side-link ${isActive(href) ? 'active' : ''}" ${isActive(href) ? 'aria-current="page"' : ''}>${label}</a>`
             ).join('')}
           </div>`).join('')}
-        <a href="watchlist.html" class="side-link side-watch ${isActive('watchlist.html') ? 'active' : ''}">自選股</a>
       </div>`;
   }
   if (ft) {

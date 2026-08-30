@@ -98,12 +98,13 @@ th,td{font-variant-numeric:tabular-nums}
 }
 .mega-link:hover,.mega-link.active{color:var(--gold);background:var(--gold-soft)}
 .mega-link.active{font-weight:600}
-.nav-watch a{
+.nav-watch{
+  display:inline-flex;align-items:center;gap:5px;
   font-size:13px;color:var(--text-secondary);text-decoration:none;
   padding:6px 10px;border-radius:var(--radius);white-space:nowrap;
-  display:inline-flex;align-items:center;gap:4px;
+  flex-shrink:0;transition:background .12s,color .12s;
 }
-.nav-watch a:hover,.nav-watch a.active{color:var(--gold);background:var(--gold-soft)}
+.nav-watch:hover,.nav-watch.active{color:var(--gold);background:var(--gold-soft)}
 .nav-star{color:var(--gold)}
 
 /* ─── 左側導覽欄（純文字，無圖示；桌面版專用，手機版隱藏） ─── */
@@ -136,8 +137,6 @@ th,td{font-variant-numeric:tabular-nums}
   content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;
   border-radius:2px;background:var(--gold);
 }
-.side-watch{margin-top:auto;border-top:1px solid var(--border-light);padding-top:12px}
-.side-watch{color:var(--ink);font-weight:600}
 
 /* 桌面：內容讓出島寬、隱藏頂部群組與 Mega（改由懸浮島提供） */
 @media(min-width:769px){
