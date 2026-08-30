@@ -610,7 +610,7 @@ function instRows(inst){
   return (inst[instTF+'_top']||[]).filter(r=>instShowEtf||!isEtfId(r[0]));
 }
 function instTableHtml(inst){
-  const rows=instRows(inst);
+  const rows=instRows(inst).slice(0,15);
   if(!rows.length) return '<div class="empty-msg" style="padding:18px">尚無資料</div>';
   return `<div class="scroll-table"><div class="table-wrap"><table><thead><tr><th>#</th><th>股號</th><th>名稱</th><th>買超(張)</th></tr></thead><tbody>${
     rows.map((r,i)=>`<tr onclick="location.href='stk.html#${esc(r[0])}'"><td>${i+1}</td><td>${esc(r[0])}</td><td>${esc(r[1])}</td><td class="up">+${fmt(r[INST_COL[instTF]])}</td></tr>`).join('')}
@@ -654,7 +654,7 @@ function renderFocus(f){
   const instToggle=`<label class="focus-toggle"><input type="checkbox" id="instEtfToggle" ${instShowEtf?'checked':''} onchange="toggleInstEtf(this.checked)">顯示 ETF</label>`;
   cards.push(focusCard('三大法人', instBody(), instDate+instToggle));
   const etf=d.etf||{};
-  const etfRows=(etf.active&&etf.active.length?etf.active:etf.top_amount||[]);
+  const etfRows=(etf.active&&etf.active.length?etf.active:etf.top_amount||[]).slice(0,15);
   const etfBody=miniTable(['代號','名稱','收盤','漲跌%','成交額(億)','法人買賣超'],
     etfRows.map(r=>[r[0],r[1]+(r[7]?' 主動':''),r[2],r[3],r[5],r[6]]),0)+
     `<div class="focus-foot"><a href="etf.html">查看 ETF 總覽 →</a><span>主動式 ${etf.active_count||0} 檔</span></div>`;
@@ -662,10 +662,10 @@ function renderFocus(f){
   const mg=d.margin;
   const marginBody=mg&&mg.date
     ? `<div class="inst-cols">
-        <div><div class="inst-label">融資增加</div><div class="scroll-table" style="max-height:320px">${(mg.m_up||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="up">+${fmt(r.m_today-r.m_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
-        <div><div class="inst-label">融資減少</div><div class="scroll-table" style="max-height:320px">${(mg.m_dn||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="dn">${fmt(r.m_today-r.m_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
-        <div><div class="inst-label">融券增加</div><div class="scroll-table" style="max-height:320px">${(mg.s_up||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="up">+${fmt(r.s_today-r.s_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
-        <div><div class="inst-label">融券減少</div><div class="scroll-table" style="max-height:320px">${(mg.s_dn||[]).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="dn">${fmt(r.s_today-r.s_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
+        <div><div class="inst-label">融資增加</div><div class="scroll-table">${(mg.m_up||[]).slice(0,15).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="up">+${fmt(r.m_today-r.m_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
+        <div><div class="inst-label">融資減少</div><div class="scroll-table">${(mg.m_dn||[]).slice(0,15).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="dn">${fmt(r.m_today-r.m_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
+        <div><div class="inst-label">融券增加</div><div class="scroll-table">${(mg.s_up||[]).slice(0,15).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="up">+${fmt(r.s_today-r.s_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
+        <div><div class="inst-label">融券減少</div><div class="scroll-table">${(mg.s_dn||[]).slice(0,15).map(r=>`<div class="inst-row"><a href="stk.html#${esc(r.id)}">${esc(r.id)} ${esc(r.name)}</a><b class="dn">${fmt(r.s_today-r.s_prev)}</b></div>`).join('')||'<div class="empty-msg">—</div>'}</div></div>
       </div>`
     : '<div class="empty-msg">資券變化約 22:00 後公布</div>';
   cards.push(focusCard('資券變化', marginBody, mg&&mg.date?`<span class="date-label">${esc(mg.date)}</span>`:''));

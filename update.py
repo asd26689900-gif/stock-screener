@@ -200,7 +200,13 @@ def fetch_tdcc_snapshot():
     for line in csv.reader(io.StringIO(r.text)):
         if len(line) < 6 or not line[0].strip().isdigit():
             continue
-        data_date = line[0].strip()
+        raw_date = line[0].strip()
+        # TDCC 回傳 YYYYMMDD，統一轉 ISO（否則與 DB 回讀的 key 不一致，
+        # 會讓「本週 vs 上週」比較到同一天，大戶加碼全算 0）
+        try:
+            data_date = f"{raw_date[:4]}-{raw_date[4:6]}-{raw_date[6:8]}"
+        except Exception:
+            data_date = raw_date
         sid = line[1].strip()
         try:
             lv = int(line[2])
