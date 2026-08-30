@@ -189,18 +189,21 @@ function renderChrome() {
   const ft = document.getElementById('footer');
   if (tb) {
     tb.className = 'topbar';
-    const nav = NAV_GROUPS.map(g => `
+    const nav = `
       <div class="nav-group">
-        <button class="nav-group-btn" type="button">${g.label}<span class="nav-caret">${I('chev', 12)}</span></button>
-        <div class="nav-drop">
-          ${g.items.map(([href, key, label]) =>
-            `<a href="${href}" class="${key === page ? 'active' : ''}">${label}</a>`
-          ).join('')}
+        <button class="nav-group-btn" type="button">選單<span class="nav-caret">${I('chev', 12)}</span></button>
+        <div class="nav-drop menu-grid">
+          ${NAV_GROUPS.map(g => `
+            <div class="menu-sec">
+              <div class="menu-sec-title">${g.label}</div>
+              ${g.items.map(([href, key, label]) =>
+                `<a href="${href}" class="${key === page ? 'active' : ''}">${label}</a>`
+              ).join('')}
+            </div>`).join('')}
         </div>
-      </div>`).join('');
+      </div>`;
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-      <button class="nav-toggle" id="navToggle" aria-label="選單">${I('menu', 18)}</button>
       <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}</nav>
       <div class="spacer"></div>
       <a class="nav-watch" href="watchlist.html"><span class="nav-star">${I('star', 12)}</span><span class="nav-watch-txt">自選股</span></a>
@@ -208,9 +211,6 @@ function renderChrome() {
         <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
       </div>
       <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
-    const toggle = document.getElementById('navToggle');
-    const links = document.getElementById('navLinks');
-    toggle.addEventListener('click', () => links.classList.toggle('show'));
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
     document.querySelectorAll('.nav-group-btn').forEach(btn => {
       btn.addEventListener('click', e => {
