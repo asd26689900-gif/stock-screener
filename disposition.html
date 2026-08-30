@@ -1,0 +1,104 @@
+<title>處置股預警 — 盤後精選模組</title>
+<meta name="description" content="處置股預警：處置中、已達標、高風險、接近與觀察分級，機械式依官方注意/處置標準計算。">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta charset="utf-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="css/style.css">
+<div id="topbar"></div>
+
+<div class="container" data-page="disposition">
+  <div class="page-header">
+    <h1 class="page-title">處置股預警</h1>
+    <p class="page-desc">官方注意/處置名單＋機械式門檻預警。燈號分級：處置中 ・ 已達標 ・ 高風險 ・ 接近 ・ 觀察。</p>
+  </div>
+  <div id="app"><div class="loading">載入預警資料...</div></div>
+</div>
+<div id="footer"></div>
+
+<script src="js/supabase.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/init.js"></script>
+<script>
+let dspData=null, dspFilter='all';
+const LV={disposing:['disposing','處置中'],alert:['alert','已達標'],high:['high','高風險'],near:['near','接近'],watch:['watch','觀察']};
+function fmt(v){ return fmtVal(v); }
+
+async function loadDsp(){
+  const box=document.getElementById('app');
+  if(!sb){ box.innerHTML='<div class="empty-state">系統載入中...</div>'; return; }
+  try{
+    const {data}=await sb.from('daily_disposition').select('date,data,created_at').order('date',{ascending:false}).limit(1);
+    const row=data&&data[0];
+    if(!row||!row.data){
+      box.innerHTML='<div class="empty-state">預警資料尚未產生<br><span style="font-size:12px">每日 19:00 自動更新（處置公告發布後）</span></div>';
+      return;
+    }
+    dspData=row.data;
+    renderAll(row);
+  }catch(e){
+    const rel=/relation|does not exist|PGRST/.test(String(e.message||e));
+    box.innerHTML=rel
+      ? '<div class="empty-state">預警資料尚未產生<br><span style="font-size:12px">每日 19:00 自動更新（處置公告發布後）</span></div>'
+      : '<div class="empty-state">載入失敗</div>';
+  }
+}
+
+function lampHtml(counts){
+  const lamps=[
+    ['disposing','處置中',counts.disposing||0,'lv-danger'],
+    ['alert','已達標',counts.alert||0,'lv-alert'],
+    ['high','高風險',counts.high||0,'lv-alert'],
+    ['near','接近',counts.near||0,'lv-watch'],
+    ['watch','觀察',counts.watch||0,'lv-ok'],
+  ];
+  return `<div class="dsp-lamps">${lamps.map(([k,label,n,lv])=>`
+    <div class="dsp-lamp ${lv} ${dspFilter===k?'active':''}" onclick="setFilter('${k}')">
+      <div class="dl-count">${n}</div><div class="dl-label">${label}</div>
+    </div>`).join('')}
+    <div class="dsp-lamp ${dspFilter==='all'?'active':''}" onclick="setFilter('all')" style="grid-column:1/-1">
+      <div class="dl-count" style="font-size:15px">顯示全部 ${(dspData.list||[]).length} 檔</div>
+    </div>
+  </div>`;
+}
+
+function rowHtml(r){
+  const [cls,label]=LV[r.level]||LV.watch;
+  const reason=(r.trading_info||r.reason||'').replace(/<[^>]+>/g,'').trim();
+  const period=r.period?String(r.period).replace(/～|~/g,' ~ '):'';
+  const th=r.threshold?`<span class="dsp-th">${esc(r.threshold_note||('門檻 '+fmt(r.threshold)))}</span>`:'';
+  const first=r.first_alert?`<span class="dsp-first">我方 ${esc(r.first_alert.slice(5).replace('-','/'))} 起示警</span>`:'';
+  return `<div class="dsp-row" onclick="location.href='stk.html#${esc(r.id)}'">
+    <span class="dsp-tag ${cls}">${label}</span>
+    <div class="dsp-body">
+      <div class="dsp-name"><span class="dsp-id">${esc(r.id)}</span>${esc(r.name||'')}${r.market?`<span class="stk-tag muted" style="margin-left:6px">${esc(r.market)}</span>`:''}</div>
+      <div class="dsp-reason">${esc(reason||'—')}${period?` ・ ${esc(period)}`:''}</div>
+      ${first||th?`<div style="margin-top:4px;display:flex;gap:12px;flex-wrap:wrap">${first}${th}</div>`:''}
+    </div>
+    <div class="dsp-right">
+      <div class="dsp-price">${fmt(r.close)}</div>
+      <div class="dsp-th">${r.measure?esc(r.measure):''}</div>
+    </div>
+  </div>`;
+}
+
+function renderAll(row){
+  const d=dspData;
+  const rows=(d.list||[]).filter(r=>dspFilter==='all'||r.level===dspFilter);
+  document.getElementById('app').innerHTML=`
+    <div class="date-label" style="margin-bottom:10px">資料日 ${esc(row.date)}${row.created_at?` ・ 更新 ${fmtDT(row.created_at)}`:''}</div>
+    ${lampHtml(d.counts||{})}
+    <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:12px">
+      ${rows.length?rows.map(rowHtml).join(''):'<div class="empty-msg">此燈號目前無股票</div>'}
+    </div>
+    <div class="dsp-note">⚠ 預警分級依證交所/櫃買中心公開之注意與處置標準機械式計算（近期漲跌劇烈、中長期漲幅、週轉率、本益比/淨值比等主要款項），僅供參考；實際處置以主管機關公告為準。處置中＝官方公告名單。</div>`;
+}
+
+function setFilter(k){
+  dspFilter=k;
+  const row={date:dspData.date,created_at:dspData.created_at};
+  renderAll(row);
+}
+
+function onDataReady(){ loadDsp(); }
+</script>

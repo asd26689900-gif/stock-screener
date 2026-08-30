@@ -25,6 +25,7 @@ const ICON_PATHS = {
   creditCard: '<rect x="1" y="4" width="22" height="16" rx="2"/><path d="M1 10h22"/>',
   calculator: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/>',
   gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>',
+  help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
 };
 function I(name, size = 14) {
   const p = ICON_PATHS[name] || '';
@@ -75,6 +76,7 @@ const NAV_GROUPS = [
       ['global.html', 'refresh', '全球股市'],
       ['heatmap.html', 'heatmap', '產業熱力圖'],
       ['history.html', 'history', '歷史漲跌幅'],
+      ['disposition.html', 'disposition', '處置股預警'],
     ],
   },
   {
@@ -210,8 +212,10 @@ function renderChrome() {
       <div class="top-search">
         <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
       </div>
+      <button class="theme-toggle" id="guideBtn" title="使用說明" aria-label="使用說明">${I('help', 15)}</button>
       <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
+    document.getElementById('guideBtn').addEventListener('click', openGuide);
     document.querySelectorAll('.nav-group-btn').forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
@@ -237,8 +241,53 @@ function renderChrome() {
   if (ft) {
     ft.innerHTML = `
       盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>
-      自動更新時程：08:30 新聞 / 15:30 行情・焦點 / 17:30 法人 / 22:00 資券 / 週六 06:30 集保大戶`;
+      自動更新時程：08:30 新聞 / 15:30 行情・焦點 / 17:30 法人 / 19:00 處置預警・重大資訊 / 22:00 資券 / 週六 06:30 集保大戶`;
   }
+}
+
+/* ─── 用戶引導（首次造訪自動彈出；右上 ? 可隨時重開） ─── */
+const GUIDE_KEY = 'screener:guide';
+function guideHTML() {
+  const steps = [
+    ['menu', '從左上「選單」進入四大功能', '市場（大盤/個股/熱力圖）・選股（模組/策略/題材）・籌碼（法人/融資/ETF）・工具（篩選/行事曆/抽籤/計算機）'],
+    ['search', '右上「查股」直接輸入股號或名稱', '例如 2330 或 台積電，免翻頁直接看 K 線、指標與評分'],
+    ['star', '看到喜歡的股票按 ☆ 加入自選', '行事曆會自動標記自選股的除權息/財報/抽籤事件'],
+    ['clock', '盤後自動更新，時間透明', '08:30 新聞 / 15:30 行情・焦點 / 17:30 法人 / 19:00 處置・重大資訊 / 22:00 資券 / 週六 06:30 集保'],
+  ];
+  return `<div class="modal guide-modal">
+    <button class="modal-close" onclick="closeGuide()" aria-label="關閉"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
+    <div class="guide-title">歡迎使用 盤後精選模組 🎉</div>
+    <div class="guide-sub">每天盤後自動整理台股公開資訊，免費使用；本站僅整理數據，不構成投資建議。</div>
+    <div class="guide-steps">
+      ${steps.map(s => `<div class="guide-step">
+        <span class="guide-ico">${I(s[0], 17)}</span>
+        <div><div class="guide-step-title">${s[1]}</div><div class="guide-step-desc">${s[2]}</div></div>
+      </div>`).join('')}
+    </div>
+    <div class="guide-new">✨ 本版新增：處置股預警・重大資訊・今日題材焦點・K 線法人買賣超副圖</div>
+    <button class="btn btn-primary guide-start" onclick="closeGuide()">開始使用</button>
+  </div>`;
+}
+function openGuide() {
+  let el = document.getElementById('guideModal');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'guideModal';
+    el.className = 'modal-overlay';
+    el.style.display = 'none';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', '使用說明');
+    el.onclick = e => { if (e.target === el) closeGuide(); };
+    document.body.appendChild(el);
+  }
+  el.innerHTML = guideHTML();
+  el.style.display = 'flex';
+  if (typeof enhanceAccessibility === 'function') enhanceAccessibility(el);
+}
+function closeGuide() {
+  const el = document.getElementById('guideModal');
+  if (el) el.style.display = 'none';
+  try { localStorage.setItem(GUIDE_KEY, '1'); } catch (e) { /* ignore */ }
 }
 
 /* 更新時間格式化（台北時區） */
@@ -580,6 +629,9 @@ document.addEventListener('DOMContentLoaded', () => {
   document.documentElement.lang = 'zh-Hant';
   initTheme();
   renderChrome();
+  let guideSeen = false;
+  try { guideSeen = localStorage.getItem(GUIDE_KEY) === '1'; } catch (e) { /* ignore */ }
+  if (!guideSeen) setTimeout(openGuide, 800);   // 首次造訪自動導覽
   enhanceAccessibility();
   const mo = new MutationObserver(() => enhanceAccessibility());
   mo.observe(document.body, { childList: true, subtree: true });

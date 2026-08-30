@@ -38,9 +38,21 @@
   <div class="section-title">類股漲跌</div>
   <div id="sectorStrip"><div class="loading">載入中...</div></div>
 
+  <!-- 今日題材焦點 -->
+  <div class="section-title">今日題材焦點</div>
+  <div id="themeFocusBox"><div class="loading">載入題材中...</div></div>
+
   <!-- 每日焦點 -->
   <div class="section-title">每日焦點</div>
   <div id="focusBox"><div class="loading">載入焦點中...</div></div>
+
+  <!-- 處置股預警 -->
+  <div class="section-title">處置股預警</div>
+  <div id="dspBox"><div class="loading">載入中...</div></div>
+
+  <!-- 重大資訊（MOPS） -->
+  <div class="section-title">重大資訊（公開資訊觀測站）</div>
+  <div id="mopsBox"><div class="loading">載入中...</div></div>
 
   <!-- 新聞晨報 -->
   <div class="section-title">新聞晨報</div>
@@ -51,6 +63,7 @@
 
 <script src="js/supabase.min.js"></script>
 <script src="js/config.js"></script>
+<script src="js/concepts-data.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/init.js"></script>
 <script>
@@ -310,11 +323,162 @@ async function loadNews(){
     </a>`).join('')}</div>`;
 }
 
+/* ── 今日題材焦點（資料與 concepts 頁共用，免額外抓取） ── */
+async function loadThemeFocus(){
+  const box=document.getElementById('themeFocusBox');
+  if(!box||!sb) return;
+  const allIds=[...new Set(CONCEPTS.flatMap(c=>c.ids))];
+  try{
+    const {data}=await sb.from('stock_metrics')
+      .select('stock_id,name,close,change_pct,volume')
+      .in('stock_id',allIds);
+    const mm={};
+    (data||[]).forEach(d=>{ mm[d.stock_id]=d; });
+    const cards=CONCEPTS.map(c=>{
+      const stocks=c.ids.map(id=>mm[id]).filter(Boolean);
+      if(!stocks.length) return null;
+      const avg=stocks.reduce((s,d)=>s+(d.change_pct||0),0)/stocks.length;
+      const leader=stocks.reduce((b,d)=>(d.change_pct||0)>(b.change_pct||0)?d:b,stocks[0]);
+      const upN=stocks.filter(d=>(d.change_pct||0)>0).length;
+      return { ...c, avg, leader, count:stocks.length, upN };
+    }).filter(Boolean).sort((a,b)=>b.avg-a.avg);
+    const top3=cards.slice(0,3);
+    if(!top3.length){ box.innerHTML='<div class="empty-msg">今日題材資料尚未更新</div>'; return; }
+    box.innerHTML=`<div class="theme-focus-grid">${top3.map((c,i)=>{
+      const cls=c.avg>=0?'up':'dn';
+      const arrow=c.avg>=0?'▲':'▼';
+      const lChg=c.leader.change_pct||0;
+      return `<div class="theme-focus-card" onclick="location.href='concepts.html#${c.key}'">
+        <div class="tf-top">
+          <span class="tf-rank">#${i+1}</span>
+          <span class="tf-title">${esc(c.title)}${i===0?'<span class="theme-focus-badge">今日焦點</span>':''}</span>
+          <span class="tf-chg ${cls}">${arrow}${Math.abs(c.avg).toFixed(2)}%</span>
+        </div>
+        <div class="tf-desc">${esc(c.desc)}</div>
+        <div class="tf-foot">
+          <span>${c.count} 檔 ・ 漲 ${c.upN} / 跌 ${c.count-c.upN}</span>
+          <span class="tf-leader">領漲 ${esc(c.leader.name||c.leader.stock_id)} <span class="${pctClass(lChg)}">${lChg>=0?'+':''}${lChg.toFixed(2)}%</span></span>
+        </div>
+      </div>`;
+    }).join('')}</div>
+    <div class="focus-foot" style="margin-top:10px"><span></span><a href="concepts.html">查看全部 ${cards.length} 組題材 →</a></div>`;
+  }catch(e){
+    box.innerHTML='<div class="empty-msg">題材資料載入失敗</div>';
+  }
+}
+
+/* ── 處置股預警（daily_disposition 最新快照） ── */
+async function loadDsp(){
+  const box=document.getElementById('dspBox');
+  if(!box||!sb) return;
+  try{
+    const {data}=await sb.from('daily_disposition').select('date,data,created_at').order('date',{ascending:false}).limit(1);
+    const row=data&&data[0];
+    if(!row||!row.data){
+      box.innerHTML='<div class="empty-msg">處置預警將於每日 19:00 更新</div>';
+      return;
+    }
+    const d=row.data;
+    const lamps=[
+      ['disposing','處置中',d.counts&&d.counts.disposing||0,'lv-danger'],
+      ['alert','已達標',d.counts&&d.counts.alert||0,'lv-alert'],
+      ['high','高風險',d.counts&&d.counts.high||0,'lv-alert'],
+      ['near','接近',d.counts&&d.counts.near||0,'lv-watch'],
+      ['watch','觀察',d.counts&&d.counts.watch||0,'lv-ok'],
+    ];
+    const rows=(d.list||[]).slice(0,8).map(r=>{
+      const tagMap={disposing:['disposing','處置中'],alert:['alert','已達標'],high:['high','高風險'],near:['near','接近'],watch:['watch','觀察']};
+      const [cls,label]=tagMap[r.level]||['watch','觀察'];
+      const reason=(r.reason||r.trading_info||'').replace(/<[^>]+>/g,'').slice(0,42);
+      return `<div class="dsp-row" onclick="location.href='stk.html#${esc(r.id)}'">
+        <span class="dsp-tag ${cls}">${label}</span>
+        <div class="dsp-body">
+          <div class="dsp-name"><span class="dsp-id">${esc(r.id)}</span>${esc(r.name||'')}</div>
+          <div class="dsp-reason">${esc(reason||(r.detail||'').slice(0,42)||'—')}</div>
+        </div>
+        <div class="dsp-right">
+          <div class="dsp-price">${fmt(r.close??r.close_price)}</div>
+          <div class="dsp-th">${r.period?esc(String(r.period).replace(/～|~/g,' ~ ').slice(0,22)):''}</div>
+        </div>
+      </div>`;
+    }).join('');
+    box.innerHTML=`<div class="dsp-lamps">${lamps.map(([key,label,n,lv])=>`
+      <div class="dsp-lamp ${lv}" onclick="location.href='disposition.html'">
+        <div class="dl-count">${n}</div><div class="dl-label">${label}</div>
+      </div>`).join('')}</div>
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden">
+        ${rows||'<div class="empty-msg">今日無處置/注意股票</div>'}
+      </div>
+      <div class="focus-foot" style="margin-top:10px"><span class="date-label">${esc(row.date)}${row.created_at?` ・ 更新 ${fmtDT(row.created_at)}`:''}</span><a href="disposition.html">查看完整預警 →</a></div>`;
+  }catch(e){
+    const rel=/relation|does not exist|PGRST/.test(String(e.message||e));
+    box.innerHTML=rel?'<div class="empty-msg">處置預警將於每日 19:00 更新</div>':'<div class="empty-msg">處置資料載入失敗</div>';
+  }
+}
+
+/* ── 重大資訊（MOPS 事件牆） ── */
+let mopsCat='all';
+let mopsItems=[];
+async function loadMops(){
+  const box=document.getElementById('mopsBox');
+  if(!box||!sb) return;
+  try{
+    const {data}=await sb.from('daily_mops').select('date,data,created_at').order('date',{ascending:false}).limit(1);
+    const row=data&&data[0];
+    if(!row||!row.data){
+      box.innerHTML='<div class="empty-msg">重大資訊將於每日 19:00 更新</div>';
+      return;
+    }
+    const d=row.data;
+    const items=Array.isArray(d)?d:(d.list||[]);
+    mopsItems=items;
+    const catLabel={clarify:'澄清回應',self:'自結',fin:'財務數據',gov:'公司治理',major:'重大事件'};
+    const catOf=e=>e.cat||'major';
+    const catName=e=>catLabel[catOf(e)]||'重大事件';
+    const catCls=e=>({clarify:'clarify',self:'self',fin:'fin',gov:'gov',major:'major'})[catOf(e)]||'major';
+    const counts={}; items.forEach(e=>{ const c=catOf(e); counts[c]=(counts[c]||0)+1; });
+    const cats=[['all','全部',items.length],['clarify',catLabel.clarify,counts.clarify||0],['self',catLabel.self,counts.self||0],['fin',catLabel.fin,counts.fin||0],['gov',catLabel.gov,counts.gov||0],['major',catLabel.major,counts.major||0]];
+    box.innerHTML=`
+      <div class="slider-tabs" id="mopsTabs" style="margin-bottom:10px">
+        ${cats.map(([k,l,n])=>`<button class="slider-tab ${mopsCat===k?'active':''}" data-k="${k}" onclick="switchMops('${k}')">${l}${k!=='all'?` ${n}`:''}</button>`).join('')}
+      </div>
+      <div id="mopsList"></div>`;
+    renderMopsList(items);
+    sliderTabs(document.getElementById('mopsTabs'));
+  }catch(e){
+    const rel=/relation|does not exist|PGRST/.test(String(e.message||e));
+    box.innerHTML=rel?'<div class="empty-msg">重大資訊將於每日 19:00 更新</div>':'<div class="empty-msg">重大資訊載入失敗</div>';
+  }
+}
+function switchMops(k){
+  mopsCat=k;
+  document.querySelectorAll('#mopsTabs .slider-tab').forEach(b=>b.classList.toggle('active',b.dataset.k===k));
+  sliderTabs(document.getElementById('mopsTabs'));
+  renderMopsList(mopsItems);
+}
+function renderMopsList(items){
+  const box=document.getElementById('mopsList');
+  if(!box) return;
+  const catLabel={clarify:'澄清回應',self:'自結',fin:'財務數據',gov:'公司治理',major:'重大事件'};
+  const catOf=e=>e.cat||'major';
+  const catCls=e=>({clarify:'clarify',self:'self',fin:'fin',gov:'gov',major:'major'})[catOf(e)]||'major';
+  const filtered=mopsCat==='all'?items:items.filter(e=>(e.cat||'major')===mopsCat);
+  if(!filtered.length){ box.innerHTML='<div class="mops-empty">此分類今日尚無公告</div>'; return; }
+  box.innerHTML=`<div class="mops-list">${filtered.slice(0,20).map(e=>`
+    <div class="mops-item" onclick="window.open('${esc(e.url||'https://mops.twse.com.tw/mops/web/index')}','_blank')">
+      <span class="mops-time">${esc(String(e.time||'').slice(0,5)||'')}</span>
+      <div class="mops-body">
+        <div><span class="mops-cat ${catCls(e)}">${esc(catLabel[catOf(e)]||'重大事件')}</span><span class="mops-title">${esc(e.title||'')}</span></div>
+        <div class="mops-company">${esc(e.company||e.name||'')}${e.id?` ・ ${esc(e.id)}`:''}</div>
+      </div>
+    </div>`).join('')}${filtered.length>20?`<div class="mops-empty">…共 ${filtered.length} 筆，僅顯示前 20 筆</div>`:''}</div>`;
+}
+
 let dataLoaded = false;
 function onDataReady(){
   if(!dataLoaded){
     dataLoaded=true;
-    loadFocus(); loadNews(); loadMarket(); loadSectors(); loadTwii(twiiTF).then(drawTwii);
+    loadFocus(); loadNews(); loadMarket(); loadSectors(); loadThemeFocus(); loadDsp(); loadMops(); loadTwii(twiiTF).then(drawTwii);
     sliderTabs(document.getElementById('twiiTabs'));
   }
 }

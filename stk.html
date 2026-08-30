@@ -116,8 +116,10 @@ window.addEventListener('hashchange', syncHeroWithHash);
 
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
 let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;
-let _chartRAF=0, _chartEventsAttached=false, _cachedMAs=null, _cachedMADataLen=0;
-let showBOLL=false, customMA=null, _cachedCustomMA=0, _cachedBOLL=null, _cachedBOLLDataLen=0;
+let _chartRAF=0, _chartEventsAttached=false, _cachedMAs=null, _cachedMADataLen=0, _cachedMAKey='';
+let showBOLL=false, showInst=false, _cachedBOLL=null, _cachedBOLLDataLen=0;
+let activeMAs=[5,10,20,60];      // 啟用中的均線（可點圖例開關）
+let customMAs=[];                // 額外自訂均線週期（可刪除）
 let selectMode=false, selecting=false, selStartX=0, selCurX=0;
 let scoreCfgDraft=null;
 const TF_MAP = {
@@ -178,7 +180,13 @@ function fmt(v){ return fmtVal(v); }
 function scoreBadge(n){const p=n/10;return p>=.7?'badge-high':p>=.4?'badge-mid':'badge-low';}
 function scoreComment(t){if(t>=25)return'多項指標正向';if(t>=20)return'指標偏正向';if(t>=15)return'指標中性';if(t>=10)return'指標偏弱';return'多項指標偏空';}
 function scoreColor(t){if(t>=25)return'var(--green)';if(t>=20)return'var(--teal)';if(t>=15)return'var(--gold)';return'var(--red)';}
-function fmtRev(v){if(!v)return'—';if(v>=1e8)return(v/1e8).toFixed(1)+'億';if(v>=1e4)return(v/1e4).toFixed(0)+'萬';return fmt(v);}
+function fmtRev(v){
+  if(!v)return'—';
+  const yi=v/1e5;   // 千元 → 億
+  const wan=v/10;   // 千元 → 萬
+  if(yi>=1) return yi.toFixed(yi>=100?0:1)+'億';
+  return wan.toFixed(0)+'萬';
+}
 
 // ══════════════════════════════════════
 // 時間週期轉換
@@ -353,6 +361,7 @@ function renderStock(sid,d){
     </div>
     <div class="ohlcv-legend" id="ohlcvLegend"></div>
     <div class="ma-legend" id="maLegend"></div>
+    <div class="ma-legend" id="instSubLegend" style="display:none"></div>
     <div class="chart-canvas" id="chartCanvas">
       <canvas id="kCanvas"></canvas>
       <canvas id="kOverlay" class="chart-overlay"></canvas>
@@ -366,6 +375,7 @@ function renderStock(sid,d){
       <button class="slider-tab ${currentInd==='kd'?'active':''}" data-ind="kd" onclick="switchInd('kd')">KD</button>
       <button class="slider-tab ${currentInd==='rsi'?'active':''}" data-ind="rsi" onclick="switchInd('rsi')">RSI</button>
       <button class="slider-tab ${currentInd==='macd'?'active':''}" data-ind="macd" onclick="switchInd('macd')">MACD</button>
+      <button class="toggle-chip ${showInst?'active':''}" onclick="toggleInst()" title="法人買賣超（外資/投信/自營，張）">法人</button>
       <button class="toggle-chip ${showBOLL?'active':''}" onclick="toggleBOLL()" style="margin-left:auto">BOLL</button>
     </div>
     <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
@@ -454,14 +464,48 @@ function applyCustomMA(){
   const inp=document.getElementById('maInput');
   const v=inp?inp.value.trim():'';
   const n=v?parseInt(v,10):null;
-  if(n&&(n<2||n>250)){if(inp)inp.value='';return;}
-  customMA=n;
-  _cachedMAs=null;_cachedCustomMA=0;
+  if(n){
+    if(n<2||n>250) return;
+    if(!customMAs.includes(n) && !activeMAs.includes(n)){
+      customMAs.push(n);
+      _cachedMAs=null;
+      if(inp) inp.value='';
+      scheduleChartRedraw();
+    } else if(inp){
+      inp.value='';
+      toast('MA'+n+' 已存在');
+    }
+    return;
+  }
+  // 輸入留空＝清除全部自訂均線
+  if(customMAs.length){
+    customMAs=[];
+    _cachedMAs=null;
+    scheduleChartRedraw();
+  }
+}
+function toggleMA(p){
+  const i=activeMAs.indexOf(p);
+  if(i>=0) activeMAs.splice(i,1); else activeMAs.push(p);
+  activeMAs.sort((a,b)=>a-b);
+  _cachedMAs=null;
+  scheduleChartRedraw();
+}
+function removeCustomMA(p){
+  customMAs=customMAs.filter(x=>x!==p);
+  _cachedMAs=null;
   scheduleChartRedraw();
 }
 function toggleBOLL(){
   showBOLL=!showBOLL;
   document.querySelectorAll('#indTabs .toggle-chip').forEach(b=>b.classList.toggle('active',showBOLL));
+  scheduleChartRedraw();
+}
+function toggleInst(){
+  showInst=!showInst;
+  document.querySelectorAll('#indTabs .toggle-chip').forEach(b=>{
+    if(b.textContent.trim()==='法人') b.classList.toggle('active',showInst);
+  });
   scheduleChartRedraw();
 }
 
@@ -491,7 +535,8 @@ function applySelZoom(){
   const x0=Math.min(selStartX,selCurX), x1=Math.max(selStartX,selCurX);
   if(x1-x0<20)return; // 太短視為點擊，不放大
   const n=chartDataCache.length;
-  let i0=Math.floor((x0-L.padL)/L.cw), i1=Math.ceil((x1-L.padL)/L.cw);
+  // 框選座標是「可見視窗」內的索引，要加上 vStart 才是全資料索引（修正縮放/平移後框選錯位）
+  let i0=L.vStart+Math.floor((x0-L.padL)/L.cw), i1=L.vStart+Math.ceil((x1-L.padL)/L.cw);
   i0=Math.max(0,Math.min(n-1,i0)); i1=Math.max(i0+1,Math.min(n,i1));
   chartZoom=Math.max(0.5,Math.min(20,n/(i1-i0)));
   chartPanIdx=i0;
@@ -508,7 +553,8 @@ function applySelZoom(){
 let chartDataCache=[];
 const MA_COLORS=['#2962FF','#FF9800','#9C27B0','#8B8780'];
 const MA_PERIODS=[5,10,20,60];
-const MA_CUSTOM_COLOR='#607D8B';
+const MA_CUSTOM_COLOR='#2F6E6C';
+function colorForMA(p){ const m={5:'#2962FF',10:'#FF9800',20:'#9C27B0',60:'#8B8780'}; return m[p]||MA_CUSTOM_COLOR; }
 
 function setOHLCBar(b, prev){
   const el=document.getElementById('ohlcvLegend');
@@ -605,7 +651,8 @@ function drawChart(data){
   const totalW = n * cw + 72;
   const W = Math.max(totalW, containerW);
   const priceH=280,volH=80,gap=8,padL=60,padR=12,padT=8,padB=24;
-  const H=priceH+gap+volH+padT+padB;
+  const instH = (showInst && (currentTF==='D'||currentTF==='W'||currentTF==='M')) ? 88 : 0;
+  const H=priceH+gap+volH+(instH?gap+instH:0)+padT+padB;
 
   // 計算可見範圍
   const visibleBars = Math.min(n, Math.ceil((containerW - padL - padR) / cw));
@@ -639,7 +686,7 @@ function drawChart(data){
   const volTop=padT+priceH+gap;
 
   // 保存佈局給 crosshair 用
-  chartLayout = {drawW,H,padL,padR,padT,padB,priceH,volH,gap,cw,vStart,vEnd,n:visData.length,pLo,pHi,vMax,yP,volTop,data:visData,allData:data,cUp,cDn,cGrid,cText};
+  chartLayout = {drawW,H,padL,padR,padT,padB,priceH,volH,gap,instH,cw,vStart,vEnd,n:visData.length,pLo,pHi,vMax,yP,volTop,data:visData,allData:data,cUp,cDn,cGrid,cText};
 
   // 網格 + Y 軸
   ctx.font='10px monospace';ctx.textAlign='right';
@@ -660,7 +707,7 @@ function drawChart(data){
     const x=padL+i*cw+cw/2;
     ctx.fillStyle=cText;
     const lbl=visData[i].d.length>5?visData[i].d.slice(5):visData[i].d;
-    ctx.fillText(lbl,x,padT+priceH+gap+volH+14);
+    ctx.fillText(lbl,x,H-padB+12);
   }
 
   // K 棒 + 成交量
@@ -718,15 +765,16 @@ function drawChart(data){
     });
   })();
 
-  // MA 均線（快取，只在資料或自訂週期變時重算）
-  const maPeriods=customMA?MA_PERIODS.concat([customMA]):MA_PERIODS;
-  if(!_cachedMAs||_cachedMADataLen!==data.length||_cachedCustomMA!==(customMA||0)){
+  // MA 均線（快取，只在資料或啟用週期變時重算）
+  const maPeriods=[...activeMAs,...customMAs].sort((a,b)=>a-b);
+  const maKey=JSON.stringify(maPeriods);
+  if(!_cachedMAs||_cachedMADataLen!==data.length||_cachedMAKey!==maKey){
     _cachedMAs=maPeriods.map(p=>calcMA(data,p));
-    _cachedMADataLen=data.length;_cachedCustomMA=customMA||0;
+    _cachedMADataLen=data.length;_cachedMAKey=maKey;
   }
   const mas=_cachedMAs;
   mas.forEach((maArr,mi)=>{
-    ctx.strokeStyle=mi<MA_COLORS.length?MA_COLORS[mi]:MA_CUSTOM_COLOR;ctx.lineWidth=1.5;
+    ctx.strokeStyle=colorForMA(maPeriods[mi]);ctx.lineWidth=1.5;
     ctx.beginPath();let started=false;
     for(let gi=vStart;gi<vEnd;gi++){
       const v=maArr[gi];
@@ -780,16 +828,60 @@ function drawChart(data){
     ctx.stroke();
   }
 
-  // MA 圖例
+  // 法人買賣超副圖（外資/投信/自營每日淨買賣，張）
+  if(showInst && instH){
+    const instTop=volTop+volH+gap;
+    const hist=(currentAnalysis&&currentAnalysis.inst_hist)||[];
+    const instByDate={};
+    hist.forEach(r=>{ if(r.date) instByDate[r.date.slice(0,10)]=[r.foreign_net||0,r.trust_net||0,r.dealer_net||0]; });
+    const instVals=visData.map(d=>instByDate[d.d.slice(0,10)]||null);
+    const iMax=Math.max(1,...instVals.filter(Boolean).flatMap(v=>v.map(x=>Math.abs(x)/1000)));
+    const iy=v=>instTop+instH/2-(v/iMax)*(instH/2-3);
+    ctx.strokeStyle=cGrid;ctx.setLineDash([4,3]);ctx.lineWidth=0.8;
+    ctx.beginPath();ctx.moveTo(padL,iy(0));ctx.lineTo(drawW-padR,iy(0));ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle=cText;ctx.font='9px monospace';ctx.textAlign='right';
+    ctx.fillText(Math.round(iMax)+'張',padL-4,instTop+10);
+    const iColors=['#2962FF','#FF9800','#9C27B0'];
+    instVals.forEach((v,i)=>{
+      if(!v) return;
+      const x=padL+i*cw+cw/2, bw2=Math.max(1,cw*0.22);
+      iColors.forEach((col,ci)=>{
+        const val=Math.round(v[ci]/1000), pos=val>=0;
+        const bh=Math.max(1,Math.abs(val)/iMax*(instH/2-3));
+        ctx.fillStyle=col;ctx.globalAlpha=pos?0.55:0.32;
+        ctx.fillRect(x-bw2,pos?iy(0)-bh:iy(0),bw2*2,bh);
+        ctx.globalAlpha=1;
+      });
+    });
+    const lc=document.getElementById('instSubLegend');
+    if(lc){
+      const last=instByDate[visData[visData.length-1].d.slice(0,10)]||[0,0,0];
+      lc.style.display='';
+      lc.innerHTML=instByDate&&Object.keys(instByDate).length?
+        ['外資','投信','自營'].map((lb,ci)=>`<span><span style="display:inline-block;width:12px;height:2px;background:${iColors[ci]};margin-right:4px;vertical-align:middle;border-radius:1px"></span>${lb} ${last[ci]>0?'+':''}${fmt(Math.round(last[ci]/1000))}張</span>`).join('')
+        :'<span style="color:var(--text-secondary)">法人買賣超資料整理中</span>';
+    }
+  } else {
+    const lc=document.getElementById('instSubLegend');
+    if(lc) lc.style.display='none';
+  }
+
+  // MA 圖例（可點擊開關；自訂週期可刪除）
   const legend=document.getElementById('maLegend');
   if(legend){
-    legend.innerHTML=mas.map((maArr,mi)=>{
-      const last=maArr.filter(v=>v!==null).pop();
-      return `<span><span style="display:inline-block;width:14px;height:2px;background:${mi<MA_COLORS.length?MA_COLORS[mi]:MA_CUSTOM_COLOR};margin-right:4px;vertical-align:middle;border-radius:1px"></span>MA${maPeriods[mi]} ${last!=null?last.toFixed(1):'—'}</span>`;
+    const lastVal=(p)=>{const arr=_cachedMAs[maPeriods.indexOf(p)];const v=arr&&arr.filter(x=>x!==null).pop();return v!=null?v.toFixed(1):'—';};
+    legend.innerHTML=MA_PERIODS.map(p=>{
+      const on=activeMAs.includes(p);
+      const v=on?lastVal(p):'—';
+      return `<span class="ma-chip ${on?'on':''}" onclick="toggleMA(${p})" title="${on?'點擊隱藏':'點擊顯示'} MA${p}"><span style="display:inline-block;width:12px;height:2px;background:${colorForMA(p)};margin-right:3px;vertical-align:middle;border-radius:1px;opacity:${on?1:.35}"></span>MA${p} ${v}</span>`;
+    }).join('')+customMAs.map(p=>{
+      const v=lastVal(p);
+      return `<span class="ma-chip on" title="點 × 刪除 MA${p}"><span style="display:inline-block;width:12px;height:2px;background:${colorForMA(p)};margin-right:3px;vertical-align:middle;border-radius:1px"></span>MA${p} ${v}<span class="ma-x" onclick="event.stopPropagation();removeCustomMA(${p})">✕</span></span>`;
     }).join('')+(showBOLL&&_cachedBOLL?(()=>{
       const lastIdx=data.length-1;
       const u=_cachedBOLL.up[lastIdx],m=_cachedBOLL.mid[lastIdx],l=_cachedBOLL.low[lastIdx];
-      return `<span style="color:#78909C">BOLL(20,2) 上 ${u!=null?u.toFixed(1):'—'} 中 ${m!=null?m.toFixed(1):'—'} 下 ${l!=null?l.toFixed(1):'—'}</span>`;
+      return `<span style="color:#78909C;align-self:center">BOLL(20,2) 上 ${u!=null?u.toFixed(1):'—'} 中 ${m!=null?m.toFixed(1):'—'} 下 ${l!=null?l.toFixed(1):'—'}</span>`;
     })():'');
   }
 

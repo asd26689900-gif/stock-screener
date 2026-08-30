@@ -46,6 +46,8 @@
   .event-group.today .event-group-header{background:var(--gold-soft)}
   .event-group.today .event-group-title{color:var(--gold)}
   .event-group-count{font-size:11px;color:var(--text-secondary);font-family:var(--font-mono)}
+  .event-group-expand{display:flex;justify-content:center;padding:10px 14px;border-top:1px solid var(--border-light)}
+  .event-group-expand .group-expand{font-size:12px;color:var(--gold);border-color:var(--gold)}
   .event-list{padding:2px 0}
   .event-row{display:grid;grid-template-columns:64px 74px 1fr auto;gap:12px;padding:9px 16px;align-items:center;border-bottom:1px solid var(--border-light);cursor:pointer;transition:background .1s}
   .event-row:last-child{border-bottom:none}
@@ -164,6 +166,8 @@ let curYear = new Date().getFullYear(), curMonth = new Date().getMonth() + 1;
 let filterType = 'all';
 let wlOnly = false;
 let watchlistIds = new Set();
+let expandedGroups = {};   // 每個群組是否已展開全部
+const GROUP_CAP = 25;      // 每個群組預設顯示筆數（Q2 財報上千件不會一次爆開）
 
 const DOW = ['日','一','二','三','四','五','六'];
 
@@ -434,23 +438,37 @@ function renderGroups(){
     else buckets.later.push(e);
   });
 
-  const groupHtml = (title, tag, items, extraCls) => items.length ? `
+  const groupHtml = (key, title, tag, items, extraCls) => {
+    if(!items.length) return '';
+    const expanded = !!expandedGroups[key];
+    const shown = expanded ? items : items.slice(0, GROUP_CAP);
+    const hidden = items.length - shown.length;
+    const expandBtn = hidden > 0 ? `
+      <button class="btn btn-sm group-expand" onclick="toggleGroupExpand('${key}')">${expanded ? '收合' : `展開全部 ${items.length} 件`}</button>` : '';
+    return `
     <div class="event-group ${extraCls||''}">
       <div class="event-group-header">
         <div class="event-group-title">${title}${tag?`<span class="tag">${tag}</span>`:''}</div>
-        <div class="event-group-count">${items.length} 件</div>
+        <div class="event-group-count">${items.length} 件 ${hidden>0&&!expanded?`（顯示 ${shown.length} 件）`:''}</div>
       </div>
-      <div class="event-list">${items.map(rowHtml).join('')}</div>
-    </div>` : '';
+      <div class="event-list">${shown.map(rowHtml).join('')}</div>
+      ${hidden>0?`<div class="event-group-expand">${expandBtn}</div>`:''}
+    </div>`;
+  };
 
-  const LATER_CAP = 30;
   const later = buckets.later;
-  const cappedLater = later.length > LATER_CAP ? later.slice(0, LATER_CAP) : later;
   document.getElementById('eventGroups').innerHTML =
-    groupHtml('今天', todayStr().slice(5).replace('-','/'), buckets.today, 'today') +
-    groupHtml('未來 3 天內', '', buckets.soon) +
-    groupHtml('未來 7 天內', '', buckets.week) +
-    groupHtml('更遠', later.length > LATER_CAP ? `本月剩下（顯示前 ${LATER_CAP} 件）` : '本月剩下', cappedLater);
+    groupHtml('today', '今天', todayStr().slice(5).replace('-','/'), buckets.today, 'today') +
+    groupHtml('soon', '未來 3 天內', '', buckets.soon) +
+    groupHtml('week', '未來 7 天內', '', buckets.week) +
+    groupHtml('later', '更遠', '本月剩下', later);
+}
+
+function toggleGroupExpand(key){
+  expandedGroups[key] = !expandedGroups[key];
+  renderGroups();
+  const el = document.querySelector('.event-group .group-expand');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'nearest'});
 }
 
 function toggleMonth(){

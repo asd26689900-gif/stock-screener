@@ -59,6 +59,13 @@ def months_before(anchor, n):
             m = 12
     return out
 
+def backfill_sleep():
+    """禮貌延遲：可用環境變數 BACKFILL_SLEEP 覆寫（秒）"""
+    try:
+        return float(os.environ.get("BACKFILL_SLEEP", "3"))
+    except Exception:
+        return 3.0
+
 # ═══════════════════════════════════════
 #  TWSE 個股日成交 (一次回傳一個月)
 # ═══════════════════════════════════════
@@ -331,12 +338,16 @@ if __name__ == "__main__":
         sys.exit(0)
 
     today = datetime.now()
-    # 一般模式：從今天往回 N 個月
+    # 一般模式：從今天往回 N 個月；延伸模式：依各股最早日期往前補
     months = months_before(today, args.months) if not args.extend else []
     if args.extend:
         print("🔄 延伸模式：依各股現有最早日期往前補")
     else:
         print(f"📅 回填月份: {[f'{y}/{m:02d}' for y,m in months]}")
+    # 已回補目標深度（一般模式=近 N 個月；延伸模式=10 年上限），比它早即跳過
+    target_cutoff = (today - timedelta(days=args.max_years * 365)).strftime("%Y-%m-%d")
+    if not args.extend:
+        target_cutoff = (today - timedelta(days=args.months * 30)).strftime("%Y-%m-%d")
 
     total = len(stock_list)
     upserted = 0
@@ -344,15 +355,16 @@ if __name__ == "__main__":
 
     for idx, sid in enumerate(stock_list):
         mkt = market_map.get(sid, "twse")
+        # 已回補到目標深度 → 跳過（重跑/續跑都安全）
+        resp0 = sb.table("stock_prices").select("date").eq("stock_id", sid) \
+            .order("date", desc=False).limit(1).execute()
+        earliest0 = resp0.data[0]["date"] if resp0.data else None
+        if earliest0 and earliest0 <= target_cutoff:
+            print(f"   [{idx+1}/{total}] {sid} 已回補到 {earliest0}，跳過", end="\r")
+            continue
         if args.extend:
-            # 查該股自己的最早日期；已達上限就跳過，不影響其他股票
-            resp = sb.table("stock_prices").select("date").eq("stock_id", sid) \
-                .order("date", desc=False).limit(1).execute()
-            if resp.data:
-                earliest = datetime.strptime(resp.data[0]["date"], "%Y-%m-%d")
-                cutoff = today - timedelta(days=args.max_years * 365)
-                if earliest <= cutoff:
-                    continue
+            if earliest0:
+                earliest = datetime.strptime(earliest0, "%Y-%m-%d")
                 months = months_before(earliest, args.months)
             else:
                 months = months_before(today, args.months)
@@ -369,7 +381,7 @@ if __name__ == "__main__":
                     rows = fetch_tpex_stock_day(sid, y, m)
                     if rows: market_map[sid] = "tpex"
             all_rows.extend(rows)
-            time.sleep(3)  # 禮貌延遲
+            time.sleep(backfill_sleep())
 
         if all_rows:
             # 去重
