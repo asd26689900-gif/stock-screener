@@ -281,6 +281,33 @@ function renderChrome() {
             ).join('')}
           </div>`).join('')}
       </div>`;
+    // ── 手機版：底部 Tab 列 + 底部選單（取代頂部群組） ──
+    let bottomNav=document.getElementById('bottomNav');
+    if(!bottomNav){
+      bottomNav=document.createElement('nav');
+      bottomNav.id='bottomNav';
+      bottomNav.className='bottom-nav';
+      bottomNav.setAttribute('aria-label','主選單');
+      document.body.appendChild(bottomNav);
+    }
+    const curGroup=NAV_GROUPS.find(g=>g.items.some(([href])=>isActive(href)));
+    bottomNav.innerHTML=NAV_GROUPS.map(g=>`
+      <button class="bn-btn ${curGroup&&curGroup.label===g.label?'active':''}" data-g="${g.label}" onclick="openBottomSheet('${g.label}')">${g.label}</button>`).join('')
+      + `<a class="bn-btn ${isActive('watchlist.html')?'active':''}" href="watchlist.html">自選</a>`;
+    let sheetOv=document.getElementById('sheetOverlay');
+    if(!sheetOv){
+      sheetOv=document.createElement('div');
+      sheetOv.id='sheetOverlay';
+      sheetOv.className='sheet-overlay';
+      sheetOv.style.display='none';
+      document.body.appendChild(sheetOv);
+    }
+    sheetOv.innerHTML=`<div class="bottom-sheet" role="dialog" aria-label="功能選單">
+      <div class="sheet-handle"></div>
+      <div class="sheet-head"><span class="sheet-title" id="sheetTitle"></span><button class="sheet-close" onclick="closeBottomSheet()" aria-label="關閉">${I('x',16)}</button></div>
+      <div class="sheet-body" id="sheetBody"></div>
+    </div>`;
+    sheetOv.addEventListener('click', e=>{ if(e.target===sheetOv) closeBottomSheet(); });
   }
   if (ft) {
     ft.innerHTML = `
@@ -302,6 +329,25 @@ function renderChrome() {
       </div>`;
   }
 }
+
+/* ─── 手機底部選單 ─── */
+function openBottomSheet(label){
+  const g=NAV_GROUPS.find(x=>x.label===label);
+  const ov=document.getElementById('sheetOverlay');
+  if(!g||!ov) return;
+  const path=(location.pathname.split('/').pop()||'index').replace(/\.html$/,'')||'index';
+  const norm=p=>String(p||'').replace(/\.html$/,'');
+  document.getElementById('sheetTitle').textContent=label;
+  document.getElementById('sheetBody').innerHTML=g.items.map(([href,key,l])=>
+    `<a href="${href}" class="sheet-link ${norm(href)===path?'active':''}">${l}</a>`
+  ).join('');
+  ov.style.display='flex';
+}
+function closeBottomSheet(){
+  const ov=document.getElementById('sheetOverlay');
+  if(ov) ov.style.display='none';
+}
+document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeBottomSheet(); });
 
 /* ─── 返回頂部按鈕 ─── */
 function initBackTop() {
