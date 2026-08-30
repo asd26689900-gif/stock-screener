@@ -26,6 +26,16 @@ const ICON_PATHS = {
   calculator: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15h.01M8 19h.01M12 19h.01M16 19h.01"/>',
   gift: '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>',
   help: '<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>',
+  analysis: '<path d="M12 20V10M18 20V4M6 20v-4"/>',
+  heat: '<path d="M12 2c1.5 4.5-3.5 6.5-3.5 11a3.5 3.5 0 007 0c0-1.2-.5-2.4-1.4-3.2"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  target: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  layers: '<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5M2 12l10 5 10-5"/>',
+  coins: '<circle cx="8" cy="8" r="6"/><path d="M18.09 10.37A6 6 0 1110.34 18"/>',
+  scale: '<path d="M12 3v18M5 21h14M7 7l10 10M7 7h4M7 7v4M17 17h-4M17 17v-4"/>',
+  pie: '<path d="M21.21 15.89A10 10 0 118 2.83M22 12A10 10 0 0012 2v10z"/>',
+  funnel: '<path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/>',
+  arrowUp: '<line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>',
 };
 function I(name, size = 14) {
   const p = ICON_PATHS[name] || '';
@@ -191,44 +201,58 @@ function renderChrome() {
   const ft = document.getElementById('footer');
   if (tb) {
     tb.className = 'topbar';
-    const nav = `
-      <div class="nav-group">
-        <button class="nav-group-btn" type="button">選單<span class="nav-caret">${I('chev', 12)}</span></button>
-        <div class="nav-drop menu-grid">
-          ${NAV_GROUPS.map(g => `
-            <div class="menu-sec">
-              <div class="menu-sec-title">${g.label}</div>
-              ${g.items.map(([href, key, label]) =>
-                `<a href="${href}" class="${key === page ? 'active' : ''}">${label}</a>`
-              ).join('')}
-            </div>`).join('')}
-        </div>
-      </div>`;
+    const NAV_ICON = {
+      index: 'chart', stk: 'analysis', global: 'refresh', heatmap: 'heat',
+      history: 'clock', disposition: 'shield', modules: 'sliders', strategy: 'target',
+      concepts: 'layers', institutional: 'coins', margin: 'scale', etf: 'pie',
+      filter: 'funnel', calendar: 'calendar', ipo: 'gift', tools: 'calculator',
+    };
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-      <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}</nav>
+      <nav class="nav-links" id="navLinks" aria-label="主選單">
+        <button class="nav-group-btn" id="megaBtn" type="button" aria-haspopup="true" aria-expanded="false">選單<span class="nav-caret">${I('chev', 12)}</span></button>
+      </nav>
       <div class="spacer"></div>
       <a class="nav-watch" href="watchlist.html"><span class="nav-star">${I('star', 12)}</span><span class="nav-watch-txt">自選股</span></a>
       <div class="top-search">
         <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
       </div>
       <button class="theme-toggle" id="guideBtn" title="使用說明" aria-label="使用說明">${I('help', 15)}</button>
-      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
+      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>
+      <div class="mega-panel" id="megaPanel" hidden>
+        <div class="mega-grid">
+          ${NAV_GROUPS.map(g => `
+            <div class="mega-col">
+              <div class="mega-col-title">${g.label}</div>
+              ${g.items.map(([href, key, label]) => {
+                const ico = NAV_ICON[key] ? I(NAV_ICON[key], 14) : '';
+                return `<a href="${href}" class="mega-link ${key === page ? 'active' : ''}">${ico}${label}</a>`;
+              }).join('')}
+            </div>`).join('')}
+          <div class="mega-col">
+            <div class="mega-col-title">常用</div>
+            <a href="watchlist.html" class="mega-link">${I('star', 14)}自選股</a>
+          </div>
+        </div>
+      </div>`;
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
     document.getElementById('guideBtn').addEventListener('click', openGuide);
-    document.querySelectorAll('.nav-group-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        btn.parentElement.classList.toggle('open'); // 可同時開多組，開工具不會關選股
-      });
+    // ── Mega Menu：點按鈕開關、點面板外關閉、Esc 關閉、點連結關閉 ──
+    const megaBtn = document.getElementById('megaBtn');
+    const megaPanel = document.getElementById('megaPanel');
+    const setMega = open => {
+      const show = open === undefined ? !megaBtn.classList.contains('open') : !!open;
+      megaBtn.classList.toggle('open', show);
+      megaBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
+      megaPanel.hidden = !show;
+    };
+    megaBtn.addEventListener('click', e => { e.stopPropagation(); setMega(); });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.mega-panel')) setMega(false);
     });
-    document.addEventListener('click', () => {
-      document.querySelectorAll('.nav-group.open').forEach(x => x.classList.remove('open'));
-    });
-    document.querySelectorAll('.nav-drop a').forEach(a => {
-      a.addEventListener('click', () => {
-        document.querySelectorAll('.nav-group.open').forEach(x => x.classList.remove('open'));
-      });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setMega(false); });
+    megaPanel.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => setMega(false));
     });
     const ts = document.getElementById('topSearch');
     if (ts) ts.addEventListener('keydown', e => {
@@ -243,6 +267,24 @@ function renderChrome() {
       盤後精選模組 — 本站僅整理公開資訊，不構成投資建議，亦非投顧服務。<br>
       自動更新時程：08:30 新聞 / 15:30 行情・焦點 / 17:30 法人 / 19:00 處置預警・重大資訊 / 22:00 資券 / 週六 06:30 集保大戶`;
   }
+}
+
+/* ─── 返回頂部按鈕 ─── */
+function initBackTop() {
+  let btn = document.getElementById('backTop');
+  if (!btn) {
+    btn = document.createElement('button');
+    btn.id = 'backTop';
+    btn.className = 'back-top';
+    btn.setAttribute('aria-label', '返回頂部');
+    btn.title = '返回頂部';
+    btn.innerHTML = I('arrowUp', 20);
+    document.body.appendChild(btn);
+  }
+  const onScroll = () => btn.classList.toggle('show', (window.scrollY || document.documentElement.scrollTop) > 420);
+  onScroll();
+  window.addEventListener('scroll', onScroll, { passive: true });
+  btn.addEventListener('click', () => window.scrollTo({ top: 0, behavior: 'smooth' }));
 }
 
 /* ─── 用戶引導（首次造訪自動彈出；右上 ? 可隨時重開） ─── */
@@ -629,6 +671,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.documentElement.lang = 'zh-Hant';
   initTheme();
   renderChrome();
+  initBackTop();
   let guideSeen = false;
   try { guideSeen = localStorage.getItem(GUIDE_KEY) === '1'; } catch (e) { /* ignore */ }
   if (!guideSeen) setTimeout(openGuide, 800);   // 首次造訪自動導覽

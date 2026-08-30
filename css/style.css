@@ -66,7 +66,6 @@ th,td{font-variant-numeric:tabular-nums}
 .topbar .brand span{color:var(--gold)}
 .topbar .spacer{flex:1}
 .nav-links{display:flex;align-items:center;gap:4px}
-.nav-group{position:relative}
 .nav-group-btn{
   font-size:13px;color:var(--text-secondary);text-decoration:none;
   padding:6px 11px;border-radius:var(--radius);
@@ -74,26 +73,31 @@ th,td{font-variant-numeric:tabular-nums}
   display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
 }
 .nav-group-btn:hover{color:var(--gold);background:var(--gold-soft)}
-.nav-group.open .nav-group-btn{color:var(--gold);background:var(--gold-soft)}
-.nav-group.open .nav-caret{transform:rotate(90deg)}
+.nav-group-btn.open{color:var(--gold);background:var(--gold-soft)}
+.nav-group-btn.open .nav-caret{transform:rotate(90deg)}
 .nav-caret{display:inline-flex;transition:transform .15s}
-.nav-drop{
-  position:absolute;top:calc(100% + 6px);left:0;min-width:150px;width:max-content;max-width:280px;z-index:120;
-  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-  box-shadow:var(--shadow-modal);padding:5px;display:none;
-  max-height:min(70vh,560px);overflow-y:auto;
+
+/* ─── Mega Menu（全寬導覽面板） ─── */
+.mega-panel{
+  position:absolute;top:100%;left:0;right:0;z-index:110;
+  background:var(--card);border-bottom:1px solid var(--border);
+  box-shadow:var(--shadow-modal);
 }
-.nav-group.open .nav-drop{display:block}
-.menu-grid{width:min(400px,92vw);max-width:92vw;padding:8px 10px;display:grid;grid-template-columns:repeat(2,1fr);gap:4px 14px}
-.menu-sec-title{font-size:10.5px;color:var(--gold);font-weight:700;letter-spacing:.08em;margin:4px 0 2px}
-.menu-sec a{display:block;padding:7px 10px;font-size:13px;color:var(--text-secondary);
-  text-decoration:none;border-radius:var(--radius);white-space:nowrap}
-.menu-sec a:hover,.menu-sec a.active{color:var(--gold);background:var(--gold-soft)}
-.nav-drop a{
-  display:block;padding:7px 12px;font-size:13px;color:var(--text-secondary);
-  text-decoration:none;border-radius:var(--radius);white-space:nowrap;
+.mega-grid{
+  max-width:1080px;margin:0 auto;padding:20px 26px 24px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px 26px;
 }
-.nav-drop a:hover,.nav-drop a.active{color:var(--gold);background:var(--gold-soft)}
+.mega-col-title{
+  font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.08em;
+  margin:4px 0 8px;text-transform:uppercase;
+}
+.mega-link{
+  display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:13.5px;
+  color:var(--text-secondary);text-decoration:none;border-radius:var(--radius);white-space:nowrap;
+}
+.mega-link svg{flex-shrink:0;opacity:.75}
+.mega-link:hover,.mega-link.active{color:var(--gold);background:var(--gold-soft)}
+.mega-link.active{font-weight:600}
 .nav-star{color:var(--gold)}
 .nav-watch{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-secondary);text-decoration:none;padding:6px 10px;border-radius:var(--radius);white-space:nowrap;flex-shrink:0}
 .nav-watch:hover{color:var(--gold);background:var(--gold-soft)}
@@ -720,6 +724,35 @@ tr.ipo-cancelled{opacity:.55}
 .guide-new{background:var(--teal-soft);border:1px solid var(--teal);color:var(--teal);border-radius:var(--radius);padding:10px 14px;font-size:12.5px;line-height:1.6;margin-bottom:18px}
 .guide-start{width:100%;padding:11px 0;font-size:14.5px}
 
+/* ─── 返回頂部 ─── */
+.back-top{
+  position:fixed;right:18px;bottom:26px;z-index:900;
+  width:44px;height:44px;border-radius:50%;
+  border:1px solid var(--border);background:var(--card);color:var(--gold);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:var(--shadow-modal);cursor:pointer;
+  opacity:0;pointer-events:none;transform:translateY(8px);
+  transition:opacity .18s,transform .18s;
+}
+.back-top.show{opacity:1;pointer-events:auto;transform:translateY(0)}
+.back-top:hover{transform:translateY(-2px);border-color:var(--gold)}
+
+/* ─── 載入 Skeleton ─── */
+.sk-box{padding:6px 0}
+.sk-box i{
+  display:block;height:18px;border-radius:6px;margin:13px 18px;
+  background:linear-gradient(90deg,var(--card) 25%,var(--hover) 50%,var(--card) 75%);
+  background-size:200% 100%;animation:skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.sk-box i:nth-child(2){width:92%}
+.sk-box i:nth-child(3){width:84%}
+.sk-box i:nth-child(4){width:96%}
+.sk-box i:nth-child(5){width:76%}
+.sk-box i:nth-child(6){width:88%}
+.sk-box i:nth-child(7){width:91%}
+.sk-box i:nth-child(8){width:81%}
+.sk-box.compact i{height:14px;margin:8px 12px}
+
 /* 概念股明細：固定置中 Modal（不再滾到頁底） */
 .concept-modal .modal{max-width:680px;padding:0}
 .concept-modal .modal-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:14px 20px;border-bottom:1px solid var(--border-light)}
@@ -753,6 +786,9 @@ tr.ipo-cancelled{opacity:.55}
   .dsp-right{display:none}
   .mops-item{grid-template-columns:48px 1fr;padding:9px 10px}
   .mops-item .mops-company{display:none}
+  .mega-grid{grid-template-columns:repeat(2,1fr);padding:14px 16px 18px;gap:4px 18px}
+  .mega-link{font-size:13px;padding:8px 10px}
+  .back-top{right:12px;bottom:18px;width:40px;height:40px}
   .star-btn{width:32px;height:32px}
   .tf-btn,.ind-btn{padding:6px 13px;font-size:12px}
   .filter-row input,.form-row input{padding:9px 8px}
