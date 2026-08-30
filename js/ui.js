@@ -196,68 +196,65 @@ function etfIntro(sid, name){
 }
 
 function renderChrome() {
-  // 以目前檔名對照連結 href 判斷 active（NAV_GROUPS 的 key 是圖示名，非頁面識別）
-  const path = location.pathname.split('/').pop() || 'index.html';
+  // Vercel cleanUrls 會把 /stk.html 轉成 /stk：兩邊都去掉 .html 再比對，任何頁面都高亮正確
+  const norm = p => String(p || '').replace(/\.html$/, '');
+  const path = norm(location.pathname.split('/').pop()) || 'index';
   const tb = document.getElementById('topbar');
   const ft = document.getElementById('footer');
   if (tb) {
     tb.className = 'topbar';
-    // 四大群組直接放導覽列，各自展開子項；自選股直接連結（無「選單」母按鈕）
+    // 四大群組名稱放導覽列，點任一個開啟同一個全寬 Mega Menu（四組一起顯示）
     const nav = NAV_GROUPS.map(g => `
       <div class="nav-group">
         <button class="nav-group-btn" type="button" aria-haspopup="true" aria-expanded="false">${g.label}<span class="nav-caret">${I('chev', 12)}</span></button>
-        <div class="nav-drop">
-          ${g.items.map(([href, key, label]) =>
-            `<a href="${href}" class="${href === path ? 'active' : ''}">${label}</a>`
-          ).join('')}
-        </div>
       </div>`).join('');
+    const isActive = href => norm(href) === path;
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
       <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
-        <div class="nav-group nav-watch"><a href="watchlist.html" class="${path === 'watchlist.html' ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span>自選股</a></div>
+        <div class="nav-group nav-watch"><a href="watchlist.html" class="${isActive('watchlist.html') ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span>自選股</a></div>
       </nav>
       <div class="spacer"></div>
       <div class="top-search">
         <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
       </div>
       <button class="theme-toggle" id="guideBtn" title="使用說明" aria-label="使用說明">${I('help', 15)}</button>
-      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
+      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>
+      <div class="mega-panel" id="megaPanel" hidden>
+        <div class="mega-grid">
+          ${NAV_GROUPS.map(g => `
+            <div class="mega-col">
+              <div class="mega-col-title">${g.label}</div>
+              ${g.items.map(([href, key, label]) =>
+                `<a href="${href}" class="mega-link ${isActive(href) ? 'active' : ''}">${label}</a>`
+              ).join('')}
+            </div>`).join('')}
+        </div>
+      </div>`;
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
     document.getElementById('guideBtn').addEventListener('click', openGuide);
-    // ── 群組下拉：點按鈕開關、點他處關閉、Esc 關閉、點連結關閉 ──
-    document.querySelectorAll('.nav-group-btn').forEach(btn => {
+    // ── Mega Menu：四個群組按鈕共同開關同一面板；點外/Esc/點連結關閉 ──
+    const megaPanel = document.getElementById('megaPanel');
+    const megaBtns = document.querySelectorAll('.nav-group-btn');
+    const setMega = open => {
+      const show = open === undefined ? megaPanel.hidden : !!open;
+      megaPanel.hidden = !show;
+      megaBtns.forEach(b => {
+        b.classList.toggle('open', show);
+        b.setAttribute('aria-expanded', show ? 'true' : 'false');
+      });
+    };
+    megaBtns.forEach(btn => {
       btn.addEventListener('click', e => {
         e.stopPropagation();
-        btn.parentElement.classList.toggle('open');
-        btn.setAttribute('aria-expanded', btn.parentElement.classList.contains('open') ? 'true' : 'false');
+        setMega();
       });
     });
-    document.addEventListener('click', () => {
-      document.querySelectorAll('.nav-group.open').forEach(x => {
-        x.classList.remove('open');
-        const b = x.querySelector('.nav-group-btn');
-        if (b) b.setAttribute('aria-expanded', 'false');
-      });
+    document.addEventListener('click', e => {
+      if (!e.target.closest('.mega-panel')) setMega(false);
     });
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        document.querySelectorAll('.nav-group.open').forEach(x => {
-          x.classList.remove('open');
-          const b = x.querySelector('.nav-group-btn');
-          if (b) b.setAttribute('aria-expanded', 'false');
-        });
-      }
-    });
-    document.querySelectorAll('.nav-drop a').forEach(a => {
-      a.addEventListener('click', () => {
-        document.querySelectorAll('.nav-group.open').forEach(x => {
-          x.classList.remove('open');
-          const b = x.querySelector('.nav-group-btn');
-          if (b) b.setAttribute('aria-expanded', 'false');
-        });
-      });
-    });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setMega(false); });
+    megaPanel.querySelectorAll('a').forEach(a => a.addEventListener('click', () => setMega(false)));
     const ts = document.getElementById('topSearch');
     if (ts) ts.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;

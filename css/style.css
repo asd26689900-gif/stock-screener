@@ -65,9 +65,9 @@ th,td{font-variant-numeric:tabular-nums}
 .topbar .brand{font-family:var(--font-display);font-size:19px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
 .topbar .brand span{color:var(--gold)}
 .topbar .spacer{flex:1}
-/* ─── 導覽列（四大群組各自下拉 + 自選股，無「選單」母按鈕） ─── */
+/* ─── 導覽列（四大群組名稱 + 自選股；共用全寬 Mega Menu） ─── */
 .nav-links{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
-.nav-group{position:relative;display:flex;align-items:center;flex-shrink:0}
+.nav-group{display:flex;align-items:center;flex-shrink:0}
 .nav-group-btn{
   font-size:13px;color:var(--text-secondary);text-decoration:none;
   padding:6px 11px;border-radius:var(--radius);
@@ -77,18 +77,27 @@ th,td{font-variant-numeric:tabular-nums}
 .nav-group-btn:hover,.nav-group.open .nav-group-btn{color:var(--gold);background:var(--gold-soft)}
 .nav-group.open .nav-caret{transform:rotate(90deg)}
 .nav-caret{display:inline-flex;transition:transform .15s}
-.nav-drop{
-  position:absolute;top:calc(100% + 6px);left:0;min-width:150px;width:max-content;max-width:280px;z-index:120;
-  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
-  box-shadow:var(--shadow-modal);padding:5px;display:none;
-  max-height:min(70vh,560px);overflow-y:auto;
+
+/* ─── Mega Menu（全寬導覽面板，四組一起顯示） ─── */
+.mega-panel{
+  position:absolute;top:100%;left:0;right:0;z-index:110;
+  background:var(--card);border-bottom:1px solid var(--border);
+  box-shadow:var(--shadow-modal);
 }
-.nav-group.open .nav-drop{display:block}
-.nav-drop a{
-  display:block;padding:7px 12px;font-size:13px;color:var(--text-secondary);
-  text-decoration:none;border-radius:var(--radius);white-space:nowrap;
+.mega-grid{
+  max-width:1080px;margin:0 auto;padding:20px 26px 24px;
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px 26px;
 }
-.nav-drop a:hover,.nav-drop a.active{color:var(--gold);background:var(--gold-soft)}
+.mega-col-title{
+  font-size:11px;color:var(--gold);font-weight:700;letter-spacing:.08em;
+  margin:4px 0 8px;text-transform:uppercase;
+}
+.mega-link{
+  display:block;padding:7px 10px;font-size:13.5px;
+  color:var(--text-secondary);text-decoration:none;border-radius:var(--radius);white-space:nowrap;
+}
+.mega-link:hover,.mega-link.active{color:var(--gold);background:var(--gold-soft)}
+.mega-link.active{font-weight:600}
 .nav-watch a{
   font-size:13px;color:var(--text-secondary);text-decoration:none;
   padding:6px 10px;border-radius:var(--radius);white-space:nowrap;
@@ -121,14 +130,11 @@ th,td{font-variant-numeric:tabular-nums}
   .top-search{margin-left:0;order:98;flex:1}
   .top-search input{width:100%}
   .top-search input:focus{width:100%}
-  .nav-watch .nav-watch-txt{display:none}
-  /* 手機：群組改直立，點開後子項就地展開（避免下拉被裁切） */
-  .nav-links{flex-direction:column;align-items:stretch;gap:0;width:100%;order:98}
-  .nav-group{flex-direction:column;align-items:stretch}
-  .nav-group-btn{justify-content:space-between;width:100%;padding:8px 10px}
-  .nav-drop{position:static;box-shadow:none;border:0;border-left:1px solid var(--border);border-radius:0;padding:0 0 2px 8px;margin:0 0 2px 14px;max-width:none;max-height:none}
-  .nav-drop a{padding:6px 10px}
-  .nav-watch a{width:100%;padding:8px 10px}
+  .nav-links{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;order:98;width:100%;padding:2px 0}
+  .nav-links::-webkit-scrollbar{display:none}
+  .nav-group-btn{white-space:nowrap}
+  .mega-grid{grid-template-columns:repeat(2,1fr);padding:14px 16px 18px;gap:4px 18px}
+  .mega-link{font-size:13px;padding:8px 10px}
 }
 
 /* ─── 頁面容器 ─── */
