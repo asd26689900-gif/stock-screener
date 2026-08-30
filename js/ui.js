@@ -209,6 +209,12 @@ function renderChrome() {
         <button class="nav-group-btn" type="button" aria-haspopup="true" aria-expanded="false">${g.label}<span class="nav-caret">${I('chev', 12)}</span></button>
       </div>`).join('');
     const isActive = href => norm(href) === path;
+    const NAV_ICON = {
+      index: 'chart', stk: 'analysis', global: 'refresh', heatmap: 'heat',
+      history: 'clock', disposition: 'shield', modules: 'sliders', strategy: 'target',
+      concepts: 'layers', institutional: 'coins', margin: 'scale', etf: 'pie',
+      filter: 'funnel', calendar: 'calendar', ipo: 'gift', tools: 'calculator',
+    };
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
       <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
@@ -262,6 +268,27 @@ function renderChrome() {
       if (!v) return;
       location.href = 'stk.html#' + encodeURIComponent(v);
     });
+    // ── 左側懸浮島（桌面版；手機版隱藏，沿用頂部群組） ──
+    let sideNav = document.getElementById('sideNav');
+    if (!sideNav) {
+      sideNav = document.createElement('nav');
+      sideNav.id = 'sideNav';
+      sideNav.className = 'side-nav';
+      sideNav.setAttribute('aria-label', '主選單');
+      document.body.appendChild(sideNav);
+    }
+    sideNav.innerHTML = `
+      <div class="side-nav-inner">
+        ${NAV_GROUPS.map(g => `
+          <div class="side-sec">
+            <div class="side-sec-label">${g.label}</div>
+            ${g.items.map(([href, key, label]) => {
+              const ico = NAV_ICON[key] ? I(NAV_ICON[key], 15) : '';
+              return `<a href="${href}" class="side-link ${isActive(href) ? 'active' : ''}"><span class="side-ico">${ico}</span><span class="side-txt">${label}</span></a>`;
+            }).join('')}
+          </div>`).join('')}
+        <a href="watchlist.html" class="side-link side-watch ${isActive('watchlist.html') ? 'active' : ''}"><span class="side-ico">${I('star', 15)}</span><span class="side-txt">自選股</span></a>
+      </div>`;
   }
   if (ft) {
     ft.innerHTML = `

@@ -21,6 +21,7 @@
   <div class="chart-box">
     <div class="chart-toolbar">
       <span class="chart-label">大盤走勢</span>
+      <button class="tf-btn" onclick="toggleTwiiSelect()" title="拖曳框選放大">框選</button>
       <span class="twii-note" style="margin-left:auto">Yahoo Finance 延遲約 15 分</span>
     </div>
     <div class="slider-tabs" id="twiiTabs">
@@ -31,7 +32,19 @@
       <button class="slider-tab" data-tf="1mo" onclick="switchTwii('1mo')">月</button>
     </div>
     <div class="ohlcv-legend" id="twiiLegend"></div>
-  <div class="twii-canvas"><canvas id="twiiCanvas"></canvas></div>
+    <div class="ma-legend" id="twiiMaLegend"></div>
+    <div class="chart-canvas" id="twiiChartCanvas">
+      <canvas id="twiiCanvas"></canvas>
+      <canvas id="twiiOverlay" class="chart-overlay"></canvas>
+      <div class="chart-tooltip" id="twiiTooltip"></div>
+    </div>
+    <div class="slider-tabs" id="twiiIndTabs" style="margin-top:10px">
+      <button class="slider-tab active" data-ind="kd" onclick="switchTwiiInd('kd')">KD</button>
+      <button class="slider-tab" data-ind="rsi" onclick="switchTwiiInd('rsi')">RSI</button>
+      <button class="slider-tab" data-ind="macd" onclick="switchTwiiInd('macd')">MACD</button>
+      <button class="toggle-chip" onclick="toggleTwiiBOLL()" style="margin-left:auto">BOLL</button>
+    </div>
+    <div class="chart-canvas"><canvas id="twiiIndCanvas"></canvas></div>
   </div>
 
   <!-- 類股漲跌 -->
@@ -109,19 +122,92 @@ async function loadTwii(tf){
   }catch(e){ twiiCache[key]=[]; }
   return twiiCache[key];
 }
+
+/* ══════════════════════════════════════
+   大盤 K 線（與個股頁同功能：十字線查高低點、量、MA、BOLL、KD/RSI/MACD、縮放/平移/框選）
+   ══════════════════════════════════════ */
+let twiiZoom=1, twiiPan=0, twiiInd='kd', twiiBOLL=false;
+let twiiActiveMA=[5,10,20,60], twiiMAKey='', twiiCachedMA=null, twiiCachedBOLL=null;
+let twiiLayout=null, twiiEvAttached=false, twiiData=[];
+let twiiSelMode=false, twiiSelecting=false, twiiSelX0=0, twiiSelX1=0;
+let twiiDrag=false, twiiDragX=0, twiiDragPan=0;
+const TWII_MA_COLORS={5:'#2962FF',10:'#FF9800',20:'#9C27B0',60:'#8B8780'};
+
+function twiiCalcMA(data,n){
+  const r=[];
+  for(let i=0;i<data.length;i++){
+    if(i<n-1){r.push(null);continue;}
+    let s=0;for(let j=i-n+1;j<=i;j++)s+=data[j].c;
+    r.push(s/n);
+  }
+  return r;
+}
+function twiiCalcBOLL(data,n=20,k=2){
+  const mid=[],up=[],low=[];
+  for(let i=0;i<data.length;i++){
+    if(i<n-1){mid.push(null);up.push(null);low.push(null);continue;}
+    let s=0;for(let j=i-n+1;j<=i;j++)s+=data[j].c;
+    const m=s/n;
+    let v=0;for(let j=i-n+1;j<=i;j++)v+=(data[j].c-m)*(data[j].c-m);
+    const sd=Math.sqrt(v/n);
+    mid.push(m);up.push(m+k*sd);low.push(m-k*sd);
+  }
+  return {mid,up,low};
+}
+function twiiCalcKD(data){
+  const k=[],d=[];let pk=50,pd=50;
+  for(let i=0;i<data.length;i++){
+    if(i<8){k.push(50);d.push(50);continue;}
+    const seg=data.slice(i-8,i+1);
+    const h=Math.max(...seg.map(x=>x.h)), l=Math.min(...seg.map(x=>x.l));
+    const rsv=h!==l?(data[i].c-l)/(h-l)*100:50;
+    pk=2/3*pk+1/3*rsv; pd=2/3*pd+1/3*pk;
+    k.push(pk);d.push(pd);
+  }
+  return {k,d};
+}
+function twiiCalcRSI(data,n=14){
+  const r=[];let ag=0,al=0;
+  for(let i=0;i<data.length;i++){
+    if(i===0){r.push(50);continue;}
+    const chg=data[i].c-data[i-1].c;
+    const g=chg>0?chg:0,l=chg<0?-chg:0;
+    if(i<=n){ag=(ag*(i-1)+g)/i;al=(al*(i-1)+l)/i;}
+    else{ag=(ag*(n-1)+g)/n;al=(al*(n-1)+l)/n;}
+    r.push(al===0?100:100-100/(1+ag/al));
+  }
+  return r;
+}
+function twiiCalcMACD(data){
+  let e12=data[0].c,e26=data[0].c,sig=0;
+  const dif=[],macd=[],osc=[];
+  for(let i=0;i<data.length;i++){
+    e12=i===0?data[i].c:e12*11/13+data[i].c*2/13;
+    e26=i===0?data[i].c:e26*25/27+data[i].c*2/27;
+    const d=e12-e26;
+    sig=i===0?d:sig*8/10+d*2/10;
+    dif.push(d);macd.push(sig);osc.push((d-sig)*2);
+  }
+  return {dif,macd,osc};
+}
+
 function drawTwii(bars){
   const canvas=document.getElementById('twiiCanvas');
   if(!canvas) return;
-  const wrap=canvas.parentElement;
-  const W=wrap.clientWidth||800, H=260, dpr=window.devicePixelRatio||1;
+  twiiData=bars;
+  const wrap=document.getElementById('twiiChartCanvas');
+  const W=wrap.clientWidth||800;
+  const dpr=window.devicePixelRatio||1;
+  const priceH=240,volH=56,gap=8,padL=56,padR=12,padT=10,padB=22;
+  const H=priceH+gap+volH+padT+padB;
   canvas.width=W*dpr; canvas.height=H*dpr;
   canvas.style.width=W+'px'; canvas.style.height=H+'px';
   const ctx=canvas.getContext('2d');
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,W,H);
   if(bars.length<2){
-    ctx.fillStyle='var(--text-secondary)'; ctx.font='13px sans-serif'; ctx.textAlign='center';
-    ctx.fillText('暫無資料', W/2, H/2);
+    ctx.fillStyle='var(--text-secondary)';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('暫無資料',W/2,H/2);
     return;
   }
   const cs=getComputedStyle(document.documentElement);
@@ -129,58 +215,342 @@ function drawTwii(bars){
   const cDn=cs.getPropertyValue('--green').trim()||'#3A7357';
   const cGrid=cs.getPropertyValue('--border-light').trim()||'#EBE7E0';
   const cText=cs.getPropertyValue('--text-secondary').trim()||'#5F6672';
-  const padL=54, padR=12, padT=14, padB=24;
-  const prices=bars.flatMap(b=>[b.h??b.c, b.l??b.c]);
+  const n=bars.length;
+  const baseCw=W/n;
+  const cw=Math.max(4,Math.min(40,baseCw*twiiZoom));
+  const visibleBars=Math.min(n,Math.ceil((W-padL-padR)/cw));
+  twiiPan=Math.max(0,Math.min(twiiPan,n-visibleBars));
+  const vS=Math.floor(twiiPan), vE=Math.min(n,vS+visibleBars+1);
+  const vis=bars.slice(vS,vE);
+  const prices=vis.flatMap(b=>[b.h??b.c,b.l??b.c]);
   const pMin=Math.min(...prices), pMax=Math.max(...prices);
   const pm=(pMax-pMin)*0.05||1;
   const lo=pMin-pm, hi=pMax+pm;
-  const y=v=>padT+(1-(v-lo)/(hi-lo))*(H-padT-padB);
-  const plotW=W-padL-padR;
-  const cw=plotW/bars.length;
-  ctx.font='10px monospace'; ctx.textAlign='right';
-  for(let i=0;i<=4;i++){
-    const pv=lo+(hi-lo)*i/4, yy=y(pv);
-    ctx.strokeStyle=cGrid; ctx.lineWidth=0.5;
-    ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(W-padR,yy); ctx.stroke();
+  const yP=v=>padT+(1-(v-lo)/(hi-lo))*priceH;
+  const volTop=padT+priceH+gap;
+  const vMax=Math.max(...vis.map(b=>b.v||0))||1;
+  twiiLayout={W,H,padL,padR,padT,padB,priceH,volH,gap,cw,vS,vE,lo,hi,yP,volTop,vMax,data:vis,allData:bars,cUp,cDn,cGrid,cText};
+  // 網格 + Y 軸
+  ctx.font='10px monospace';ctx.textAlign='right';
+  for(let i=0;i<=5;i++){
+    const pv=lo+(hi-lo)*i/5, yy=yP(pv);
+    ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.moveTo(padL,yy);ctx.lineTo(W-padR,yy);ctx.stroke();
     ctx.fillStyle=cText;
-    ctx.fillText(pv>=100?pv.toFixed(0):pv.toFixed(1), padL-4, yy+3);
+    ctx.fillText(pv>=100?pv.toFixed(0):pv.toFixed(1),padL-4,yy+3);
   }
-  // K棒
-  const bw2=Math.max(1, Math.min(9, cw*0.35));
-  bars.forEach((b,i)=>{
-    const o=b.o??b.c, h=b.h??b.c, l=b.l??b.c, c=b.c;
-    const up=c>=o;
-    const color=up?cUp:cDn;
-    const x0=padL+i*cw+cw/2;
-    ctx.strokeStyle=color; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(x0,y(h)); ctx.lineTo(x0,y(l)); ctx.stroke();
-    const top=y(Math.max(o,c)), bot=y(Math.min(o,c));
+  ctx.fillStyle=cText;ctx.fillText(Math.round(vMax)+'張',padL-4,volTop+10);
+  // X 軸日期
+  ctx.textAlign='center';
+  const step=Math.max(1,Math.floor(vis.length/8));
+  for(let i=0;i<vis.length;i+=step){
+    const x=padL+i*cw+cw/2;
+    ctx.fillStyle=cText;
+    const lbl=String(vis[i].d).length>5?String(vis[i].d).slice(5):vis[i].d;
+    ctx.fillText(lbl,x,H-padB+12);
+  }
+  // K 棒 + 量
+  vis.forEach((b,i)=>{
+    const o=b.o??b.c,h=b.h??b.c,l=b.l??b.c,c=b.c;
+    const up=c>=o, color=up?cUp:cDn;
+    const x=padL+i*cw+cw/2, bw2=Math.max(1,cw*0.35);
+    ctx.strokeStyle=color;ctx.lineWidth=1;
+    ctx.beginPath();ctx.moveTo(x,yP(h));ctx.lineTo(x,yP(l));ctx.stroke();
+    const top=yP(Math.max(o,c)),bot=yP(Math.min(o,c));
     const bh=Math.max(bot-top,1);
-    if(up){
-      ctx.strokeStyle=color;
-      ctx.strokeRect(x0-bw2,top,bw2*2,bh);
-    }else{
-      ctx.fillStyle=color;
-      ctx.fillRect(x0-bw2,top,bw2*2,bh);
+    if(up){ctx.strokeStyle=color;ctx.strokeRect(x-bw2,top,bw2*2,bh);}
+    else{ctx.fillStyle=color;ctx.fillRect(x-bw2,top,bw2*2,bh);}
+    const vh=(b.v||0)/vMax*volH;
+    ctx.fillStyle=color;ctx.globalAlpha=0.4;
+    ctx.fillRect(x-bw2,volTop+volH-vh,bw2*2,vh);
+    ctx.globalAlpha=1;
+  });
+  // 量 MA5/20
+  [[5,'#2962FF'],[20,'#FF9800']].forEach(([pn,col])=>{
+    const arr=twiiCalcMA(bars.map(b=>({c:b.v||0})),pn);
+    ctx.strokeStyle=col;ctx.lineWidth=1;ctx.beginPath();let st=false;
+    for(let gi=vS;gi<vE;gi++){
+      const v=arr[gi];if(v===null)continue;
+      const x=padL+(gi-vS)*cw+cw/2;
+      const yv=volTop+volH-(v/vMax*volH);
+      if(!st){ctx.moveTo(x,yv);st=true;}else ctx.lineTo(x,yv);
+    }
+    ctx.stroke();
+  });
+  // MA 線
+  const maKey=JSON.stringify(twiiActiveMA);
+  if(!twiiCachedMA||twiiMAKey!==maKey||twiiCachedMA.len!==n){twiiCachedMA={arr:twiiActiveMA.map(p=>twiiCalcMA(bars,p)),len:n};twiiMAKey=maKey;}
+  twiiCachedMA.arr.forEach((maArr,mi)=>{
+    ctx.strokeStyle=TWII_MA_COLORS[twiiActiveMA[mi]]||'#2F6E6C';ctx.lineWidth=1.5;
+    ctx.beginPath();let st=false;
+    for(let gi=vS;gi<vE;gi++){
+      const v=maArr[gi];if(v===null)continue;
+      const x=padL+(gi-vS)*cw+cw/2;
+      if(!st){ctx.moveTo(x,yP(v));st=true;}else ctx.lineTo(x,yP(v));
+    }
+    ctx.stroke();
+  });
+  // BOLL
+  if(twiiBOLL){
+    if(!twiiCachedBOLL||twiiCachedBOLL.len!==n){twiiCachedBOLL={...twiiCalcBOLL(bars),len:n};}
+    const b=twiiCachedBOLL;
+    ctx.fillStyle='rgba(96,125,139,0.07)';
+    ctx.beginPath();let bs=false;
+    for(let gi=vS;gi<vE;gi++){if(b.up[gi]===null)continue;const x=padL+(gi-vS)*cw+cw/2;if(!bs){ctx.moveTo(x,yP(b.up[gi]));bs=true;}else ctx.lineTo(x,yP(b.up[gi]));}
+    for(let gi=vE-1;gi>=vS;gi--){if(b.low[gi]===null)continue;const x=padL+(gi-vS)*cw+cw/2;ctx.lineTo(x,yP(b.low[gi]));}
+    ctx.closePath();ctx.fill();
+    [['up',b.up],['mid',b.mid],['low',b.low]].forEach(([tag,arr])=>{
+      ctx.strokeStyle='#78909C';ctx.lineWidth=1;ctx.setLineDash(tag==='mid'?[]:[4,3]);
+      ctx.beginPath();let st=false;
+      for(let gi=vS;gi<vE;gi++){const v=arr[gi];if(v===null)continue;const x=padL+(gi-vS)*cw+cw/2;if(!st){ctx.moveTo(x,yP(v));st=true;}else ctx.lineTo(x,yP(v));}
+      ctx.stroke();ctx.setLineDash([]);
+    });
+  }
+  // 最新價虛線
+  if(vis.length){
+    const lastC=vis[vis.length-1].c;
+    const lastY=yP(lastC);
+    const lc2=lastC>=vis[vis.length-2]?.c?cUp:cDn;
+    ctx.strokeStyle=lc2;ctx.globalAlpha=0.65;ctx.lineWidth=0.8;ctx.setLineDash([4,3]);
+    ctx.beginPath();ctx.moveTo(padL,lastY);ctx.lineTo(W-padR,lastY);ctx.stroke();
+    ctx.setLineDash([]);ctx.globalAlpha=1;
+    ctx.fillStyle=lc2;ctx.font='700 11px monospace';ctx.textAlign='right';
+    ctx.fillText(lastC.toFixed(2),W-padR-2,lastY-4);
+    twiiSetLegend(vis[vis.length-1],vis[vis.length-2]);
+  }
+  // MA 圖例（可點擊開關）
+  const ml=document.getElementById('twiiMaLegend');
+  if(ml){
+    const valOf=p=>{const arr=twiiCachedMA.arr[twiiActiveMA.indexOf(p)];const v=arr&&arr.filter(x=>x!==null).pop();return v!=null?v.toFixed(1):'—';};
+    ml.innerHTML=[5,10,20,60].map(p=>{
+      const on=twiiActiveMA.includes(p);
+      return `<span class="ma-chip ${on?'on':''}" onclick="toggleTwiiMA(${p})"><span style="display:inline-block;width:12px;height:2px;background:${TWII_MA_COLORS[p]};margin-right:3px;vertical-align:middle;border-radius:1px;opacity:${on?1:.35}"></span>MA${p} ${on?valOf(p):'—'}</span>`;
+    }).join('')+(twiiBOLL&&twiiCachedBOLL?(()=>{
+      const u=twiiCachedBOLL.up[n-1],m=twiiCachedBOLL.mid[n-1],l=twiiCachedBOLL.low[n-1];
+      return `<span style="color:#78909C;align-self:center">BOLL(20,2) 上 ${u!=null?u.toFixed(1):'—'} 中 ${m!=null?m.toFixed(1):'—'} 下 ${l!=null?l.toFixed(1):'—'}</span>`;
+    })():'');
+  }
+  // overlay + 事件
+  const ov=document.getElementById('twiiOverlay');
+  if(ov){ov.width=W*dpr;ov.height=H*dpr;ov.style.width=W+'px';ov.style.height=H+'px';}
+  if(!twiiEvAttached) twiiAttachEvents(canvas);
+  drawTwiiIndicator();
+}
+function twiiSetLegend(b,prev){
+  const el=document.getElementById('twiiLegend');
+  if(!el||!b) return;
+  const chg=prev?(b.c-prev.c):0;
+  const chgP=prev&&prev.c?(chg/prev.c*100):0;
+  const cc=pctClass(chg);
+  el.innerHTML=`<span>${b.d}</span><span>開 <b>${b.o.toFixed(2)}</b></span><span>高 <b class="${pctClass(b.h-b.o)}">${b.h.toFixed(2)}</b></span><span>低 <b class="${pctClass(b.l-b.o)}">${b.l.toFixed(2)}</b></span><span>收 <b>${b.c.toFixed(2)}</b></span><span>漲跌 <b class="${cc}">${chg>0?'+':''}${chg.toFixed(2)} (${fmtPct(chgP,2)})</b></span><span>量 <b>${fmt(b.v||0)}</b></span>`;
+}
+function drawTwiiIndicator(){
+  const canvas=document.getElementById('twiiIndCanvas');
+  if(!canvas||!twiiLayout||twiiData.length<3) return;
+  const wrap=canvas.parentElement;
+  const W=wrap.clientWidth||800, H=88, dpr=window.devicePixelRatio||1;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  canvas.style.width=W+'px';canvas.style.height=H+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  const L=twiiLayout, n=twiiData.length;
+  const padL=L.padL,padR=L.padR,padT=6,padB=8;
+  const vS=L.vS,vE=L.vE,cw=L.cw;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  const cGrid=L.cGrid,cText=L.cText,cUp=L.cUp,cDn=L.cDn;
+  const x=i=>padL+(i-vS)*cw+cw/2;
+  if(twiiInd==='kd'){
+    const {k,d}=twiiCalcKD(twiiData);
+    const yy=v=>padT+(1-v/100)*plotH;
+    ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
+    [20,50,80].forEach(p=>{ctx.beginPath();ctx.moveTo(padL,yy(p));ctx.lineTo(W-padR,yy(p));ctx.stroke();});
+    [['#2962FF',k],['#FF9800',d]].forEach(([col,arr])=>{
+      ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.beginPath();let st=false;
+      for(let gi=vS;gi<vE;gi++){const v=arr[gi];if(v==null)continue;if(!st){ctx.moveTo(x(gi),yy(v));st=true;}else ctx.lineTo(x(gi),yy(v));}
+      ctx.stroke();
+    });
+    ctx.fillStyle=cText;ctx.textAlign='left';ctx.font='10px monospace';
+    ctx.fillText('KD '+k[vE-1].toFixed(1)+' / '+d[vE-1].toFixed(1),padL+4,padT+10);
+  }else if(twiiInd==='rsi'){
+    const r=twiiCalcRSI(twiiData);
+    const yy=v=>padT+(1-v/100)*plotH;
+    ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
+    [30,50,70].forEach(p=>{ctx.beginPath();ctx.moveTo(padL,yy(p));ctx.lineTo(W-padR,yy(p));ctx.stroke();});
+    ctx.strokeStyle='#D4A840';ctx.lineWidth=1.2;ctx.beginPath();let st=false;
+    for(let gi=vS;gi<vE;gi++){if(!st){ctx.moveTo(x(gi),yy(r[gi]));st=true;}else ctx.lineTo(x(gi),yy(r[gi]));}
+    ctx.stroke();
+    ctx.fillStyle=cText;ctx.textAlign='left';ctx.font='10px monospace';
+    ctx.fillText('RSI14 '+r[vE-1].toFixed(1),padL+4,padT+10);
+  }else if(twiiInd==='macd'){
+    const {dif,macd:sig,osc}=twiiCalcMACD(twiiData);
+    const allV=[...osc.slice(vS,vE),...dif.slice(vS,vE),...sig.slice(vS,vE)];
+    const vMax=Math.max(...allV.map(Math.abs))||1;
+    const yy=v=>padT+plotH/2-v/vMax*(plotH/2);
+    ctx.strokeStyle=cGrid;ctx.lineWidth=0.5;
+    ctx.beginPath();ctx.moveTo(padL,yy(0));ctx.lineTo(W-padR,yy(0));ctx.stroke();
+    for(let gi=vS;gi<vE;gi++){
+      const v=osc[gi],xx=x(gi),bw2=Math.max(1,cw*0.3);
+      ctx.fillStyle=v>=0?cUp:cDn;ctx.globalAlpha=0.5;
+      const top=v>=0?yy(v):yy(0),h=Math.abs(yy(v)-yy(0));
+      ctx.fillRect(xx-bw2,top,bw2*2,h||1);ctx.globalAlpha=1;
+    }
+    [['#D4A840',dif],['#5AADAB',sig]].forEach(([col,arr])=>{
+      ctx.strokeStyle=col;ctx.lineWidth=1.2;ctx.beginPath();let st=false;
+      for(let gi=vS;gi<vE;gi++){if(!st){ctx.moveTo(x(gi),yy(arr[gi]));st=true;}else ctx.lineTo(x(gi),yy(arr[gi]));}
+      ctx.stroke();
+    });
+    ctx.fillStyle=cText;ctx.textAlign='left';ctx.font='10px monospace';
+    ctx.fillText('DIF '+dif[vE-1].toFixed(2)+'  MACD '+sig[vE-1].toFixed(2),padL+4,padT+10);
+  }
+}
+function twiiAttachEvents(canvas){
+  twiiEvAttached=true;
+  const wrap=document.getElementById('twiiChartCanvas');
+  wrap.addEventListener('wheel',e=>{
+    e.preventDefault();
+    const rect=canvas.getBoundingClientRect();
+    const mx=e.clientX-rect.left,L=twiiLayout;
+    if(!L.cw)return;
+    const frac=(mx-L.padL)/L.cw;
+    const old=twiiZoom;
+    twiiZoom=Math.max(0.5,Math.min(20,twiiZoom*(e.deltaY>0?0.85:1.18)));
+    twiiPan=twiiPan+frac*(1-1/(twiiZoom/old));
+    drawTwii(twiiData);
+  },{passive:false});
+  wrap.addEventListener('mousedown',e=>{
+    if(e.button!==0)return;
+    e.preventDefault();
+    if(twiiSelMode){
+      const rect=canvas.getBoundingClientRect();
+      twiiSelecting=true;twiiSelX0=twiiSelX1=e.clientX-rect.left;
+      return;
+    }
+    twiiDrag=true;twiiDragX=e.clientX;twiiDragPan=twiiPan;
+  });
+  document.addEventListener('mousemove',e=>{
+    const rect=canvas.getBoundingClientRect();
+    if(twiiSelecting){
+      twiiSelX1=e.clientX-rect.left;
+      const ov=document.getElementById('twiiOverlay');
+      const octx=ov.getContext('2d');
+      const dpr=window.devicePixelRatio||1;
+      octx.setTransform(dpr,0,0,dpr,0,0);
+      octx.clearRect(0,0,ov.width,ov.height);
+      const x0=Math.min(twiiSelX0,twiiSelX1),x1=Math.max(twiiSelX0,twiiSelX1);
+      if(x1-x0<2)return;
+      octx.fillStyle='rgba(184,134,11,0.12)';
+      octx.fillRect(x0,0,x1-x0,rect.height);
+      octx.strokeStyle='#B8860B';octx.lineWidth=1;
+      octx.strokeRect(x0,0,x1-x0,rect.height);
+      return;
+    }
+    if(twiiDrag){
+      const dx=e.clientX-twiiDragX;
+      if(twiiLayout&&twiiLayout.cw) twiiPan=twiiDragPan-dx/twiiLayout.cw;
+      drawTwii(twiiData);
+      return;
+    }
+    twiiCrosshair(e);
+  });
+  document.addEventListener('mouseup',()=>{
+    if(twiiSelecting){
+      twiiSelecting=false;
+      twiiApplySel();
+      return;
+    }
+    twiiDrag=false;
+  });
+  wrap.addEventListener('mouseleave',()=>{
+    if(!twiiDrag){
+      const ov=document.getElementById('twiiOverlay');
+      const tip=document.getElementById('twiiTooltip');
+      if(ov){const c=ov.getContext('2d');c.clearRect(0,0,ov.width,ov.height);}
+      if(tip)tip.style.display='none';
     }
   });
-  // 最新價虛線 + 標籤
-  const last=bars[bars.length-1];
-  const lc=last.c;
-  const prevC=bars.length>1?bars[bars.length-2].c:lc;
-  const up=lc>=prevC;
-  const col=up?cUp:cDn;
-  const ly=y(lc);
-  ctx.strokeStyle=col; ctx.globalAlpha=0.65; ctx.lineWidth=0.8; ctx.setLineDash([4,3]);
-  ctx.beginPath(); ctx.moveTo(padL,ly); ctx.lineTo(W-padR,ly); ctx.stroke();
-  ctx.setLineDash([]); ctx.globalAlpha=1;
-  ctx.fillStyle=col; ctx.font='700 13px monospace'; ctx.textAlign='right';
-  ctx.fillText(lc.toFixed(2), W-padR-2, ly-5);
-  const legend=document.getElementById('twiiLegend');
-  if(legend) legend.innerHTML=`<span>加權指數</span><span>開 <b>${last.o.toFixed(2)}</b></span><span>高 <b class="${pctClass(last.h-last.o)}">${last.h.toFixed(2)}</b></span><span>低 <b class="${pctClass(last.l-last.o)}">${last.l.toFixed(2)}</b></span><span>收 <b>${lc.toFixed(2)}</b></span><span class="${up?'up':'dn'}">${prevC?fmtPct((lc-prevC)/prevC*100,2):'—'}</span>`;
+}
+function twiiCrosshair(e){
+  const ov=document.getElementById('twiiOverlay'),tip=document.getElementById('twiiTooltip');
+  const canvas=document.getElementById('twiiCanvas');
+  if(!ov||!twiiLayout||!twiiData.length)return;
+  const L=twiiLayout,rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  if(mx<0||mx>L.W||my<0||my>L.H){
+    const c=ov.getContext('2d');c.clearRect(0,0,ov.width,ov.height);
+    if(tip)tip.style.display='none';
+    return;
+  }
+  const idx=Math.max(0,Math.min(L.data.length-1,Math.floor((mx-L.padL)/L.cw)));
+  const b=L.data[idx];
+  const dpr=window.devicePixelRatio||1;
+  const c=ov.getContext('2d');
+  c.setTransform(dpr,0,0,dpr,0,0);
+  c.clearRect(0,0,ov.width,ov.height);
+  const x=Math.round(L.padL+idx*L.cw+L.cw/2);
+  c.strokeStyle='rgba(140,140,140,0.55)';c.lineWidth=0.8;
+  c.beginPath();c.moveTo(x,0);c.lineTo(x,L.H);c.stroke();
+  c.beginPath();c.moveTo(L.padL,my);c.lineTo(L.W-L.padR,my);c.stroke();
+  if(tip){
+    const prev=L.data[idx-1];
+    const chg=prev?(b.c-prev.c):0;
+    const chgP=prev&&prev.c?(chg/prev.c*100):0;
+    const cc=pctClass(chg);
+    const maVals=twiiActiveMA.map(p=>{
+      const arr=twiiCachedMA.arr[twiiActiveMA.indexOf(p)];
+      const v=arr?arr[idx+(L.vS)]:null;
+      return v!=null?`MA${p} ${v.toFixed(1)}`:'';
+    }).filter(Boolean).join(' ');
+    tip.innerHTML=`<div>${b.d}</div><div>開 <b>${b.o.toFixed(2)}</b> 高 <b class="${pctClass(b.h-b.o)}">${b.h.toFixed(2)}</b> 低 <b class="${pctClass(b.l-b.o)}">${b.l.toFixed(2)}</b> 收 <b>${b.c.toFixed(2)}</b></div><div class="${cc}">漲跌 ${chg>0?'+':''}${chg.toFixed(2)} (${fmtPct(chgP,2)})</div><div>量 ${fmt(b.v||0)}${maVals?' · '+maVals:''}</div>`;
+    tip.style.display='block';
+    const tipW=tip.offsetWidth;
+    tip.style.left=Math.min(x+14,L.W-tipW-6)+'px';
+    tip.style.top=Math.max(6,my-40)+'px';
+  }
+}
+function twiiApplySel(){
+  const L=twiiLayout;
+  if(!L||!L.cw||!twiiData.length)return;
+  const x0=Math.min(twiiSelX0,twiiSelX1),x1=Math.max(twiiSelX0,twiiSelX1);
+  if(x1-x0<20)return;
+  const n=twiiData.length;
+  let i0=L.vS+Math.floor((x0-L.padL)/L.cw), i1=L.vS+Math.ceil((x1-L.padL)/L.cw);
+  i0=Math.max(0,Math.min(n-1,i0));i1=Math.max(i0+1,Math.min(n,i1));
+  twiiZoom=Math.max(0.5,Math.min(20,n/(i1-i0)));
+  twiiPan=i0;
+  twiiSelMode=false;
+  document.querySelectorAll('.chart-toolbar .tf-btn').forEach(b=>{
+    if(b.textContent.trim()==='框選') b.classList.remove('active');
+  });
+  drawTwii(twiiData);
+}
+function toggleTwiiSelect(){
+  twiiSelMode=!twiiSelMode;
+  document.querySelectorAll('#twiiChartCanvas .tf-btn, .chart-toolbar .tf-btn').forEach(b=>{
+    if(b.textContent.trim()==='框選') b.classList.toggle('active',twiiSelMode);
+  });
+}
+function toggleTwiiMA(p){
+  const i=twiiActiveMA.indexOf(p);
+  if(i>=0)twiiActiveMA.splice(i,1);else twiiActiveMA.push(p);
+  twiiActiveMA.sort((a,b)=>a-b);
+  twiiCachedMA=null;
+  drawTwii(twiiData);
+}
+function toggleTwiiBOLL(){
+  twiiBOLL=!twiiBOLL;
+  document.querySelectorAll('#twiiIndTabs .toggle-chip').forEach(b=>b.classList.toggle('active',twiiBOLL));
+  drawTwii(twiiData);
+}
+function switchTwiiInd(ind){
+  twiiInd=ind;
+  document.querySelectorAll('#twiiIndTabs .slider-tab').forEach(b=>b.classList.toggle('active',b.dataset.ind===ind));
+  sliderTabs(document.getElementById('twiiIndTabs'));
+  drawTwiiIndicator();
 }
 async function switchTwii(tf){
   twiiTF=tf;
+  twiiZoom=1;twiiPan=0;twiiCachedMA=null;twiiCachedBOLL=null;
   document.querySelectorAll('#twiiTabs .slider-tab').forEach(b=>b.classList.toggle('active',b.dataset.tf===tf));
   sliderTabs(document.getElementById('twiiTabs'));
   const bars=await loadTwii(tf);

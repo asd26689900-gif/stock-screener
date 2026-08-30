@@ -105,9 +105,45 @@ th,td{font-variant-numeric:tabular-nums}
 }
 .nav-watch a:hover,.nav-watch a.active{color:var(--gold);background:var(--gold-soft)}
 .nav-star{color:var(--gold)}
-.nav-watch{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-secondary);text-decoration:none;padding:6px 10px;border-radius:var(--radius);white-space:nowrap;flex-shrink:0}
-.nav-watch:hover{color:var(--gold);background:var(--gold-soft)}
-.nav-watch.active{color:var(--gold);background:var(--gold-soft)}
+
+/* ─── 左側懸浮島（桌面版專用；手機版隱藏） ─── */
+.side-nav{
+  position:fixed;left:0;top:0;bottom:0;width:56px;z-index:950;
+  background:var(--card);border-right:1px solid var(--border);
+  overflow:hidden;transition:width .18s ease;
+}
+.side-nav:hover{width:216px;box-shadow:var(--shadow-modal)}
+.side-nav-inner{
+  display:flex;flex-direction:column;gap:2px;
+  padding:14px 8px 16px;width:216px;min-width:216px;height:100%;
+  overflow-y:auto;overflow-x:hidden;
+}
+.side-sec{margin-bottom:10px}
+.side-sec-label{
+  font-size:10px;color:var(--gold);font-weight:700;letter-spacing:.08em;
+  padding:3px 8px 5px;white-space:nowrap;opacity:0;transition:opacity .12s;
+}
+.side-nav:hover .side-sec-label{opacity:1}
+.side-link{
+  display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;
+  color:var(--text-secondary);text-decoration:none;white-space:nowrap;font-size:13px;
+}
+.side-link .side-ico{flex-shrink:0;width:22px;text-align:center;display:inline-flex;justify-content:center}
+.side-link .side-ico svg{display:block;margin:0 auto}
+.side-link:hover,.side-link.active{color:var(--gold);background:var(--gold-soft)}
+.side-link .side-txt{opacity:0;transition:opacity .12s}
+.side-nav:hover .side-txt{opacity:1}
+.side-watch{margin-top:auto;border-top:1px solid var(--border-light);padding-top:8px}
+
+/* 桌面：內容讓出島寬、隱藏頂部群組與 Mega（改由懸浮島提供） */
+@media(min-width:769px){
+  body{padding-left:56px}
+  .topbar .nav-links{display:none}
+  .mega-panel{display:none!important}
+}
+@media(max-width:768px){
+  .side-nav{display:none}
+}
 .top-search input{
   width:150px;padding:6px 11px;border:1px solid var(--border);border-radius:var(--radius);
   background:var(--surface);color:var(--text);font-size:12.5px;font-family:var(--font-mono);
