@@ -202,17 +202,20 @@ function renderChrome() {
   const ft = document.getElementById('footer');
   if (tb) {
     tb.className = 'topbar';
-    // 四大類子項 + 自選股直接攤平在導覽列（無母項選單）
+    // 四大群組直接放導覽列，各自展開子項；自選股直接連結（無「選單」母按鈕）
     const nav = NAV_GROUPS.map(g => `
       <div class="nav-group">
-        ${g.items.map(([href, key, label]) =>
-          `<a href="${href}" class="${href === path ? 'active' : ''}">${label}</a>`
-        ).join('')}
+        <button class="nav-group-btn" type="button" aria-haspopup="true" aria-expanded="false">${g.label}<span class="nav-caret">${I('chev', 12)}</span></button>
+        <div class="nav-drop">
+          ${g.items.map(([href, key, label]) =>
+            `<a href="${href}" class="${href === path ? 'active' : ''}">${label}</a>`
+          ).join('')}
+        </div>
       </div>`).join('');
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
       <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
-        <div class="nav-group"><a href="watchlist.html" class="${path === 'watchlist.html' ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span>自選股</a></div>
+        <div class="nav-group nav-watch"><a href="watchlist.html" class="${path === 'watchlist.html' ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span>自選股</a></div>
       </nav>
       <div class="spacer"></div>
       <div class="top-search">
@@ -222,6 +225,39 @@ function renderChrome() {
       <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
     document.getElementById('guideBtn').addEventListener('click', openGuide);
+    // ── 群組下拉：點按鈕開關、點他處關閉、Esc 關閉、點連結關閉 ──
+    document.querySelectorAll('.nav-group-btn').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        btn.parentElement.classList.toggle('open');
+        btn.setAttribute('aria-expanded', btn.parentElement.classList.contains('open') ? 'true' : 'false');
+      });
+    });
+    document.addEventListener('click', () => {
+      document.querySelectorAll('.nav-group.open').forEach(x => {
+        x.classList.remove('open');
+        const b = x.querySelector('.nav-group-btn');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      });
+    });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.querySelectorAll('.nav-group.open').forEach(x => {
+          x.classList.remove('open');
+          const b = x.querySelector('.nav-group-btn');
+          if (b) b.setAttribute('aria-expanded', 'false');
+        });
+      }
+    });
+    document.querySelectorAll('.nav-drop a').forEach(a => {
+      a.addEventListener('click', () => {
+        document.querySelectorAll('.nav-group.open').forEach(x => {
+          x.classList.remove('open');
+          const b = x.querySelector('.nav-group-btn');
+          if (b) b.setAttribute('aria-expanded', 'false');
+        });
+      });
+    });
     const ts = document.getElementById('topSearch');
     if (ts) ts.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;

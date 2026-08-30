@@ -65,23 +65,36 @@ th,td{font-variant-numeric:tabular-nums}
 .topbar .brand{font-family:var(--font-display);font-size:19px;font-weight:700;color:var(--ink);letter-spacing:-0.02em;white-space:nowrap;text-decoration:none}
 .topbar .brand span{color:var(--gold)}
 .topbar .spacer{flex:1}
-/* ─── 導覽列（四大類子項攤平 + 自選股，無母項選單） ─── */
-.nav-links{
-  display:flex;align-items:center;gap:2px;
-  overflow-x:auto;scrollbar-width:none;
-  order:3;width:100%;padding:6px 0 2px;
-  border-top:1px solid var(--border-light);margin-top:9px;
+/* ─── 導覽列（四大群組各自下拉 + 自選股，無「選單」母按鈕） ─── */
+.nav-links{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.nav-group{position:relative;display:flex;align-items:center;flex-shrink:0}
+.nav-group-btn{
+  font-size:13px;color:var(--text-secondary);text-decoration:none;
+  padding:6px 11px;border-radius:var(--radius);
+  background:none;border:0;font-family:inherit;cursor:pointer;
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
 }
-.nav-links::-webkit-scrollbar{display:none}
-.nav-group{display:flex;align-items:center;gap:2px;flex-shrink:0}
-.nav-group + .nav-group::before{
-  content:'';width:1px;height:16px;background:var(--border);margin:0 8px;flex-shrink:0;
+.nav-group-btn:hover,.nav-group.open .nav-group-btn{color:var(--gold);background:var(--gold-soft)}
+.nav-group.open .nav-caret{transform:rotate(90deg)}
+.nav-caret{display:inline-flex;transition:transform .15s}
+.nav-drop{
+  position:absolute;top:calc(100% + 6px);left:0;min-width:150px;width:max-content;max-width:280px;z-index:120;
+  background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow-modal);padding:5px;display:none;
+  max-height:min(70vh,560px);overflow-y:auto;
 }
-.nav-links a{
-  font-size:12.5px;color:var(--text-secondary);text-decoration:none;
-  padding:5px 9px;border-radius:var(--radius);white-space:nowrap;
+.nav-group.open .nav-drop{display:block}
+.nav-drop a{
+  display:block;padding:7px 12px;font-size:13px;color:var(--text-secondary);
+  text-decoration:none;border-radius:var(--radius);white-space:nowrap;
 }
-.nav-links a:hover,.nav-links a.active{color:var(--gold);background:var(--gold-soft)}
+.nav-drop a:hover,.nav-drop a.active{color:var(--gold);background:var(--gold-soft)}
+.nav-watch a{
+  font-size:13px;color:var(--text-secondary);text-decoration:none;
+  padding:6px 10px;border-radius:var(--radius);white-space:nowrap;
+  display:inline-flex;align-items:center;gap:4px;
+}
+.nav-watch a:hover,.nav-watch a.active{color:var(--gold);background:var(--gold-soft)}
 .nav-star{color:var(--gold)}
 .nav-watch{display:inline-flex;align-items:center;gap:5px;font-size:13px;color:var(--text-secondary);text-decoration:none;padding:6px 10px;border-radius:var(--radius);white-space:nowrap;flex-shrink:0}
 .nav-watch:hover{color:var(--gold);background:var(--gold-soft)}
@@ -109,6 +122,13 @@ th,td{font-variant-numeric:tabular-nums}
   .top-search input{width:100%}
   .top-search input:focus{width:100%}
   .nav-watch .nav-watch-txt{display:none}
+  /* 手機：群組改直立，點開後子項就地展開（避免下拉被裁切） */
+  .nav-links{flex-direction:column;align-items:stretch;gap:0;width:100%;order:98}
+  .nav-group{flex-direction:column;align-items:stretch}
+  .nav-group-btn{justify-content:space-between;width:100%;padding:8px 10px}
+  .nav-drop{position:static;box-shadow:none;border:0;border-left:1px solid var(--border);border-radius:0;padding:0 0 2px 8px;margin:0 0 2px 14px;max-width:none;max-height:none}
+  .nav-drop a{padding:6px 10px}
+  .nav-watch a{width:100%;padding:8px 10px}
 }
 
 /* ─── 頁面容器 ─── */
