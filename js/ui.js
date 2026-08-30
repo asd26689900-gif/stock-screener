@@ -196,64 +196,32 @@ function etfIntro(sid, name){
 }
 
 function renderChrome() {
-  const page = (location.pathname.split('/').pop() || 'index').replace(/\.html$/, '') || 'index';
+  // 以目前檔名對照連結 href 判斷 active（NAV_GROUPS 的 key 是圖示名，非頁面識別）
+  const path = location.pathname.split('/').pop() || 'index.html';
   const tb = document.getElementById('topbar');
   const ft = document.getElementById('footer');
   if (tb) {
     tb.className = 'topbar';
-    const NAV_ICON = {
-      index: 'chart', stk: 'analysis', global: 'refresh', heatmap: 'heat',
-      history: 'clock', disposition: 'shield', modules: 'sliders', strategy: 'target',
-      concepts: 'layers', institutional: 'coins', margin: 'scale', etf: 'pie',
-      filter: 'funnel', calendar: 'calendar', ipo: 'gift', tools: 'calculator',
-    };
+    // 四大類子項 + 自選股直接攤平在導覽列（無母項選單）
+    const nav = NAV_GROUPS.map(g => `
+      <div class="nav-group">
+        ${g.items.map(([href, key, label]) =>
+          `<a href="${href}" class="${href === path ? 'active' : ''}">${label}</a>`
+        ).join('')}
+      </div>`).join('');
     tb.innerHTML = `
       <a class="brand" href="index.html">盤後精選<span>模組</span></a>
-      <nav class="nav-links" id="navLinks" aria-label="主選單">
-        <button class="nav-group-btn" id="megaBtn" type="button" aria-haspopup="true" aria-expanded="false">選單<span class="nav-caret">${I('chev', 12)}</span></button>
+      <nav class="nav-links" id="navLinks" aria-label="主選單">${nav}
+        <div class="nav-group"><a href="watchlist.html" class="${path === 'watchlist.html' ? 'active' : ''}"><span class="nav-star">${I('star', 12)}</span>自選股</a></div>
       </nav>
       <div class="spacer"></div>
-      <a class="nav-watch" href="watchlist.html"><span class="nav-star">${I('star', 12)}</span><span class="nav-watch-txt">自選股</span></a>
       <div class="top-search">
         <input id="topSearch" type="text" placeholder="查股 2330 / 台積電" aria-label="查股" autocomplete="off" maxlength="20">
       </div>
       <button class="theme-toggle" id="guideBtn" title="使用說明" aria-label="使用說明">${I('help', 15)}</button>
-      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>
-      <div class="mega-panel" id="megaPanel" hidden>
-        <div class="mega-grid">
-          ${NAV_GROUPS.map(g => `
-            <div class="mega-col">
-              <div class="mega-col-title">${g.label}</div>
-              ${g.items.map(([href, key, label]) => {
-                const ico = NAV_ICON[key] ? I(NAV_ICON[key], 14) : '';
-                return `<a href="${href}" class="mega-link ${key === page ? 'active' : ''}">${ico}${label}</a>`;
-              }).join('')}
-            </div>`).join('')}
-          <div class="mega-col">
-            <div class="mega-col-title">常用</div>
-            <a href="watchlist.html" class="mega-link">${I('star', 14)}自選股</a>
-          </div>
-        </div>
-      </div>`;
+      <button class="theme-toggle" id="themeToggle" title="切換主題" aria-label="切換主題">${effectiveTheme() === 'dark' ? I('sun', 15) : I('moon', 15)}</button>`;
     document.getElementById('themeToggle').addEventListener('click', e => toggleTheme(e.currentTarget));
     document.getElementById('guideBtn').addEventListener('click', openGuide);
-    // ── Mega Menu：點按鈕開關、點面板外關閉、Esc 關閉、點連結關閉 ──
-    const megaBtn = document.getElementById('megaBtn');
-    const megaPanel = document.getElementById('megaPanel');
-    const setMega = open => {
-      const show = open === undefined ? !megaBtn.classList.contains('open') : !!open;
-      megaBtn.classList.toggle('open', show);
-      megaBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
-      megaPanel.hidden = !show;
-    };
-    megaBtn.addEventListener('click', e => { e.stopPropagation(); setMega(); });
-    document.addEventListener('click', e => {
-      if (!e.target.closest('.mega-panel')) setMega(false);
-    });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape') setMega(false); });
-    megaPanel.querySelectorAll('a').forEach(a => {
-      a.addEventListener('click', () => setMega(false));
-    });
     const ts = document.getElementById('topSearch');
     if (ts) ts.addEventListener('keydown', e => {
       if (e.key !== 'Enter') return;
@@ -293,12 +261,12 @@ function guideHTML() {
   const steps = [
     ['menu', '從左上「選單」進入四大功能', '市場（大盤/個股/熱力圖）・選股（模組/策略/題材）・籌碼（法人/融資/ETF）・工具（篩選/行事曆/抽籤/計算機）'],
     ['search', '右上「查股」直接輸入股號或名稱', '例如 2330 或 台積電，免翻頁直接看 K 線、指標與評分'],
-    ['star', '看到喜歡的股票按 ☆ 加入自選', '行事曆會自動標記自選股的除權息/財報/抽籤事件'],
+    ['star', '看到喜歡的股票可加入自選', '個股頁按星號加入，行事曆會自動標記自選股的除權息/財報/抽籤事件'],
     ['clock', '盤後自動更新，時間透明', '08:30 新聞 / 15:30 行情・焦點 / 17:30 法人 / 19:00 處置・重大資訊 / 22:00 資券 / 週六 06:30 集保'],
   ];
   return `<div class="modal guide-modal">
     <button class="modal-close" onclick="closeGuide()" aria-label="關閉"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg></button>
-    <div class="guide-title">歡迎使用 盤後精選模組 🎉</div>
+    <div class="guide-title">歡迎使用 盤後精選模組</div>
     <div class="guide-sub">每天盤後自動整理台股公開資訊，免費使用；本站僅整理數據，不構成投資建議。</div>
     <div class="guide-steps">
       ${steps.map(s => `<div class="guide-step">
@@ -306,7 +274,7 @@ function guideHTML() {
         <div><div class="guide-step-title">${s[1]}</div><div class="guide-step-desc">${s[2]}</div></div>
       </div>`).join('')}
     </div>
-    <div class="guide-new">✨ 本版新增：處置股預警・重大資訊・今日題材焦點・K 線法人買賣超副圖</div>
+    <div class="guide-new">本版新增：處置股預警・重大資訊・今日題材焦點・K 線法人買賣超副圖</div>
     <button class="btn btn-primary guide-start" onclick="closeGuide()">開始使用</button>
   </div>`;
 }
