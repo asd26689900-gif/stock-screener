@@ -117,7 +117,7 @@ window.addEventListener('hashchange', syncHeroWithHash);
 let currentSid='', currentAnalysis=null, rawDaily=[], currentTF='D', currentInd='kd';
 let chartZoom=1, chartPanIdx=0, chartIsDragging=false, chartDragStartX=0, chartDragStartPan=0;
 let _chartRAF=0, _chartEventsAttached=false, _cachedMAs=null, _cachedMADataLen=0, _cachedMAKey='';
-let showBOLL=false, showInst=false, _cachedBOLL=null, _cachedBOLLDataLen=0;
+let showBOLL=false, showInst=false, showInstF=true, showInstT=true, showInstD=true, _cachedBOLL=null, _cachedBOLLDataLen=0;
 let activeMAs=[5,10,20,60];      // 啟用中的均線（可點圖例開關）
 let customMAs=[];                // 額外自訂均線週期（可刪除）
 let selectMode=false, selecting=false, selStartX=0, selCurX=0;
@@ -365,7 +365,6 @@ function renderStock(sid,d){
     <div class="chart-canvas" id="chartCanvas">
       <canvas id="kCanvas"></canvas>
       <canvas id="kOverlay" class="chart-overlay"></canvas>
-      <div class="chart-tooltip" id="kTooltip"></div>
       <div class="chart-price-tag" id="kPriceTag"></div>
     </div>
     <div class="chart-toolbar" style="margin-top:8px;margin-bottom:0">
@@ -506,6 +505,12 @@ function toggleInst(){
   document.querySelectorAll('#indTabs .toggle-chip').forEach(b=>{
     if(b.textContent.trim()==='法人') b.classList.toggle('active',showInst);
   });
+  scheduleChartRedraw();
+}
+function toggleInstSeries(k){
+  if(k==='f') showInstF=!showInstF;
+  else if(k==='t') showInstT=!showInstT;
+  else showInstD=!showInstD;
   scheduleChartRedraw();
 }
 
@@ -835,22 +840,26 @@ function drawChart(data){
     const instByDate={};
     hist.forEach(r=>{ if(r.date) instByDate[r.date.slice(0,10)]=[r.foreign_net||0,r.trust_net||0,r.dealer_net||0]; });
     const instVals=visData.map(d=>instByDate[d.d.slice(0,10)]||null);
-    const iMax=Math.max(1,...instVals.filter(Boolean).flatMap(v=>v.map(x=>Math.abs(x)/1000)));
+    const iColors=['#2962FF','#FF9800','#9C27B0'];
+    const flags=[showInstF,showInstT,showInstD];
+    const iMax=Math.max(1,...instVals.filter(Boolean).flatMap(v=>v.map((x,ci)=>flags[ci]?Math.abs(x)/1000:0)));
     const iy=v=>instTop+instH/2-(v/iMax)*(instH/2-3);
     ctx.strokeStyle=cGrid;ctx.setLineDash([4,3]);ctx.lineWidth=0.8;
     ctx.beginPath();ctx.moveTo(padL,iy(0));ctx.lineTo(drawW-padR,iy(0));ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle=cText;ctx.font='9px monospace';ctx.textAlign='right';
     ctx.fillText(Math.round(iMax)+'張',padL-4,instTop+10);
-    const iColors=['#2962FF','#FF9800','#9C27B0'];
     instVals.forEach((v,i)=>{
       if(!v) return;
-      const x=padL+i*cw+cw/2, bw2=Math.max(1,cw*0.22);
+      const x=padL+i*cw+cw/2;
+      const bw=Math.max(1,cw*0.17), gapB=Math.max(1,cw*0.05);
+      const x0=x-(bw*3+gapB*2)/2;
       iColors.forEach((col,ci)=>{
+        if(!flags[ci]) return;
         const val=Math.round(v[ci]/1000), pos=val>=0;
         const bh=Math.max(1,Math.abs(val)/iMax*(instH/2-3));
-        ctx.fillStyle=col;ctx.globalAlpha=pos?0.55:0.32;
-        ctx.fillRect(x-bw2,pos?iy(0)-bh:iy(0),bw2*2,bh);
+        ctx.fillStyle=col;ctx.globalAlpha=pos?0.6:0.35;
+        ctx.fillRect(x0+ci*(bw+gapB),pos?iy(0)-bh:iy(0),bw,bh);
         ctx.globalAlpha=1;
       });
     });
@@ -859,7 +868,7 @@ function drawChart(data){
       const last=instByDate[visData[visData.length-1].d.slice(0,10)]||[0,0,0];
       lc.style.display='';
       lc.innerHTML=instByDate&&Object.keys(instByDate).length?
-        ['外資','投信','自營'].map((lb,ci)=>`<span><span style="display:inline-block;width:12px;height:2px;background:${iColors[ci]};margin-right:4px;vertical-align:middle;border-radius:1px"></span>${lb} ${last[ci]>0?'+':''}${fmt(Math.round(last[ci]/1000))}張</span>`).join('')
+        ['外資','投信','自營'].map((lb,ci)=>`<span class="ma-chip ${flags[ci]?'on':''}" onclick="toggleInstSeries('${['f','t','d'][ci]}')"><span style="display:inline-block;width:12px;height:2px;background:${iColors[ci]};margin-right:3px;vertical-align:middle;border-radius:1px"></span>${lb} ${last[ci]>0?'+':''}${fmt(Math.round(last[ci]/1000))}張</span>`).join('')
         :'<span style="color:var(--text-secondary)">法人買賣超資料整理中</span>';
     }
   } else {
@@ -970,10 +979,8 @@ function setupChartEvents(canvas){
   container.addEventListener('mouseleave',()=>{
     if(!chartIsDragging){
       const overlay=document.getElementById('kOverlay');
-      const tooltip=document.getElementById('kTooltip');
       const priceTag=document.getElementById('kPriceTag');
       if(overlay){const octx=overlay.getContext('2d');octx.clearRect(0,0,overlay.width,overlay.height);}
-      if(tooltip)tooltip.style.display='none';
       if(priceTag)priceTag.style.display='none';
       if(chartDataCache.length) setOHLCBar(chartDataCache[chartDataCache.length-1], chartDataCache[chartDataCache.length-2]);
     }
@@ -996,7 +1003,6 @@ function setupChartEvents(canvas){
 
 function drawCrosshair(e){
   const overlay=document.getElementById('kOverlay');
-  const tooltip=document.getElementById('kTooltip');
   const priceTag=document.getElementById('kPriceTag');
   const canvas=document.getElementById('kCanvas');
   if(!overlay||!canvas||!chartLayout.data)return;
@@ -1008,7 +1014,6 @@ function drawCrosshair(e){
   if(mx<0||mx>L.drawW||my<0||my>L.H){
     const octx=overlay.getContext('2d');
     octx.clearRect(0,0,overlay.width,overlay.height);
-    tooltip.style.display='none';
     if(priceTag)priceTag.style.display='none';
     return;
   }
@@ -1041,24 +1046,13 @@ function drawCrosshair(e){
     priceTag.textContent=price>=100?price.toFixed(0):price.toFixed(2);
   }else if(priceTag){priceTag.style.display='none';}
 
-  // Tooltip
+  // 數值顯示在頂部資訊列，不擋圖表
   if(idx>=0&&idx<L.n){
     const d=L.data[idx];
     const globalIdx=L.vStart+idx;
     const prev=globalIdx>0?L.allData[globalIdx-1]:null;
-    const chg=prev?(d.c-prev.c):0;
-    const chgP=prev&&prev.c?(chg/prev.c*100):0;
-    const c=chg>=0?L.cUp:L.cDn;
-    tooltip.style.display='block';
-    tooltip.style.left=Math.max(4,Math.min(mx+16,rect.width-190))+'px';
-    tooltip.style.top='8px';
-    tooltip.innerHTML=`<div style="margin-bottom:3px;font-weight:600">${d.d}</div>
-      開 <span style="color:${c}">${d.o}</span>　高 <span style="color:${c}">${d.h}</span><br>
-      低 <span style="color:${c}">${d.l}</span>　收 <span style="color:${c}">${d.c}</span><br>
-      量 ${fmt(d.v)}張<br>
-      漲跌 <span style="color:${c}">${chg>=0?'+':''}${chg.toFixed(2)} (${chgP>=0?'+':''}${chgP.toFixed(2)}%)</span>`;
     setOHLCBar(d, prev);
-  }else{tooltip.style.display='none';}
+  }
 }
 
 function switchInd(ind){

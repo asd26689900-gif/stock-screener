@@ -691,6 +691,8 @@ tr.ipo-cancelled{opacity:.55}
 .evt-badge{display:inline-flex;align-items:center;gap:3px;background:var(--gold-soft);color:var(--gold);font-size:10px;padding:1px 6px;border-radius:99px;margin-left:5px;vertical-align:middle;font-family:var(--font-body)}
 .evt-alert-bar{background:var(--gold-soft);border:1px solid var(--gold);border-radius:var(--radius);padding:10px 14px;font-size:12.5px;color:var(--ink);margin-bottom:12px;line-height:1.7;display:flex;align-items:flex-start;gap:8px}
 .evt-alert-bar strong{color:var(--gold)}
+.wl-na{color:var(--text-secondary);opacity:.55}
+.wl-hint{font-size:12px;color:var(--text-secondary);line-height:1.7;margin-top:6px}
 
 /* ─── 篩選器 ─── */
 .filter-panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}

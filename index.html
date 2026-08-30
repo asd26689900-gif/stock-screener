@@ -36,7 +36,6 @@
     <div class="chart-canvas" id="twiiChartCanvas">
       <canvas id="twiiCanvas"></canvas>
       <canvas id="twiiOverlay" class="chart-overlay"></canvas>
-      <div class="chart-tooltip" id="twiiTooltip"></div>
     </div>
     <div class="slider-tabs" id="twiiIndTabs" style="margin-top:10px">
       <button class="slider-tab active" data-ind="kd" onclick="switchTwiiInd('kd')">KD</button>
@@ -464,21 +463,22 @@ function twiiAttachEvents(canvas){
   wrap.addEventListener('mouseleave',()=>{
     if(!twiiDrag){
       const ov=document.getElementById('twiiOverlay');
-      const tip=document.getElementById('twiiTooltip');
       if(ov){const c=ov.getContext('2d');c.clearRect(0,0,ov.width,ov.height);}
-      if(tip)tip.style.display='none';
+      const d=twiiData,last=d[d.length-1];
+      if(last) twiiSetLegend(last,d[d.length-2]);
     }
   });
 }
 function twiiCrosshair(e){
-  const ov=document.getElementById('twiiOverlay'),tip=document.getElementById('twiiTooltip');
+  const ov=document.getElementById('twiiOverlay');
   const canvas=document.getElementById('twiiCanvas');
   if(!ov||!twiiLayout||!twiiData.length)return;
   const L=twiiLayout,rect=canvas.getBoundingClientRect();
   const mx=e.clientX-rect.left,my=e.clientY-rect.top;
   if(mx<0||mx>L.W||my<0||my>L.H){
     const c=ov.getContext('2d');c.clearRect(0,0,ov.width,ov.height);
-    if(tip)tip.style.display='none';
+    const d=twiiData,last=d[d.length-1];
+    twiiSetLegend(last,d[d.length-2]);
     return;
   }
   const idx=Math.max(0,Math.min(L.data.length-1,Math.floor((mx-L.padL)/L.cw)));
@@ -491,22 +491,8 @@ function twiiCrosshair(e){
   c.strokeStyle='rgba(140,140,140,0.55)';c.lineWidth=0.8;
   c.beginPath();c.moveTo(x,0);c.lineTo(x,L.H);c.stroke();
   c.beginPath();c.moveTo(L.padL,my);c.lineTo(L.W-L.padR,my);c.stroke();
-  if(tip){
-    const prev=L.data[idx-1];
-    const chg=prev?(b.c-prev.c):0;
-    const chgP=prev&&prev.c?(chg/prev.c*100):0;
-    const cc=pctClass(chg);
-    const maVals=twiiActiveMA.map(p=>{
-      const arr=twiiCachedMA.arr[twiiActiveMA.indexOf(p)];
-      const v=arr?arr[idx+(L.vS)]:null;
-      return v!=null?`MA${p} ${v.toFixed(1)}`:'';
-    }).filter(Boolean).join(' ');
-    tip.innerHTML=`<div>${b.d}</div><div>開 <b>${b.o.toFixed(2)}</b> 高 <b class="${pctClass(b.h-b.o)}">${b.h.toFixed(2)}</b> 低 <b class="${pctClass(b.l-b.o)}">${b.l.toFixed(2)}</b> 收 <b>${b.c.toFixed(2)}</b></div><div class="${cc}">漲跌 ${chg>0?'+':''}${chg.toFixed(2)} (${fmtPct(chgP,2)})</div><div>量 ${fmt(b.v||0)}${maVals?' · '+maVals:''}</div>`;
-    tip.style.display='block';
-    const tipW=tip.offsetWidth;
-    tip.style.left=Math.min(x+14,L.W-tipW-6)+'px';
-    tip.style.top=Math.max(6,my-40)+'px';
-  }
+  // 數值顯示在頂部資訊列，不擋圖表
+  twiiSetLegend(b,L.data[idx-1]);
 }
 function twiiApplySel(){
   const L=twiiLayout;
