@@ -113,18 +113,31 @@ th,td{font-variant-numeric:tabular-nums}
   overflow-y:auto;overflow-x:hidden;
 }
 .side-nav-inner{display:flex;flex-direction:column;gap:2px;padding:14px 10px 16px;height:100%}
-.side-sec{margin-bottom:10px}
+.side-sec{margin-bottom:14px}
 .side-sec-label{
-  font-size:10px;color:var(--gold);font-weight:700;letter-spacing:.08em;
-  padding:3px 10px 5px;
+  display:flex;align-items:center;justify-content:space-between;
+  font-size:10.5px;color:var(--gold);font-weight:700;letter-spacing:.08em;
+  padding:4px 10px 7px;margin-bottom:6px;
+  border-bottom:1px solid var(--border-light);
+}
+.side-sec-label .cnt{
+  font-family:var(--font-mono);font-size:10px;font-weight:400;
+  color:var(--text-secondary);background:var(--surface);
+  border:1px solid var(--border-light);border-radius:99px;padding:0 7px;
 }
 .side-link{
-  display:block;padding:7px 10px;border-radius:8px;
+  position:relative;display:block;padding:8px 10px 8px 14px;border-radius:6px;
   color:var(--text-secondary);text-decoration:none;font-size:13.5px;white-space:nowrap;
+  transition:background .12s,color .12s,transform .12s;
 }
-.side-link:hover,.side-link.active{color:var(--gold);background:var(--gold-soft)}
-.side-link.active{font-weight:600}
-.side-watch{margin-top:auto;border-top:1px solid var(--border-light);padding-top:8px}
+.side-link:hover{background:var(--hover);color:var(--ink);transform:translateX(2px)}
+.side-link.active{background:var(--gold-soft);color:var(--gold);font-weight:700}
+.side-link.active::before{
+  content:'';position:absolute;left:0;top:22%;bottom:22%;width:3px;
+  border-radius:2px;background:var(--gold);
+}
+.side-watch{margin-top:auto;border-top:1px solid var(--border-light);padding-top:12px}
+.side-watch{color:var(--ink);font-weight:600}
 
 /* 桌面：內容讓出島寬、隱藏頂部群組與 Mega（改由懸浮島提供） */
 @media(min-width:769px){

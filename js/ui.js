@@ -276,9 +276,9 @@ function renderChrome() {
       <div class="side-nav-inner">
         ${NAV_GROUPS.map(g => `
           <div class="side-sec">
-            <div class="side-sec-label">${g.label}</div>
+            <div class="side-sec-label">${g.label}<span class="cnt">${g.items.length}</span></div>
             ${g.items.map(([href, key, label]) =>
-              `<a href="${href}" class="side-link ${isActive(href) ? 'active' : ''}">${label}</a>`
+              `<a href="${href}" class="side-link ${isActive(href) ? 'active' : ''}" ${isActive(href) ? 'aria-current="page"' : ''}>${label}</a>`
             ).join('')}
           </div>`).join('')}
         <a href="watchlist.html" class="side-link side-watch ${isActive('watchlist.html') ? 'active' : ''}">自選股</a>
