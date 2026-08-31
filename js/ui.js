@@ -113,6 +113,7 @@ const NAV_GROUPS = [
       ['calendar.html', 'calendar', '投資行事曆'],
       ['ipo.html', 'ipo', '股票抽籤'],
       ['tools.html', 'tools', '股票計算機'],
+      ['concepts_admin.html', 'concepts_admin', '題材管理'],
     ],
   },
 ];

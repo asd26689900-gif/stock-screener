@@ -683,14 +683,15 @@ async function loadNews(){
 async function loadThemeFocus(){
   const box=document.getElementById('themeFocusBox');
   if(!box||!sb) return;
-  const allIds=[...new Set(CONCEPTS.flatMap(c=>c.ids))];
+  const cs=await loadConceptsData();
+  const allIds=[...new Set(cs.flatMap(c=>c.ids))];
   try{
     const {data}=await sb.from('stock_metrics')
       .select('stock_id,name,close,change_pct,volume')
       .in('stock_id',allIds);
     const mm={};
     (data||[]).forEach(d=>{ mm[d.stock_id]=d; });
-    const cards=CONCEPTS.map(c=>{
+    const cards=cs.map(c=>{
       const stocks=c.ids.map(id=>mm[id]).filter(Boolean);
       if(!stocks.length) return null;
       const avg=stocks.reduce((s,d)=>s+(d.change_pct||0),0)/stocks.length;

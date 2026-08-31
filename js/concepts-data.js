@@ -65,3 +65,26 @@ const CONCEPTS = [
    ids:['3231','2455','6285','3380','5309','4977','3714'],
    tier:1, up:['silicon_photonics','passive'], down:[]},
 ];
+
+/* ── 題材資料來源：優先讀資料庫（管理頁可增刪），無資料時回退靜態表 ── */
+let ACTIVE_CONCEPTS = null;
+async function loadConceptsData() {
+  if (ACTIVE_CONCEPTS) return ACTIVE_CONCEPTS;
+  let arr = null;
+  if (typeof sb !== 'undefined' && sb) {
+    try {
+      const { data } = await sb.from('concepts').select('*').order('sort', { ascending: true });
+      if (data && data.length) {
+        arr = data.map(c => ({
+          key: c.key, title: c.title, desc: c.desc || '',
+          ids: Array.isArray(c.ids) ? c.ids : [],
+          tier: c.tier || 0,
+          up: Array.isArray(c.up) ? c.up : [],
+          down: Array.isArray(c.down) ? c.down : [],
+        }));
+      }
+    } catch (e) { /* 表不存在或讀取失敗 → 用靜態表 */ }
+  }
+  ACTIVE_CONCEPTS = arr || CONCEPTS;
+  return ACTIVE_CONCEPTS;
+}

@@ -29,9 +29,11 @@ function fmt(v){ return fmtVal(v); }
 
 async function loadConcepts(){
   if(!sb){ document.getElementById('app').innerHTML='<div class="loading">系統載入中...</div>'; return; }
+  const cs = await loadConceptsData();
+  ACTIVE_CONCEPTS = cs;
 
   // 收集所有需要的股票 ID
-  const allIds = [...new Set(CONCEPTS.flatMap(c => c.ids))];
+  const allIds = [...new Set(cs.flatMap(c => c.ids))];
 
   const { data, error } = await sb.from('stock_metrics')
     .select('stock_id,name,close,change_pct,volume,foreign_net_shares,rev_yoy,date')
@@ -45,7 +47,7 @@ async function loadConcepts(){
   data.forEach(d => { metricsMap[d.stock_id] = d; });
 
   // 計算每個題材的統計
-  const cards = CONCEPTS.map(c => {
+  const cards = cs.map(c => {
     const stocks = c.ids.map(id => metricsMap[id]).filter(Boolean);
     if(!stocks.length) return null;
     const avgChg = stocks.reduce((s, d) => s + (d.change_pct || 0), 0) / stocks.length;
@@ -167,7 +169,7 @@ function resetGraphFocus(){
 }
 
 function showDetail(key){
-  const c = CONCEPTS.find(x => x.key === key);
+  const c = (ACTIVE_CONCEPTS || CONCEPTS).find(x => x.key === key);
   if(!c) return;
   try{ history.replaceState(null, '', '#' + key); }catch(e){}
   const stocks = c.ids.map(id => metricsMap[id]).filter(Boolean);
@@ -190,7 +192,7 @@ function showDetail(key){
   const avgChg = stocks.reduce((s, d) => s + (d.change_pct||0), 0) / stocks.length;
   const cls = avgChg >= 0 ? 'up' : 'dn';
   const rel = (arr, label) => (arr && arr.length)
-    ? `<div class="rel-row"><span class="rel-label">${label}</span>${arr.map(k => { const x = CONCEPTS.find(cc => cc.key === k); return x ? `<button class="rel-chip" onclick="jumpConcept('${k}')">${x.title}</button>` : ''; }).join('')}</div>`
+    ? `<div class="rel-row"><span class="rel-label">${label}</span>${arr.map(k => { const x = (ACTIVE_CONCEPTS || CONCEPTS).find(cc => cc.key === k); return x ? `<button class="rel-chip" onclick="jumpConcept('${k}')">${x.title}</button>` : ''; }).join('')}</div>`
     : '';
 
   document.getElementById('detailModal').innerHTML = `<div class="modal">
@@ -220,9 +222,10 @@ function closeDetail(){
 }
 document.addEventListener('keydown', e => { if(e.key==='Escape') closeDetail(); });
 
-function onDataReady(){
-  const p=loadConcepts();
-  if(p&&p.then) p.then(afterLoad); else setTimeout(afterLoad, 900);
+async function onDataReady(){
+  await loadConceptsData();
+  await loadConcepts();
+  afterLoad();
 }
 function afterLoad(){
   const key=(location.hash||'').replace('#','');
