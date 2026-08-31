@@ -92,6 +92,7 @@ def fetch_twse_prices(date_dt):
                 "stock_id": sid,
                 "name": line[2].strip().strip('"'),
                 "date": iso_date(date_dt),
+                "mkt": "twse",
                 "open": parse_num(line[5]),
                 "high": parse_num(line[6]),
                 "low": parse_num(line[7]),
@@ -125,6 +126,7 @@ def fetch_tpex_prices(date_dt):
                 "stock_id": sid,
                 "name": str(line[1]).strip(),
                 "date": iso_date(date_dt),
+                "mkt": "tpex",
                 "open": parse_num(line[4]),
                 "high": parse_num(line[5]),
                 "low": parse_num(line[6]),
@@ -509,6 +511,34 @@ print(f"\n   共取得 {fetched_days} 個交易日行情")
 if fetched_days < 3:
     print("❌ 行情資料不足（可能是假日），結束")
     sys.exit(1)
+
+# ── 盤前/假日回聲偵測（分市場） ──
+# TWSE/TPEX 在尚未開盤/資料未發布的日期，會回傳「上一交易日資料」但標記新日期。
+# 逐市場比較最後一天與前一交易日，幾乎完全一致 → 判定回聲，捨棄該市場該日。
+dropped_echo = []  # (mkt, date, sids)
+def _same_bar(a, b):
+    return (a.get("open") == b.get("open") and a.get("high") == b.get("high")
+            and a.get("low") == b.get("low") and a.get("close") == b.get("close")
+            and a.get("Trading_Volume") == b.get("Trading_Volume"))
+for _mkt in ("twse", "tpex"):
+    _mrows = [r for r in all_prices if r.get("mkt") == _mkt]
+    _dates = sorted({r["date"] for r in _mrows})
+    if len(_dates) < 2:
+        continue
+    _prev_iso, _cur_iso = _dates[-2], _dates[-1]
+    _prev_map = {r["stock_id"]: r for r in _mrows if r["date"] == _prev_iso}
+    _cur_map = {r["stock_id"]: r for r in _mrows if r["date"] == _cur_iso}
+    _common = list(set(_prev_map) & set(_cur_map))
+    if not _common:
+        continue
+    _identical = sum(1 for s in _common if _same_bar(_prev_map[s], _cur_map[s]))
+    if _identical / len(_common) > 0.95:
+        print(f"⚠ 偵測到 {_mkt} {_cur_iso} 為 {_prev_iso} 的回聲假資料（{_identical}/{len(_common)} 完全相同），捨棄", flush=True)
+        dropped_echo.append((_mkt, _cur_iso, list(_cur_map.keys())))
+        all_prices = [r for r in all_prices if not (r.get("mkt") == _mkt and r["date"] == _cur_iso)]
+_real_dates = sorted({r["date"] for r in all_prices})
+if _real_dates:
+    end_str = _real_dates[-1]
 
 # 按 stock_id 分組，按日期排序
 stocks = defaultdict(list)
@@ -969,6 +999,7 @@ for sid in stocks:
     if len(data) < 20: continue
     p = data[-1]
     if not p["close"]: continue  # 跳過收盤價為0的股票
+    if p["date"] != end_str: continue  # 該股當日無真實資料（停牌/該市場回聲被捨棄）→ 不寫當日分析
     prev = data[-2] if len(data) >= 2 else p
     name = name_map.get(sid, sid)
     close = p["close"]
@@ -1571,3 +1602,21 @@ for tbl in ["daily_heatmap", "daily_modules", "daily_strategies", "daily_focus"]
         print(f"   {tbl}: 已清理")
     except Exception as e:
         print(f"   {tbl}: 清理失敗 ({e})")
+
+# ── 清除比最新真實交易日更新的「未來假資料」（盤前 echo / 手動誤寫）──
+for tbl in ["daily_stk", "daily_focus", "daily_heatmap", "daily_modules", "daily_strategies", "stock_prices"]:
+    try:
+        sb.table(tbl).delete().gt("date", end_str).execute()
+        print(f"   {tbl}: 已清除 {end_str} 之後的假資料")
+    except Exception as e:
+        print(f"   {tbl}: 清除失敗 ({e})")
+
+# ── 清除「該市場被判定回聲而捨棄」的個股當日假資料 ──
+for _mkt, _ddate, _sids in dropped_echo:
+    for _tbl in ("stock_prices", "daily_stk"):
+        try:
+            for _i in range(0, len(_sids), 100):
+                sb.table(_tbl).delete().eq("date", _ddate).in_("stock_id", _sids[_i:_i + 100]).execute()
+            print(f"   {_tbl}: 已清除 {_mkt} {_ddate} 回聲假資料 {len(_sids)} 檔")
+        except Exception as e:
+            print(f"   {_tbl}: 清除失敗 ({e})")
