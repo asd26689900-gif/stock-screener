@@ -33,17 +33,13 @@
     </div>
     <div class="ohlcv-legend" id="twiiLegend"></div>
     <div class="ma-legend" id="twiiMaLegend"></div>
-    <div class="chart-canvas" id="twiiChartCanvas">
-      <canvas id="twiiCanvas"></canvas>
-      <canvas id="twiiOverlay" class="chart-overlay"></canvas>
-    </div>
+    <div class="chart-canvas" id="twiiChartCanvas" style="height:300px"></div>
     <div class="slider-tabs" id="twiiIndTabs" style="margin-top:10px">
       <button class="slider-tab active" data-ind="kd" onclick="switchTwiiInd('kd')">KD</button>
       <button class="slider-tab" data-ind="rsi" onclick="switchTwiiInd('rsi')">RSI</button>
       <button class="slider-tab" data-ind="macd" onclick="switchTwiiInd('macd')">MACD</button>
       <button class="toggle-chip" onclick="toggleTwiiBOLL()" style="margin-left:auto">BOLL</button>
     </div>
-    <div class="chart-canvas"><canvas id="twiiIndCanvas"></canvas></div>
   </div>
 
   <!-- 類股漲跌 -->
@@ -78,6 +74,8 @@
 <script src="js/concepts-data.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/init.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="js/kchart.js"></script>
 <script>
 function esc(s){ return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function fmt(v){ return fmtVal(v); }
@@ -541,6 +539,81 @@ async function switchTwii(tf){
   sliderTabs(document.getElementById('twiiTabs'));
   const bars=await loadTwii(tf);
   drawTwii(bars);
+}
+
+/* ══════════════════════════════════════
+   TradingView 引擎（覆寫自繪 canvas）
+   ══════════════════════════════════════ */
+let twKC=null, twBoxMode=false;
+function ensureTwKC(){
+  if(twKC) return twKC;
+  twKC=createKChart(document.getElementById('twiiChartCanvas'),{
+    height:300,
+    onLegend:(b,prev)=>twiiSetLegend(b,prev),
+    ind:twiiInd,
+  });
+  return twKC;
+}
+function drawTwii(bars){
+  twiiData=bars||[];
+  if(!twiiData.length){
+    if(twKC) twKC.setData([]);
+    return;
+  }
+  const k=ensureTwKC();
+  k.setData(twiiData);
+  k.setInd(twiiInd);
+  k.setBOLL(twiiBOLL);
+  k.setMA(twiiActiveMA);
+  renderTwiiLegends();
+}
+function renderTwiiLegends(){
+  const ml=document.getElementById('twiiMaLegend');
+  if(!ml) return;
+  const valOf=p=>{const arr=KChart.calcMA(twiiData,p);const v=arr&&arr.filter(x=>x!=null).pop();return v!=null?v.toFixed(1):'—';};
+  ml.innerHTML=[5,10,20,60].map(p=>{
+    const on=twiiActiveMA.includes(p);
+    return `<span class="ma-chip ${on?'on':''}" onclick="toggleTwiiMA(${p})"><span style="display:inline-block;width:12px;height:2px;background:${KChart.MA_COLORS[p]};margin-right:3px;vertical-align:middle;border-radius:1px;opacity:${on?1:.35}"></span>MA${p} ${on?valOf(p):'—'}</span>`;
+  }).join('')+`<span class="ma-chip ${twiiBOLL?'on':''}" onclick="toggleTwiiBOLL()">BOLL(20,2)</span>`;
+}
+function switchTwiiInd(ind){
+  twiiInd=ind;
+  document.querySelectorAll('#twiiIndTabs .slider-tab').forEach(b=>b.classList.toggle('active',b.dataset.ind===ind));
+  sliderTabs(document.getElementById('twiiIndTabs'));
+  if(twKC) twKC.setInd(ind);
+}
+function toggleTwiiBOLL(){
+  twiiBOLL=!twiiBOLL;
+  document.querySelectorAll('#twiiIndTabs .toggle-chip').forEach(b=>b.classList.toggle('active',twiiBOLL));
+  if(twKC) twKC.setBOLL(twiiBOLL);
+  renderTwiiLegends();
+}
+function toggleTwiiMA(p){
+  const i=twiiActiveMA.indexOf(p);
+  if(i>=0) twiiActiveMA.splice(i,1); else twiiActiveMA.push(p);
+  twiiActiveMA.sort((a,b)=>a-b);
+  if(twKC) twKC.setMA(twiiActiveMA);
+  renderTwiiLegends();
+}
+function toggleTwiiSelect(){
+  twBoxMode=!twBoxMode;
+  document.querySelectorAll('.chart-toolbar .tf-btn').forEach(b=>{ if(b.textContent.trim()==='框選') b.classList.toggle('active',twBoxMode); });
+  if(!twBoxMode||!twKC) return;
+  const el=document.getElementById('twiiChartCanvas');
+  const down=ev=>{
+    const rect=el.getBoundingClientRect();
+    const x0=ev.clientX-rect.left;
+    const move=ev2=>{
+      const x1=ev2.clientX-rect.left;
+      const l0=twKC.chart.timeScale().coordinateToLogical(x0);
+      const l1=twKC.chart.timeScale().coordinateToLogical(x1);
+      if(l0!=null&&l1!=null) twKC.chart.timeScale().setVisibleLogicalRange({from:Math.min(l0,l1),to:Math.max(l0,l1)});
+    };
+    const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); toggleTwiiSelect(); };
+    document.addEventListener('mousemove',move);
+    document.addEventListener('mouseup',up);
+  };
+  el.addEventListener('mousedown',down,{once:true});
 }
 
 /* ── 每日焦點 ── */

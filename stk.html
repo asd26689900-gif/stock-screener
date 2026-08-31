@@ -44,6 +44,8 @@
 <script src="js/config.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/init.js"></script>
+<script src="https://unpkg.com/lightweight-charts@4.2.0/dist/lightweight-charts.standalone.production.js"></script>
+<script src="js/kchart.js"></script>
 <script>
 // 頁面載入：hash 有值 → 藏 hero 直接查
 function syncHeroWithHash(){
@@ -362,11 +364,7 @@ function renderStock(sid,d){
     <div class="ohlcv-legend" id="ohlcvLegend"></div>
     <div class="ma-legend" id="maLegend"></div>
     <div class="ma-legend" id="instSubLegend" style="display:none"></div>
-    <div class="chart-canvas" id="chartCanvas">
-      <canvas id="kCanvas"></canvas>
-      <canvas id="kOverlay" class="chart-overlay"></canvas>
-      <div class="chart-price-tag" id="kPriceTag"></div>
-    </div>
+    <div class="chart-canvas" id="chartCanvas" style="height:360px"></div>
     <div class="chart-toolbar" style="margin-top:8px;margin-bottom:0">
       <span class="chart-label" style="font-size:13px">技術指標</span>
     </div>
@@ -377,7 +375,6 @@ function renderStock(sid,d){
       <button class="toggle-chip ${showInst?'active':''}" onclick="toggleInst()" title="法人買賣超（外資/投信/自營，張）">法人</button>
       <button class="toggle-chip ${showBOLL?'active':''}" onclick="toggleBOLL()" style="margin-left:auto">BOLL</button>
     </div>
-    <div class="chart-canvas"><canvas id="indCanvas"></canvas></div>
   </div>`:`<div class="chart-box"><div class="chart-toolbar"><span class="chart-label">${I('chart',14)} K線走勢圖</span></div><div style="padding:30px;text-align:center;color:var(--text-secondary)">歷史資料載入中（回填後可顯示）</div></div>`}
   ${renderMATags(d)}
   ${renderMetricStrip(d)}
@@ -1515,4 +1512,87 @@ function resetScoreCfgUI(){
 }
 
 function onDataReady(){ if(location.hash) doSearch(); }
+
+/* ══════════════════════════════════════
+   TradingView 引擎（覆寫自繪 canvas：drawChart / drawIndicator / switchInd / 框選）
+   ══════════════════════════════════════ */
+let kc=null, kcBoxMode=false;
+function stkInstMap(){
+  const m={};
+  (((currentAnalysis||{}).inst_hist)||[]).forEach(r=>{ if(r.date) m[r.date.slice(0,10)]=[Math.round((r.foreign_net||0)/1000),Math.round((r.trust_net||0)/1000),Math.round((r.dealer_net||0)/1000)]; });
+  return m;
+}
+function ensureKC(){
+  const el=document.getElementById('chartCanvas');
+  if(!el) return null;
+  if(kc && kc._el===el) return kc;
+  if(kc){ try{ kc.remove(); }catch(e){} kc=null; }
+  kc=createKChart(el,{
+    onLegend:(b,prev)=>setOHLCBar(b,prev),
+    ind:currentInd,
+    instByDate:stkInstMap(),
+  });
+  kc._el=el;
+  return kc;
+}
+function drawChart(data){
+  chartDataCache=data||[];
+  if(!chartDataCache.length) return;
+  const k=ensureKC();
+  k.setData(chartDataCache);
+  k.setInd(currentInd);
+  k.setBOLL(showBOLL);
+  k.setMA(activeMAs);
+  k.setInstFlags([showInstF,showInstT,showInstD]);
+  renderStkLegends();
+}
+function drawIndicator(){ /* 指標由 kchart 渲染 */ }
+function scheduleChartRedraw(){ drawChart(chartDataCache); }
+function switchInd(ind){
+  currentInd=ind;
+  document.querySelectorAll('#indTabs .slider-tab').forEach(b=>b.classList.toggle('active',b.dataset.ind===ind));
+  sliderTabs(document.getElementById('indTabs'));
+  if(kc) kc.setInd(ind);
+}
+function renderStkLegends(){
+  const ml=document.getElementById('maLegend');
+  if(ml){
+    const valOf=p=>{const arr=KChart.calcMA(chartDataCache,p);const v=arr&&arr.filter(x=>x!=null).pop();return v!=null?v.toFixed(1):'—';};
+    ml.innerHTML=[5,10,20,60].map(p=>{
+      const on=activeMAs.includes(p);
+      return `<span class="ma-chip ${on?'on':''}" onclick="toggleMA(${p})"><span style="display:inline-block;width:12px;height:2px;background:${KChart.MA_COLORS[p]};margin-right:3px;vertical-align:middle;border-radius:1px;opacity:${on?1:.35}"></span>MA${p} ${on?valOf(p):'—'}</span>`;
+    }).join('')+customMAs.map(p=>{
+      const v=valOf(p);
+      return `<span class="ma-chip on"><span style="display:inline-block;width:12px;height:2px;background:#2F6E6C;margin-right:3px;vertical-align:middle;border-radius:1px"></span>MA${p} ${v}<span class="ma-x" onclick="event.stopPropagation();removeCustomMA(${p})">✕</span></span>`;
+    }).join('')+`<span class="ma-chip ${showBOLL?'on':''}" onclick="toggleBOLL()">BOLL(20,2)</span>`;
+  }
+  const il=document.getElementById('instSubLegend');
+  if(il){
+    il.style.display=showInst?'':'none';
+    if(showInst){
+      const last=stkInstMap()[String(chartDataCache[chartDataCache.length-1].d).slice(0,10)]||[0,0,0];
+      il.innerHTML=['外資','投信','自營'].map((lb,ci)=>`<span class="ma-chip ${[showInstF,showInstT,showInstD][ci]?'on':''}" onclick="toggleInstSeries('${['f','t','d'][ci]}')"><span style="display:inline-block;width:12px;height:2px;background:${['#2962FF','#FF9800','#9C27B0'][ci]};margin-right:3px;vertical-align:middle;border-radius:1px"></span>${lb} ${last[ci]>0?'+':''}${fmt(Math.round(last[ci]))}張</span>`).join('');
+    }
+  }
+}
+function toggleSelectMode(){
+  kcBoxMode=!kcBoxMode;
+  document.querySelectorAll('.chart-toolbar .tf-btn').forEach(b=>{ if(b.textContent.trim()==='框選') b.classList.toggle('active',kcBoxMode); });
+  if(!kcBoxMode||!kc) return;
+  const el=document.getElementById('chartCanvas');
+  const down=ev=>{
+    const rect=el.getBoundingClientRect();
+    const x0=ev.clientX-rect.left;
+    const move=ev2=>{
+      const x1=ev2.clientX-rect.left;
+      const l0=kc.chart.timeScale().coordinateToLogical(x0);
+      const l1=kc.chart.timeScale().coordinateToLogical(x1);
+      if(l0!=null&&l1!=null) kc.chart.timeScale().setVisibleLogicalRange({from:Math.min(l0,l1),to:Math.max(l0,l1)});
+    };
+    const up=()=>{ document.removeEventListener('mousemove',move); document.removeEventListener('mouseup',up); toggleSelectMode(); };
+    document.addEventListener('mousemove',move);
+    document.addEventListener('mouseup',up);
+  };
+  el.addEventListener('mousedown',down,{once:true});
+}
 </script>
