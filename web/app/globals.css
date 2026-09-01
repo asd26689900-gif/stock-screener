@@ -367,6 +367,17 @@ img,svg{display:block}
 .result-box hr{border:none;border-top:1px solid var(--border);margin:8px 0}
 @media (max-width:640px){.tool-card{padding:18px 16px}.calc-form{grid-template-columns:1fr}.calc-field{grid-template-columns:100px 1fr}}
 
+/* ─── 投資行事曆 ─── */
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:16px}
+.cal-dow{font-size:10.5px;color:var(--text-secondary);text-align:center;font-weight:700;padding:2px 0}
+.cal-day{position:relative;min-height:54px;border:1px solid var(--border-light);border-radius:6px;padding:4px;display:flex;flex-direction:column;gap:2px}
+.cal-day.empty{border-color:transparent;background:transparent}
+.cal-day.today{border-color:var(--gold);background:var(--gold-soft)}
+.cal-day.has-events{background:var(--surface)}
+.cal-num{font-family:var(--font-mono);font-size:11px;color:var(--text-secondary)}
+.cal-day.today .cal-num{color:var(--gold);font-weight:700}
+.hc-count{position:absolute;right:4px;bottom:4px;min-width:16px;height:16px;border-radius:99px;background:var(--teal);color:#fff;font-size:9px;font-weight:700;line-height:16px;text-align:center;padding:0 4px}
+
 /* ─── 表格 ─── */
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
 table{width:100%;border-collapse:collapse;font-size:13.5px}

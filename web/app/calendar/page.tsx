@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
-import PlaceholderPage from "@/components/PlaceholderPage";
+import CalendarApp from "@/components/CalendarApp";
 
 export const metadata: Metadata = { title: "投資行事曆" };
 
 export default function Page() {
-  return <PlaceholderPage title="投資行事曆" desc="除權息 / 財報 / 抽籤 / 增資事件（群組上限＋自選股標記）" phase="第 4 批" />;
+  return (
+    <div className="container">
+      <div className="page-header">
+        <h1 className="page-title">投資行事曆</h1>
+        <p className="page-desc">除權息 / 股票抽籤 / 財報 / 月營收公告；財報群組上千筆時自動收合。</p>
+      </div>
+      <CalendarApp />
+    </div>
+  );
 }
