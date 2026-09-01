@@ -114,3 +114,94 @@ export async function getStockPage(sid: string): Promise<StockPageData | null> {
     return null;
   }
 }
+
+export type ConceptStock = {
+  stock_id: string;
+  name: string;
+  close: number | null;
+  change_pct: number | null;
+  volume: number;
+  industry: string;
+  role: string;
+  foreign_net_shares: number;
+  trust_net_shares: number;
+  rev_yoy: number | null;
+  date: string | null;
+  returns: { d1: number | null; d5: number | null; d20: number | null; d60: number | null };
+  signals: number;
+  scoreFund: number | null;
+  scoreTech: number | null;
+  pe: number | null;
+};
+
+function pctFrom(base: number | undefined, cur: number | undefined): number | null {
+  if (base == null || cur == null || !base) return null;
+  return Math.round(((cur - base) / base) * 10000) / 100;
+}
+
+/** 單題材成分股：報價＋1/5/20/60日報酬（stock_prices）＋訊號數＋品質/估值/法人標籤所需欄位 */
+export async function getConceptStocks(ids: string[]): Promise<ConceptStock[]> {
+  if (!sb || !ids.length) return [];
+  try {
+    const cutoff = new Date(Date.now() - 120 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const [metricsRes, pricesRes, stkRes] = await Promise.all([
+      sb.from("stock_metrics").select("stock_id,name,close,change_pct,volume,foreign_net_shares,trust_net_shares,rev_yoy,date,industry").in("stock_id", ids),
+      sb.from("stock_prices").select("stock_id,date,close").in("stock_id", ids).gte("date", cutoff).order("date", { ascending: true }),
+      sb.from("daily_stk").select("stock_id,date,data").in("stock_id", ids).order("date", { ascending: false }).limit(200),
+    ]);
+    const metricsMap = new Map<string, Record<string, unknown>>();
+    for (const m of metricsRes.data ?? []) metricsMap.set(String(m.stock_id), m);
+
+    const closes = new Map<string, number[]>();
+    for (const p of pricesRes.data ?? []) {
+      const arr = closes.get(String(p.stock_id)) ?? [];
+      arr.push(Number(p.close));
+      closes.set(String(p.stock_id), arr);
+    }
+
+    const stkLatest = new Map<string, { date: string; data: Record<string, unknown> }>();
+    for (const r of stkRes.data ?? []) {
+      const sid = String(r.stock_id);
+      if (!stkLatest.has(sid)) stkLatest.set(sid, { date: r.date, data: r.data as Record<string, unknown> });
+    }
+
+    return ids.map((id) => {
+      const m = metricsMap.get(id) ?? {};
+      const arr = closes.get(id) ?? [];
+      const last = arr[arr.length - 1];
+      const idx = (n: number) => arr[arr.length - 1 - n];
+      const stk = stkLatest.get(id);
+      const d = stk?.data ?? {};
+      const criteria = (d.criteria ?? {}) as { chip?: string[]; fundamental?: string[]; technical?: string[] };
+      const signals = (criteria.chip?.length ?? 0) + (criteria.fundamental?.length ?? 0) + (criteria.technical?.length ?? 0);
+      const scores = (d.scores ?? {}) as { chip?: number; fundamental?: number; technical?: number };
+      const fundamental = (d.fundamental ?? {}) as { pe?: number };
+      const industry = String(m.industry ?? "");
+      return {
+        stock_id: id,
+        name: String(m.name ?? id),
+        close: last != null ? last : m.close != null ? Number(m.close) : null,
+        change_pct: m.change_pct != null ? Number(m.change_pct) : null,
+        volume: Number(m.volume ?? 0),
+        industry,
+        role: industry || "成分股",
+        foreign_net_shares: Number(m.foreign_net_shares ?? 0),
+        trust_net_shares: Number(m.trust_net_shares ?? 0),
+        rev_yoy: m.rev_yoy != null ? Number(m.rev_yoy) : null,
+        date: m.date != null ? String(m.date) : stk?.date ?? null,
+        returns: {
+          d1: pctFrom(idx(1), last),
+          d5: pctFrom(idx(5), last),
+          d20: pctFrom(idx(20), last),
+          d60: pctFrom(idx(60), last),
+        },
+        signals,
+        scoreFund: scores.fundamental != null ? Number(scores.fundamental) : null,
+        scoreTech: scores.technical != null ? Number(scores.technical) : null,
+        pe: fundamental.pe != null ? Number(fundamental.pe) : null,
+      };
+    });
+  } catch {
+    return [];
+  }
+}

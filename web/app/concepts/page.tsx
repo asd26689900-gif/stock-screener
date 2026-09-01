@@ -1,8 +1,24 @@
 import type { Metadata } from "next";
-import PlaceholderPage from "@/components/PlaceholderPage";
+import { getConcepts } from "@/lib/concepts";
+import { getConceptStocks } from "@/lib/stock";
+import ConceptsView from "@/components/ConceptsView";
 
 export const metadata: Metadata = { title: "題材概念股" };
+export const dynamic = "force-dynamic";
 
-export default function Page() {
-  return <PlaceholderPage title="題材概念股" desc="題材列表＋單題材頁（仿 finlab：成分股角色、報酬、上下游三層圖）" phase="第 4 批" />;
+export default async function Page() {
+  const concepts = await getConcepts();
+  const allIds = [...new Set(concepts.flatMap((c) => c.ids))];
+  const stocks = await getConceptStocks(allIds);
+  const stocksMap = new Map(stocks.map((s) => [s.stock_id, s]));
+  const date = stocks.find((s) => s.date)?.date ?? "";
+  return (
+    <div className="container">
+      <div className="page-header">
+        <h1 className="page-title">題材概念股</h1>
+        <p className="page-desc">題材關係圖＋成分股報酬，每日盤後更新。</p>
+      </div>
+      <ConceptsView concepts={concepts} stocksMap={stocksMap} date={date} />
+    </div>
+  );
 }
