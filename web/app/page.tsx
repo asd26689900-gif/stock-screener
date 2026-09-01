@@ -4,6 +4,7 @@ import { getLatestExecutionTimes, getLatestFocus, type FocusData, type Row, type
 import { fmt, fmtSigned, pctClass } from "@/lib/format";
 import UpdateStamp from "@/components/UpdateStamp";
 import FocusStrong from "@/components/FocusStrong";
+import IndexChart from "@/components/IndexChart";
 
 export const metadata: Metadata = { title: "市場總覽" };
 export const dynamic = "force-dynamic";
@@ -77,13 +78,7 @@ export default async function Home() {
         </p>
       </div>
 
-      <div className="card">
-        <div className="section-title" style={{ marginTop: 0 }}>
-          大盤走勢
-          <UpdateStamp job="update" times={times} />
-        </div>
-        <div className="empty-msg">K 線圖將於第 2 批（個股 + 大盤 K 線）上線，沿用 lightweight-charts v4 引擎。</div>
-      </div>
+      <IndexChart />
 
       <div className="section-title">
         本週強勢股
