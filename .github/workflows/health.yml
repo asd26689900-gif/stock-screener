@@ -1,8 +1,8 @@
 name: 資料新鮮度檢查
 on:
   schedule:
-    # 週一~五 16:45 台北 = 08:45 UTC（15:30 盤後更新完成後檢查）
-    - cron: '45 8 * * 1-5'
+    # 週一~五 08:00–18:00 台北每小時 = 00:00–10:00 UTC
+    - cron: '0 0-10 * * 1-5'
   workflow_dispatch:
 
 jobs:
@@ -14,8 +14,48 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
+      - run: pip install -r requirements.txt
       - run: python -X utf8 -u health.py
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
           PYTHONUNBUFFERED: "1"
+      - name: 檢查是否需自動重試（6 小時最多一次）
+        if: failure()
+        id: retry
+        run: python -X utf8 -u retry_guard.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      - name: 重新觸發 daily + extra 更新
+        if: failure() && steps.retry.outputs.retry == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          IN_PROGRESS=$(gh run list --workflow=daily.yml --limit 5 --json status --jq '[.[].status] | index("in_progress") != null' 2>/dev/null || echo false)
+          if [ "$IN_PROGRESS" = "true" ]; then
+            echo "daily 更新仍在執行，跳過重試"
+            exit 0
+          fi
+          gh workflow run daily.yml
+          gh workflow run extra.yml || true
+      - name: 開/更新「資料逾期」通知 issue
+        if: failure() && steps.retry.outputs.retry == '1'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RUN_URL="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          BODY="資料新鮮度異常，已自動重試 daily + extra。檢查記錄: $RUN_URL"
+          EXISTING=$(gh issue list --label data-stale --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then
+            gh issue edit "$EXISTING" --body "$BODY" || true
+          else
+            gh issue create --title "⚠ 資料新鮮度異常（已自動重試）" --label data-stale --body "$BODY" || true
+          fi
+      - name: 資料恢復時關閉通知
+        if: success()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EXISTING=$(gh issue list --label data-stale --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          if [ -n "$EXISTING" ]; then gh issue close "$EXISTING" || true; fi

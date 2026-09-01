@@ -34,9 +34,11 @@ import os
 import re
 import json
 import time
+import atexit
 from datetime import datetime, timedelta, timezone
 
 import requests
+import plog
 
 try:
     import urllib3
@@ -466,6 +468,8 @@ def cleanup():
 
 
 def main():
+    job = plog.start("update_extra")
+    atexit.register(plog.mark_failed_if_unfinished, job)
     print(f"📅 台北時間: {TODAY.isoformat()}", flush=True)
 
     disp_date, disp_data = build_disposition()
@@ -486,6 +490,8 @@ def main():
     print(f"   ✅ daily_disposition: {disp_date} / daily_mops: {mops_date}", flush=True)
     cleanup()
     print("✅ 完成！", flush=True)
+    plog.finish(job, detail={"disposition": len(disp_data["list"]), "mops": len(mops_list), "date": mops_date})
+    plog.done(job)
 
 
 if __name__ == "__main__":

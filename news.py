@@ -3,7 +3,8 @@
 來源: news.google.com/rss/search?q=...
 寫入 Supabase daily_news（upsert by link），保留 14 天
 """
-import os, sys, time, requests
+import os, sys, time, requests, atexit
+import plog
 from datetime import datetime, date, timedelta
 from email.utils import parsedate_to_datetime
 from xml.etree import ElementTree as ET
@@ -100,6 +101,8 @@ def fetch_stock_news():
     return total
 
 def main():
+    job = plog.start("news")
+    atexit.register(plog.mark_failed_if_unfinished, job)
     if not sb:
         print("⚠ SUPABASE_URL / SUPABASE_SERVICE_KEY 未設定，僅測試抓取", flush=True)
     today = date.today().isoformat()
@@ -140,6 +143,8 @@ def main():
             print(f"   ⚠ 清理失敗: {e}", flush=True)
 
     print(f"\n✅ 新聞晨報完成: {total} 筆", flush=True)
+    plog.finish(job, detail={"total": total, "date": today})
+    plog.done(job)
 
 if __name__ == "__main__":
     main()

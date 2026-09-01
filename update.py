@@ -2,7 +2,8 @@
 盤後選股模組 — 每日自動更新腳本
 資料來源：TWSE/TPEX 官方 API（完全免費，不需 token）
 """
-import os, json, csv, io, math, re, requests, sys, time
+import os, json, csv, io, math, re, requests, sys, time, atexit
+import plog
 from datetime import datetime, timedelta, timezone
 from collections import defaultdict
 
@@ -468,6 +469,9 @@ def fetch_tpex_fundamentals():
 # ═══════════════════════════════════════
 #  主程式
 # ═══════════════════════════════════════
+JOB_ID = plog.start("update")
+atexit.register(plog.mark_failed_if_unfinished, JOB_ID)
+
 # 一律用台北時間判斷日期（GitHub Actions 容器預設 UTC）
 TZ_TAIPEI = timezone(timedelta(hours=8))
 today = datetime.now(TZ_TAIPEI)
@@ -1620,3 +1624,14 @@ for _mkt, _ddate, _sids in dropped_echo:
             print(f"   {_tbl}: 已清除 {_mkt} {_ddate} 回聲假資料 {len(_sids)} 檔")
         except Exception as e:
             print(f"   {_tbl}: 清除失敗 ({e})")
+
+# ── 執行日誌收尾 ──
+plog.finish(JOB_ID, detail={
+    "date": end_str,
+    "fetched_days": fetched_days,
+    "modules": len(results),
+    "stk": len(stk_analysis),
+    "strategies": len(strategies),
+    "echo_dropped": [[m, d, len(s)] for m, d, s in dropped_echo],
+})
+plog.done(JOB_ID)

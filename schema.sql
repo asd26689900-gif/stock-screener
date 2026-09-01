@@ -141,4 +141,24 @@ create policy "公開讀取" on daily_news for select using (true);
 drop policy if exists "公開讀取" on daily_focus;
 create policy "公開讀取" on daily_focus for select using (true);
 
+-- 10. 排程執行日誌（Phase 0 可靠度；亦可單獨執行 schema_execution_log.sql）
+create table if not exists execution_log (
+  id bigint generated always as identity primary key,
+  job text not null,
+  status text not null default 'running'
+    check (status in ('running', 'success', 'failed')),
+  started_at timestamptz not null default now(),
+  finished_at timestamptz,
+  detail jsonb not null default '{}',
+  error text,
+  created_at timestamptz default now()
+);
+
+create index if not exists idx_execution_log_job_time on execution_log(job, started_at desc);
+create index if not exists idx_execution_log_status on execution_log(status);
+
+alter table execution_log enable row level security;
+drop policy if exists "公開讀取" on execution_log;
+create policy "公開讀取" on execution_log for select using (true);
+
 -- update.py 用 service_role key 寫入，不受 RLS 限制

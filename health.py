@@ -3,13 +3,16 @@
 確認 daily_focus / daily_modules / daily_news / 集保快照都有最新資料，
 任何一項逾期就以非零 exit code 結束（GitHub Actions 會標示失敗）。
 """
-import os, sys, requests
+import os, sys, requests, atexit
 from datetime import datetime, timedelta, timezone
+import plog
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
 H = {"apikey": SUPABASE_KEY, "Authorization": "Bearer " + SUPABASE_KEY}
 issues = []
+JOB = plog.start("health")
+atexit.register(plog.mark_failed_if_unfinished, JOB)
 
 def latest(table):
     try:
@@ -29,6 +32,9 @@ def last_trading_day(d):
 
 tw = datetime.now(timezone(timedelta(hours=8)))
 expect = last_trading_day(tw.date())
+# 15:30 盤後更新前（16:00 前），預期值是「上一個交易日」而非今天
+if tw.hour < 16:
+    expect = last_trading_day(tw.date() - timedelta(days=1))
 
 focus = latest("daily_focus")
 mods = latest("daily_modules")
@@ -65,5 +71,9 @@ if issues:
     print("❌ 資料新鮮度異常：")
     for i in issues:
         print("   -", i)
+    plog.finish(JOB, status="failed", error="\n".join(issues))
+    plog.done(JOB)
     sys.exit(1)
 print(f"✅ 資料正常：daily_focus {focus} / daily_modules {mods} / daily_news {news}")
+plog.finish(JOB, detail={"focus": focus, "modules": mods, "news": news, "expected": str(expect)})
+plog.done(JOB)

@@ -5,7 +5,8 @@ stock_prices 回填腳本 — 用 TWSE STOCK_DAY / TPEX 個股日成交 抓真�
   python backfill.py --months 6   # 回填 6 個月
   python backfill.py --offset 500 --limit 500  # 分批跑
 """
-import os, sys, json, csv, io, math, time, requests
+import os, sys, json, csv, io, math, time, requests, atexit
+import plog
 from datetime import datetime, timedelta
 from collections import defaultdict
 
@@ -271,6 +272,9 @@ if __name__ == "__main__":
     parser.add_argument("--revenue", action="store_true", help="月營收歷史回填模式（histock 補 12 個月）")
     args = parser.parse_args()
 
+    job = plog.start("backfill-revenue" if args.revenue else ("backfill-extend" if args.extend else "backfill-prices"))
+    atexit.register(plog.mark_failed_if_unfinished, job)
+
     if not sb:
         print("ERROR: SUPABASE_URL / SUPABASE_SERVICE_KEY not set")
         sys.exit(1)
@@ -335,6 +339,8 @@ if __name__ == "__main__":
             if (idx + 1) % 25 == 0 or idx == len(stock_list) - 1:
                 print(f"   [{idx+1}/{len(stock_list)}] 成功 {done} / 失敗 {errors}")
         print(f"\n✅ 營收回填完成: 成功 {done} / 失敗 {errors}")
+        plog.finish(job, detail={"mode": "revenue", "total": len(stock_list), "done": done, "errors": errors})
+        plog.done(job)
         sys.exit(0)
 
     today = datetime.now()
@@ -411,3 +417,6 @@ if __name__ == "__main__":
     print(f"   處理: {total} 檔")
     print(f"   寫入: {upserted} 筆")
     print(f"   錯誤: {errors} 筆")
+    plog.finish(job, detail={"mode": "extend" if args.extend else "prices",
+                             "total": total, "upserted": upserted, "errors": errors})
+    plog.done(job)
