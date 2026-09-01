@@ -104,7 +104,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       </div>
       <InstitutionalPanel rows={data.instRows} />
 
-      <HolderSlider bigPct={data.chip?.bigHolderPct} retailPct={data.chip?.retailHolderPct} src={data.chip?.holderSrc} />
+      <HolderSlider bigPct={data.chip?.bigHolderPct} retailPct={data.chip?.retailHolderPct} src={data.chip?.holderSrc} levels={data.chip?.tdccLevels} />
 
       <div className="section-title">
         基本面 / 月營收 / 本益比河流圖

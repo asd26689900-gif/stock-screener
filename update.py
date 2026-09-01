@@ -196,10 +196,13 @@ TDCC_OD_URL = "https://smart.tdcc.com.tw/opendata/getOD.ashx?id=1-5"
 def fetch_tdcc_snapshot():
     """抓最新一週集保分散表，回傳 (資料日期, {sid: agg})。
     agg 含 big_shares/big_ratio（400張以上）、big_holders（千張人數）、
-    retail_shares/retail_ratio（10張以下）。"""
+    retail_shares/retail_ratio（10張以下）、levels（各級距累計持股比率，
+    供前端大戶/小戶門檻滑桿切換真實門檻）。"""
     r = requests.get(TDCC_OD_URL, headers=HEADERS, timeout=300)
     r.encoding = "utf-8"
     data_date, agg = "", {}
+    # TDCC 分級（1張=1000股）：9≈50張、10≈100張、11≈200張、12≈400張、13≈600張、14≈800張、15≈1000張
+    LEVEL_THRESHOLDS = {50: 9, 100: 10, 200: 11, 400: 12, 600: 13, 800: 14, 1000: 15}
     for line in csv.reader(io.StringIO(r.text)):
         if len(line) < 6 or not line[0].strip().isdigit():
             continue
@@ -221,7 +224,7 @@ def fetch_tdcc_snapshot():
         ratio = parse_num(line[5])
         a = agg.setdefault(sid, {"big_shares": 0, "big_ratio": 0.0,
                                  "retail_shares": 0, "retail_ratio": 0.0,
-                                 "big_holders": 0})
+                                 "big_holders": 0, "lv_ratio": {}})
         if lv >= 12:
             a["big_shares"] += int(shares)
             a["big_ratio"] = round(a["big_ratio"] + ratio, 4)
@@ -230,6 +233,13 @@ def fetch_tdcc_snapshot():
         if lv <= 3:
             a["retail_shares"] += int(shares)
             a["retail_ratio"] = round(a["retail_ratio"] + ratio, 4)
+        a["lv_ratio"][lv] = round(a["lv_ratio"].get(lv, 0.0) + ratio, 4)
+    for sid, a in agg.items():
+        lv = a.pop("lv_ratio", {})
+        a["levels"] = {
+            str(th): round(sum(v for k, v in lv.items() if k >= lv_min), 4)
+            for th, lv_min in LEVEL_THRESHOLDS.items()
+        }
     return data_date, agg
 
 # ═══════════════════════════════════════
@@ -1142,7 +1152,8 @@ for sid in stocks:
         "chip": {"main_net": main_net, "retail_net": retail_net,
                  "concentration_pct": conc_pct, "concentration_shares": conc_shares,
                  "big_holder_pct": big_holder, "retail_holder_pct": retail_holder,
-                 "holder_src": holder_src},
+                 "holder_src": holder_src,
+                 "tdcc_levels": (holder.get("levels") if holder else None)},
         "inst_hist": [{"date": rec["date"],
                        "foreign_net": rec.get("foreign_net", 0),
                        "trust_net": rec.get("trust_net", 0),

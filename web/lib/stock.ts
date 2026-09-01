@@ -30,6 +30,7 @@ export type StockPageData = {
     bigHolderPct?: number;
     retailHolderPct?: number;
     holderSrc?: string;
+    tdccLevels?: Record<string, number>;
   };
   scores?: Record<string, number>;
   revenue?: { m: string; rev: number; mom?: number; yoy?: number }[];
