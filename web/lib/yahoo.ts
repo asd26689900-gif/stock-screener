@@ -40,3 +40,21 @@ export async function getYahooBars(sid: string, interval = "1d", range = "6mo", 
   }
   return [];
 }
+
+export type Returns = { d1: number | null; d5: number | null; d20: number | null; d60: number | null };
+
+export function retFromCloses(closes: number[]): Returns {
+  const idx = (n: number) => {
+    if (closes.length < n + 1) return null;
+    const base = closes[closes.length - 1 - n];
+    const cur = closes[closes.length - 1];
+    if (!base) return null;
+    return Math.round(((cur - base) / base) * 10000) / 100;
+  };
+  return { d1: idx(1), d5: idx(5), d20: idx(20), d60: idx(60) };
+}
+
+export async function getIndexReturns(): Promise<Returns> {
+  const bars = await getYahooBars("^TWII", "1d", "6mo");
+  return retFromCloses(bars.map((b) => b.c));
+}

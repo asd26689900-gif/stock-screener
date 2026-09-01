@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { NAV_GROUPS, WATCHLIST_HREF } from "@/lib/navigation";
+import { authSb, useSession } from "@/lib/auth";
 import ThemeToggle from "./ThemeToggle";
 
 function caretIcon() {
@@ -30,8 +31,49 @@ function isActive(pathname: string, href: string): boolean {
 export default function Topbar() {
   const pathname = usePathname();
   const router = useRouter();
+  const { user } = useSession();
   const [open, setOpen] = useState(false);
+  const [signalCount, setSignalCount] = useState(0);
   const panelRef = useRef<HTMLDivElement>(null);
+
+  // 自選股訊號徽章：重大消息或最新營收已公布
+  useEffect(() => {
+    (async () => {
+      try {
+        let ids: string[] = [];
+        if (user) {
+          if (!authSb) return;
+          const { data } = await authSb.from("user_data").select("key,data").eq("user_id", user.id);
+          const wl = data?.find((r) => r.key === "watchlists")?.data as Record<string, string[]> | undefined;
+          ids = wl ? [...new Set(Object.values(wl).flat())] : [];
+        } else {
+          const w = JSON.parse(localStorage.getItem("watchlists") || "null");
+          if (w && Object.keys(w).length) ids = [...new Set(Object.values(w as Record<string, string[]>).flat())];
+          else {
+            const old = JSON.parse(localStorage.getItem("watchlist") || "[]");
+            if (Array.isArray(old)) ids = old;
+          }
+        }
+        if (!ids.length || !authSb) return;
+        const [metricsRes, mopsRes] = await Promise.all([
+          authSb.from("stock_metrics").select("stock_id,name,rev_yoy,rev_mom").in("stock_id", ids),
+          authSb.from("daily_mops").select("data").order("date", { ascending: false }).limit(1),
+        ]);
+        const names = new Map((metricsRes.data ?? []).map((r) => [String(r.stock_id), String(r.name ?? "")]));
+        const list = (mopsRes.data?.[0]?.data as { list?: { id: string; company: string }[] })?.list ?? [];
+        let n = 0;
+        for (const sid of ids) {
+          const name = names.get(sid) ?? "";
+          if (list.some((m) => m.id === sid || (name && m.company?.includes(name)))) n++;
+          const m = metricsRes.data?.find((r) => r.stock_id === sid);
+          if (m?.rev_yoy != null && m.rev_mom != null) n++;
+        }
+        setSignalCount(n);
+      } catch {
+        setSignalCount(0);
+      }
+    })();
+  }, [user]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -85,6 +127,7 @@ export default function Topbar() {
       </form>
       <Link className={`nav-watch ${isActive(pathname, WATCHLIST_HREF) ? "active" : ""}`} href={WATCHLIST_HREF}>
         {starIcon()}自選股
+        {signalCount > 0 && <span className="nav-signal">{signalCount}</span>}
       </Link>
       <ThemeToggle />
       {open && (

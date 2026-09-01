@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
-import PlaceholderPage from "@/components/PlaceholderPage";
+import ConceptsAdmin from "@/components/ConceptsAdmin";
 
 export const metadata: Metadata = { title: "題材管理" };
 
 export default function Page() {
-  return <PlaceholderPage title="題材管理" desc="登入後 CRUD 題材（DB 優先、靜態表回退）" phase="第 4 批" />;
+  return (
+    <div className="container">
+      <div className="page-header">
+        <h1 className="page-title">題材管理</h1>
+        <p className="page-desc">登入後可新增 / 修改 / 刪除題材；資料庫優先、靜態表回退。</p>
+      </div>
+      <ConceptsAdmin />
+    </div>
+  );
 }

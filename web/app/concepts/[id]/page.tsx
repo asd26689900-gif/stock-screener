@@ -3,8 +3,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getConcept, getConcepts } from "@/lib/concepts";
 import { getConceptStocks, type ConceptStock } from "@/lib/stock";
-import { getYahooBars } from "@/lib/yahoo";
+import { getIndexReturns } from "@/lib/yahoo";
 import { fmt, fmtSigned, pctClass } from "@/lib/format";
+import ThemeTierGraph, { type GraphConcept } from "@/components/ThemeTierGraph";
 
 export const dynamic = "force-dynamic";
 
@@ -22,18 +23,6 @@ function avg(rows: ConceptStock[], key: "d1" | "d5" | "d20" | "d60"): number | n
   const vals = rows.map((r) => r.returns[key]).filter((v): v is number => v != null);
   if (!vals.length) return null;
   return vals.reduce((s, v) => s + v, 0) / vals.length;
-}
-
-function pctSeries(bars: { d: string; c: number }[]): number[] {
-  return bars.map((b) => b.c);
-}
-
-function idxRet(closes: number[], n: number): number | null {
-  if (closes.length < n + 1) return null;
-  const base = closes[closes.length - 1 - n];
-  const cur = closes[closes.length - 1];
-  if (!base) return null;
-  return Math.round(((cur - base) / base) * 10000) / 100;
 }
 
 function qualityTag(s: ConceptStock): string {
@@ -59,22 +48,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const { id } = await params;
   const [concept, all] = await Promise.all([getConcept(id), getConcepts()]);
   if (!concept) notFound();
-  const stocks = await getConceptStocks(concept.ids);
-  const indexBars = await getYahooBars("^TWII", "1d", "6mo");
-  const indexCloses = pctSeries(indexBars);
+  const relatedKeys = [...new Set([...concept.up, ...concept.down])];
+  const relatedConcepts = all.filter((c) => relatedKeys.includes(c.key));
+  const relatedIds = [...new Set(relatedConcepts.flatMap((c) => c.ids))];
+  const [stocks, relatedStocks, indexRet] = await Promise.all([getConceptStocks(concept.ids), getConceptStocks(relatedIds), getIndexReturns()]);
   const date = stocks.find((s) => s.date)?.date ?? "";
 
   const themeRet = { d1: avg(stocks, "d1"), d5: avg(stocks, "d5"), d20: avg(stocks, "d20"), d60: avg(stocks, "d60") };
-  const indexRet = { d1: idxRet(indexCloses, 1), d5: idxRet(indexCloses, 5), d20: idxRet(indexCloses, 20), d60: idxRet(indexCloses, 60) };
-  const relatedKeys = new Set([...concept.up, ...concept.down]);
-  const tiers = [0, 1, 2].map((t) => ({
-    tier: t,
-    items: all.filter((c) => c.tier === t).map((c) => ({
-      ...c,
-      linked: c.key === concept.key || relatedKeys.has(c.key),
-      avgChg: avg(stocks.map((s) => s).filter((s) => c.ids.includes(s.stock_id)), "d1"),
-    })),
-  }));
+  const stockBySid = new Map([...stocks, ...relatedStocks].map((s) => [s.stock_id, s]));
+  const graphConcepts: GraphConcept[] = all.map((c) => {
+    const list = c.ids.map((sid) => stockBySid.get(sid)).filter(Boolean) as ConceptStock[];
+    return { key: c.key, title: c.title, tier: c.tier, up: c.up, down: c.down, avgChg: avg(list, "d1") };
+  });
 
   return (
     <div className="container">
@@ -138,27 +123,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         ))}
       </div>
 
-      <div className="section-title">上下游三層圖</div>
-      <div className="tier-blocks">
-        {tiers.map(({ tier, items }) => (
-          <div key={tier} className={`tier-block ${tier === 0 ? "up" : tier === 1 ? "mid" : "down"}`}>
-            <div className="tier-title">{tier === 0 ? "上游" : tier === 1 ? "中游" : "下游"}</div>
-            <div className="tier-items">
-              {items.map((c) => (
-                <Link
-                  key={c.key}
-                  href={`/concepts/${c.key}`}
-                  className={`tier-item ${c.linked ? "linked" : ""}`}
-                  title={c.desc}
-                >
-                  {c.title}
-                  {c.avgChg != null && <span className={pctClass(c.avgChg)}>{fmtSigned(c.avgChg)}%</span>}
-                </Link>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
+      <div className="section-title">上下游供應鏈</div>
+      <ThemeTierGraph concepts={graphConcepts} focusKey={concept.key} />
 
       <div className="section-title">常見問題</div>
       <div className="card">

@@ -105,6 +105,10 @@ img,svg{display:block}
 }
 .nav-watch:hover,.nav-watch.active{color:var(--gold);background:var(--gold-soft)}
 .nav-star{color:var(--gold)}
+.nav-signal{
+  min-width:16px;height:16px;border-radius:99px;background:var(--red);color:#fff;
+  font-size:10px;font-weight:700;line-height:16px;text-align:center;padding:0 4px;
+}
 .theme-toggle{
   width:30px;height:30px;border:1px solid var(--border);border-radius:var(--radius);
   background:transparent;color:var(--text-secondary);cursor:pointer;flex-shrink:0;
@@ -302,6 +306,48 @@ img,svg{display:block}
 .tier-item:hover{border-color:var(--gold);color:var(--gold)}
 .tier-item.linked{background:var(--gold-soft);border-color:rgba(138,101,8,.25);color:var(--gold);font-weight:600}
 .tier-item span{font-family:var(--font-mono);font-size:11px}
+
+/* ─── 全球股市 ─── */
+.g-note{font-size:11.5px;color:var(--text-secondary);margin:-8px 0 14px}
+.g-heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-bottom:20px}
+.g-tile{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--border);border-radius:var(--radius);padding:10px 12px;text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:2px;transition:border-color .12s}
+.g-tile:hover{border-color:var(--gold);text-decoration:none}
+.g-tile.up{border-left-color:var(--red)}
+.g-tile.dn{border-left-color:var(--green)}
+.g-sym{font-family:var(--font-mono);font-weight:700;font-size:12px}
+.g-name{font-size:10.5px;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.g-price{font-family:var(--font-mono);font-size:15px;font-weight:700}
+.g-chg{font-family:var(--font-mono);font-size:11px}
+.g-spark{display:block;margin-top:3px}
+
+/* ─── 處置預警 ─── */
+.dsp-lamps{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:14px}
+.dsp-lamp{display:flex;flex-direction:column;align-items:center;gap:2px;padding:11px 8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--card);cursor:pointer;transition:border-color .12s,transform .12s;font-family:inherit}
+.dsp-lamp:hover{border-color:var(--gold);transform:translateY(-1px)}
+.dsp-lamp.active{border-color:var(--gold);background:var(--gold-soft)}
+.dsp-lamp .dl-count{font-family:var(--font-mono);font-size:22px;font-weight:700;line-height:1.1}
+.dsp-lamp .dl-label{font-size:11px;color:var(--text-secondary)}
+.dsp-lamp.lv-danger .dl-count{color:var(--red)}
+.dsp-lamp.lv-alert .dl-count{color:var(--gold)}
+.dsp-lamp.lv-watch .dl-count{color:var(--teal)}
+.dsp-lamp.lv-ok .dl-count{color:var(--green)}
+.dsp-list{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.dsp-row{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border-light);cursor:pointer;transition:background .1s;text-decoration:none;color:var(--text)}
+.dsp-row:last-child{border-bottom:none}
+.dsp-row:hover{background:var(--hover);text-decoration:none}
+.dsp-tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:4px;text-align:center;white-space:nowrap}
+.dsp-tag.disposing{background:rgba(192,84,79,.15);color:var(--red)}
+.dsp-tag.alert,.dsp-tag.high{background:rgba(184,134,11,.16);color:var(--gold)}
+.dsp-tag.near{background:rgba(58,125,123,.14);color:var(--teal)}
+.dsp-tag.watch{background:rgba(58,125,123,.08);color:var(--text-secondary)}
+.dsp-body{min-width:0}
+.dsp-name{font-size:13px;font-weight:600;color:var(--ink)}
+.dsp-name .dsp-id{font-family:var(--font-mono);color:var(--gold);font-weight:700;margin-right:6px}
+.dsp-reason{font-size:11.5px;color:var(--text-secondary);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsp-right{text-align:right}
+.dsp-price{font-family:var(--font-mono);font-size:12.5px;font-weight:700;color:var(--ink)}
+.dsp-th{font-size:10px;color:var(--text-secondary);margin-top:1px;font-family:var(--font-mono)}
+.dsp-first{font-size:10px;color:var(--green);font-family:var(--font-mono);white-space:nowrap}
 
 /* ─── 表格 ─── */
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}

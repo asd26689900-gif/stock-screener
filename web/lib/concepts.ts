@@ -8,6 +8,7 @@ export type Concept = {
   tier: number; // 0=上游 1=中游 2=下游
   up: string[];
   down: string[];
+  sort?: number;
 };
 
 // 靜態回退表（與舊站 js/concepts-data.js 一致；管理頁寫入 DB 後以 DB 為準）
