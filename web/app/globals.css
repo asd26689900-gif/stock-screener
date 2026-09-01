@@ -349,6 +349,24 @@ img,svg{display:block}
 .dsp-th{font-size:10px;color:var(--text-secondary);margin-top:1px;font-family:var(--font-mono)}
 .dsp-first{font-size:10px;color:var(--green);font-family:var(--font-mono);white-space:nowrap}
 
+/* ─── 股票計算機 ─── */
+.tool-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:22px 26px;margin-bottom:18px}
+.tool-title{font-family:var(--font-display);font-size:17px;color:var(--ink);margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:8px;font-weight:600}
+.calc-form{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px}
+.calc-field{display:grid;grid-template-columns:110px 1fr;gap:12px;align-items:center}
+.calc-field.full{grid-column:1/-1}
+.calc-field label{font-size:13px;color:var(--text);font-weight:500}
+.calc-field input,.calc-field select{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:6px;background:var(--surface);color:var(--text);font-family:var(--font-mono);font-size:14px;transition:border-color .15s,box-shadow .15s}
+.calc-field input:focus,.calc-field select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.calc-btn{margin-top:18px;padding:10px 32px;background:var(--gold);color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;transition:opacity .15s,transform .1s;font-family:inherit}
+.calc-btn:hover{opacity:.9}
+.calc-btn:active{transform:translateY(1px)}
+.result-box{display:none;margin-top:18px;padding:16px 20px;background:var(--surface);border-left:3px solid var(--gold);border-radius:6px;font-family:var(--font-mono);font-size:13px;line-height:1.9}
+.result-box.show{display:block}
+.result-box .big{font-size:26px;font-weight:700}
+.result-box hr{border:none;border-top:1px solid var(--border);margin:8px 0}
+@media (max-width:640px){.tool-card{padding:18px 16px}.calc-form{grid-template-columns:1fr}.calc-field{grid-template-columns:100px 1fr}}
+
 /* ─── 表格 ─── */
 .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);background:var(--card)}
 table{width:100%;border-collapse:collapse;font-size:13.5px}

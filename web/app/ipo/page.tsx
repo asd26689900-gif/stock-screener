@@ -1,8 +1,16 @@
 import type { Metadata } from "next";
-import PlaceholderPage from "@/components/PlaceholderPage";
+import IpoView from "@/components/IpoView";
 
 export const metadata: Metadata = { title: "股票抽籤" };
 
 export default function Page() {
-  return <PlaceholderPage title="股票抽籤" desc="申購抽籤資訊" phase="第 4 批" />;
+  return (
+    <div className="container">
+      <div className="page-header">
+        <h1 className="page-title">股票抽籤</h1>
+        <p className="page-desc">公開申購抽籤日程與承銷資訊（TWSE）。</p>
+      </div>
+      <IpoView />
+    </div>
+  );
 }
