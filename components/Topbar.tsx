@@ -77,7 +77,13 @@ export default function Topbar() {
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node | null;
+      // React 事件與此監聽器同在 document 層：點到群組按鈕時跳過，
+      // 否則「開啟」會被同一個 click 的關閉邏輯立即蓋掉
+      if (!t || !(t instanceof Element)) return;
+      if (t.closest(".nav-group-btn")) return;
+      if (panelRef.current && panelRef.current.contains(t)) return;
+      setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setOpen(false);
