@@ -1,19 +1,25 @@
-# 盤後精選模組 — 設計與架構文件（翻新版）
+# 盤後通 — 設計系統文件
 
-> 這份文件是整站翻新（Next.js 15 全重寫）的單一設計基準。所有頁面、元件、資料管線與排程都以此為準，避免「只改表面沒改到深層」。
+> 視覺基底參考 Coinbase Design System（機構級金融品牌美學），針對台股盤後分析工具調整。
+> 參考來源：[VoltAgent/awesome-design-md — Coinbase](https://github.com/VoltAgent/awesome-design-md/tree/main/design-md/coinbase)
 
-## 1. 定位與設計原則
+## 1. 定位與設計哲學
 
-**一句話**：台股盤後資料整理站 — 把散落在官方與公開來源的盤後資訊，變成「當天就能用的決策清單」。
+**一句話**：台股盤後資料整理站 — 收盤後用最快速度掌握「今天發生了什麼」和「明天該注意什麼」。
 
-設計原則（沿用現站並補強）：
+### Coinbase 設計哲學移植
 
-1. **資訊密度高、但層次清楚**：每個頁面先給結論（排行/焦點），再給細節（K線、明細）。
-2. **紅漲綠跌、數字等寬**：全站統一；所有數字欄位 tabular-nums，漲跌以顏色標示，不靠文字猜。
-3. **每項自動更新的資料都要標註更新時間**：來源是新的 `execution_log` 表，不是前端寫死。
-4. **手機不是縮小版桌面**：桌面用頂欄＋Mega Menu，手機用底部 Tab＋底部選單，操作以拇指可達為原則。
-5. **不讓使用者等待**：資料未載入時一律 Skeleton；頁面過長提供返回頂部。
-6. **登入是選用**：不登入照常使用（guest 存瀏覽器端），登入後同步自選/持股/評分到 Supabase。
+盤後通和 Coinbase 一樣，**不是即時交易平台**（那是券商的事），而是分析工具。因此適合 Coinbase 那種「沉穩機構感」而非「交易急迫感」。
+
+核心原則：
+1. **單一品牌色（金色）**：盤後通金 `#8A6508` 只用在 CTA、active tab、連結，其餘表面保持中性
+2. **Editorial 節奏**：寬敞的 section 間距，資訊密度高但層次清楚
+3. **克制的字重**：標題不用粗黑體，傳達「沉穩分析」而非「金融急迫」
+4. **漲跌色只做文字色**：不做按鈕/卡片背景填充（同 Coinbase semantic color 原則）
+5. **資訊優先**：每頁先給結論（排行/焦點），再給細節（K線/明細）
+6. **紅漲綠跌、數字等寬**：全站統一 tabular-nums，漲跌以顏色+正負號雙重標示
+7. **登入選用**：未登入用 localStorage，登入後同步到 Supabase
+8. **不讓使用者等待**：Skeleton 佔位，不用轉圈
 
 ## 2. 資訊架構
 
@@ -24,7 +30,7 @@
 | 市場 | 市場總覽 / 個股分析 / 全球股市 / 產業熱力圖 / 歷史漲跌幅 / 處置股預警 |
 | 選股 | 選股模組 / 選股策略 / 題材概念股 |
 | 籌碼 | 法人買賣超 / 融資融券 / ETF 總覽 |
-| 工具 | 自訂篩選 / 投資行事曆 / 股票抽籤 / 股票計算機 / 題材管理 |
+| 工具 | 自訂篩選 / 股票比較 / 投資行事曆 / 股票抽籤 / 股票計算機 / 設定 / 題材管理 |
 
 - 右側固定：查股輸入框（代號或名稱）、自選股、主題切換。
 - Mega Menu：點任一組名稱開啟同一面板（四組並排），點外部 / Esc / 選取後關閉。
@@ -38,39 +44,125 @@
 | `/stock/[id]` | 個股分析 | 2 |
 | `/global` | 全球股市 | 2 |
 | `/disposition` | 處置股預警 | 2 |
-| `/heatmap` `/history` `/modules` `/strategy` `/filter` `/institutional` `/margin` `/etf` | 各功能頁 | 3 |
-| `/concepts` `/concepts/[id]` `/concepts/admin` | 題材列表/單題材/管理 | 4 |
-| `/calendar` `/ipo` `/tools` `/watchlist` `/login` | 行事曆/抽籤/計算機/自選/登入 | 4 |
+| `/heatmap` `/history` `/modules` `/strategy` `/filter` `/institutional` `/margin` `/etf` | 各功能頁 | ✅ |
+| `/concepts` `/concepts/[id]` `/concepts/admin` | 題材列表/單題材/管理 | ✅ |
+| `/calendar` `/ipo` `/tools` `/watchlist` `/login` | 行事曆/抽籤/計算機/自選/登入 | ✅ |
+| `/compare` | 股票比較（最多 5 支並排） | ✅ |
+| `/settings` | 設定（漲跌色切換 + 到價提醒） | ✅ |
 
-## 3. 設計系統
+## 3. 設計系統（Coinbase 風格移植）
 
-### 色票與字體（CSS variables，亮/暗雙主題）
+### 色彩對照（Coinbase → 盤後通）
 
-- 底色 `--surface` / 卡片 `--card`；金 `--gold` 為品牌主色；青綠 `--teal` 為次強調。
-- 漲 `--red`、跌 `--green`（台股習慣）；數字 `--font-mono` 等寬。
-- 字體：`-apple-system / Segoe UI / Roboto / PingFang TC / Microsoft JhengHei`，全站統一。
-- 主題：跟隨系統偏好，可手動覆蓋（localStorage），避免 FOUC（layout 內嵌 script）。
+| 用途 | Coinbase | 盤後通（亮） | 盤後通（暗） | CSS Variable |
+|------|----------|-------------|-------------|-------------|
+| 品牌主色 | #0052ff 藍 | **#8A6508 金** | #CBA135 | `--gold` |
+| 品牌主色（柔） | — | rgba(138,101,8,0.10) | rgba(203,161,53,0.12) | `--gold-soft` |
+| 輔助色 | — | #2F6E6C | #5AADAB | `--teal` |
+| 墨色/標題 | #0a0b0d | #1C2127 | #F0EDE5 | `--ink` |
+| 正文 | #5b616e | #3B3F45 | #DDD8CE | `--text` |
+| 次要文字 | #7c828a | #6B7280 | #ADA9A0 | `--text-secondary` |
+| 畫布 | #ffffff | **#F5F2EC 暖米** | #141618 | `--surface` |
+| 卡片 | #ffffff | #FFFFFF | #1E2024 | `--card` |
+| 分隔線 | #dee1e6 | #DDD8D0 | #2E3036 | `--border` |
+| 漲色 | #cf202f（跌） | **#B24A45（漲）** | #D97070 | `--red` |
+| 跌色 | #05b169（漲） | **#3A7357（跌）** | #6BB88E | `--green` |
 
-### 核心元件清單（`web/components/`）
+> **注意**：盤後通漲跌色與 Coinbase **相反**（台灣慣例紅漲綠跌），但遵循同一原則——漲跌色**只做文字色**，不做按鈕/卡片背景。
+> 可透過 `/settings` 切換為國際慣例（`data-color-mode="intl"`）。
 
-| 元件 | 用途 | 狀態 |
-| --- | --- | --- |
-| Topbar / MegaMenu | 桌面導覽 | ✅ 已移植 |
-| BottomNav | 手機底部選單 | ✅ 已移植 |
-| SliderTabs | Linear slider tabs（全站 tab 統一） | ✅ 已移植 |
-| Skeleton | 載入中骨架 | ✅ 已移植 |
-| BackToTop | 返回頂部 | ✅ 已移植 |
-| UpdateStamp | 自動更新時間標籤（讀 execution_log） | ✅ 已移植 |
-| FocusStrong | 強勢股日/週/月 | ✅ 已移植 |
-| KChart | lightweight-charts v4 共用引擎（個股＋大盤） | 第 2 批 |
-| 交易帳本 | 多筆買賣、損益曲線 | 第 4 批 |
+### 三態暗色模式
+
+```css
+:root { /* 亮色（預設） */ }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { /* 系統暗色 */ }
+}
+:root[data-theme="dark"] { /* 手動暗色 */ }
+```
+
+Layout 內嵌 `<script>` 讀取 localStorage，避免 FOUC。
+
+### 字型
+
+Coinbase 用品牌自有字型（CoinbaseDisplay/CoinbaseSans/CoinbaseMono），盤後通替代如下：
+
+| Coinbase 字型 | 盤後通替代 | CSS Variable |
+|--------------|-----------|-------------|
+| CoinbaseDisplay/CoinbaseSans | -apple-system, Segoe UI, Roboto, PingFang TC, Microsoft JhengHei | `--font-display`, `--font-body` |
+| CoinbaseMono | SF Mono, Cascadia Code, Consolas | `--font-mono` |
+
+#### 字型層級
+
+| 角色 | 字級 | 字重 | 行高 | 用途 |
+|------|------|------|------|------|
+| page-title | 24px | 600 | 1.2 | 頁面標題 h1 |
+| section-title | 16px | 600 | 1.3 | 區塊標題 |
+| body | 15px | 400 | 1.6 | 正文 |
+| hint/caption | 12-13px | 400 | 1.5 | 說明文字、來源 |
+| number | 13-15px | mono 500 | 1.4 | 價格、百分比 |
+| button | 14px | 600 | 1.15 | 按鈕 |
+| nav-link | 13px | 500 | 1.4 | 導覽 |
+
+### 圓角與間距
+
+| Token | 值 | 對應 Coinbase | 用途 |
+|-------|-----|-------------|------|
+| `--radius` | 8px | rounded.sm | 卡片、輸入框 |
+| pill | 99px | rounded.pill | chip、badge、toggle |
+| full | 9999px | rounded.full | 頭像、資產圖示 |
+
+| 用途 | 值 | 對應 Coinbase |
+|------|-----|-------------|
+| 元素間隙 | 8-12px | spacing.xs-sm |
+| 卡片內距 | 12-16px | spacing.sm-base |
+| 區塊間距 | 20-32px | spacing.md-xl |
+| 控制列 marginBottom | 14px | — |
+
+### 元件規範
+
+#### 摘要卡片（summary-card）— 對應 Coinbase feature-card
+- 背景 `var(--card)`，圓角 `var(--radius)`
+- 三行結構：label（hint 色）→ value（大字）→ sub（小字灰色）
+- Grid：`auto-fill, minmax(160px, 1fr)`
+
+#### 表格 — 對應 Coinbase asset-row
+- `thead` sticky，背景 `var(--card)`
+- 數字欄 `text-align: right`，`font-family: var(--font-mono)`
+- hover 行變色 `var(--hover)`
+- 漲跌**只用文字色**，不做行背景（Coinbase 原則）
+
+#### 按鈕 — 對應 Coinbase button 系列
+- 主要 `.btn`：背景 `var(--gold)`，白字
+- 次要 `.btn-reset`：透明背景，金色文字（對應 button-tertiary-text）
+- Tab `.tab-btn`：預設透明，active 加底線
+- Toggle `.toggle-chip`：pill 形狀，on 態加背景（對應 badge-pill）
+
+#### 導覽 — 對應 Coinbase top-nav
+- 桌面：頂部橫列 64px，mega menu 下拉，右側查股+自選+主題
+- 手機：底部 Tab 固定，點組名彈出選單
+- 品牌色只在 active 態
+
+#### 圖表
+- K 線：TradingView Lightweight Charts，深色容器
+- 迷你走勢：SVG，漲 `var(--red)` 跌 `var(--green)`
+- 營收柱狀：金色（YoY ≥ 0）/ 青色（YoY < 0）
+
+#### 漲跌色 CSS
+```css
+.up   { color: var(--red) }
+.down { color: var(--green) }
+/* 國際反轉 */
+:root[data-color-mode="intl"] .up   { color: var(--green) }
+:root[data-color-mode="intl"] .down { color: var(--red) }
+```
 
 ### 頁面共同規範
 
-- 頁面標題 + 一句話描述（`.page-header`）。
-- 每區塊 `.section-title` 右側放 UpdateStamp。
-- 排行榜表格超過螢幕高度時可捲動；行動版表格橫向捲動。
-- 所有「會自動更新」的區塊都有來源資料日期。
+- 頁面標題 + 一句話描述（`.page-header`）
+- 每區塊 `.section-title` 右側放 UpdateStamp
+- 排行榜表格可捲動；行動版表格橫向捲動
+- 所有自動更新區塊標註資料日期
 
 ## 4. 頁面規格
 
@@ -151,22 +243,23 @@
 - 首屏以 server component 直出，client 僅負責交互；首載 JS < 110KB。
 - 資料查詢都走 Supabase 索引欄位（date / module_key / stock_id）。
 
-## 8. 翻新批次與驗收
+## 8. 完成狀態
 
-| 批次 | 內容 | 驗收標準 |
-| --- | --- | --- |
-| 1（本批） | 骨架：設計系統、導覽、路由、首頁接真實資料、DESIGN.md、execution_log | `web/` build 通過；首頁出現真實排行與更新時間 |
-| 2 | 個股分析＋大盤 K 線＋處置預警＋全球股市 | KChart 共用引擎；法人當日柱狀＋累計曲線；滑桿門檻 |
-| 3 | 選股模組/策略/篩選/法人/資券/ETF/熱力圖/歷史 | linear slider tabs；ETF 開關；30 檔下拉 |
-| 4 | 題材（finlab 版）＋行事曆＋自選＋登入＋交易帳本＋管理頁 | 單題材頁、上下游三層、登入同步、自選訊號、損益曲線 |
+所有計劃功能已實作完成：
 
-> 更新：第 4 批已完成 題材 finlab 版＋上下游供應鏈圖、自選股（報價/持股＋交易帳本＋訊號徽章）、登入（email/密碼，`user_data` 同步）、題材管理 CRUD、全球股市、處置預警、行事曆（群組上限 25＋自選過濾）、抽籤、計算機。剩集保級距回補（讓個股頁滑桿接真實各級距資料）。
-
-每批可獨立上線；舊靜態站保留於 repo 根目錄，直到新站驗收完成。
+| Phase | 內容 | 狀態 |
+|-------|------|------|
+| 1 | 修 bug + Dashboard 首頁 + 導覽重做 + 改名盤後通 | ✅ |
+| 2 | 個股分析頁強化 + 籌碼分析頁 | ✅ |
+| 3 | 選股模組卡片化 + 自選股功能強化 | ✅ |
+| 4 | 工具頁 + 國際市場 + 產業熱力圖改善 | ✅ |
+| 補齊 | 漲跌停/成本攤平計算機、股票比較器、設定頁、到價提醒、CSV 匯出、拖拽排序、同業比較 | ✅ |
+| 基礎 | GMT+8 時區統一、CLAUDE.md、DESIGN.md | ✅ |
 
 ## 9. 部署
 
-- 新站位於 `web/`（Next.js 15，App Router，TypeScript）。
-- 上線時：Vercel 專案 → Settings → Root Directory 改為 `web`，並新增環境變數 `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`（值同現站 `js/config.js`）。
-- 資料庫需執行 `schema_execution_log.sql`（使用者操作）。
-- 登入同步另需執行 `schema_user_data.sql`（使用者操作）。
+- 專案根目錄即 Next.js 15 App Router（非子資料夾）
+- Vercel 自動從 `master` 部署 → https://stock-screener-flax-three.vercel.app
+- 環境變數（僅 Vercel）：`NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- 本地開發無 `.env.local`：需要 Supabase 的頁面會回 404/空資料，這是正常的
+- commit 前必須 `npx tsc --noEmit` 零錯誤
