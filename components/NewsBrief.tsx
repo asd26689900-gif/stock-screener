@@ -22,15 +22,15 @@ export default async function NewsBrief() {
 
   if (!news.length) {
     return (
-      <div className="card" style={{ padding: "14px 16px" }}>
+      <div className="card">
         <div className="section-title" style={{ margin: 0 }}>新聞晨報</div>
-        <p className="hint" style={{ marginTop: 8 }}>暫無新聞（每日 08:30 更新）</p>
+        <p className="hint" style={{ marginTop: 8 }}>暫無新聞（每日 08:00 更新）</p>
       </div>
     );
   }
 
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
+    <div className="card">
       <div className="section-title" style={{ margin: "0 0 8px" }}>
         新聞晨報
         <span className="chip teal">{news.length} 則</span>

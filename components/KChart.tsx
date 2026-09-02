@@ -121,11 +121,16 @@ function calcMACD(data: KBar[]) {
   return { dif, macd, osc };
 }
 
-function Legend({ b, prev, showInst }: { b: KBar | null; prev: KBar | null; showInst: boolean }) {
+function Legend({ b, prev, showInst, idx, maActive, maData, indType, indData }: {
+  b: KBar | null; prev: KBar | null; showInst: boolean; idx: number;
+  maActive: number[]; maData: Record<number, (number | null)[]>;
+  indType: "kd" | "rsi" | "macd"; indData: { a: number[]; b: number[]; osc: number[] };
+}) {
   const cur = b ?? prev;
   if (!cur) return null;
   const chg = prev ? cur.c - prev.c : 0;
   const cls = chg > 0 ? "up" : chg < 0 ? "down" : "flat";
+  const fi = idx >= 0 ? idx : 0;
   return (
     <div className="ohlcv-legend">
       <span>
@@ -150,6 +155,26 @@ function Legend({ b, prev, showInst }: { b: KBar | null; prev: KBar | null; show
       <span>
         量 <b>{cur.v.toLocaleString("zh-TW")}</b> 張
       </span>
+      {maActive.map((p) => {
+        const v = maData[p]?.[fi];
+        return v != null ? (
+          <span key={p} style={{ color: MA_COLORS[p] }}>MA{p} <b>{v.toFixed(2)}</b></span>
+        ) : null;
+      })}
+      {idx >= 0 && indType === "kd" && indData.a[fi] != null && (
+        <span style={{ color: IND_COLORS.k }}>K <b>{indData.a[fi].toFixed(1)}</b>{" "}
+          <span style={{ color: IND_COLORS.d }}>D <b>{indData.b[fi]?.toFixed(1)}</b></span>
+        </span>
+      )}
+      {idx >= 0 && indType === "rsi" && indData.a[fi] != null && (
+        <span style={{ color: IND_COLORS.rsi }}>RSI <b>{indData.a[fi].toFixed(1)}</b></span>
+      )}
+      {idx >= 0 && indType === "macd" && indData.a[fi] != null && (
+        <span style={{ color: IND_COLORS.dif }}>DIF <b>{indData.a[fi].toFixed(2)}</b>{" "}
+          <span style={{ color: IND_COLORS.sig }}>SIG <b>{indData.b[fi]?.toFixed(2)}</b></span>{" "}
+          <span>OSC <b>{indData.osc[fi]?.toFixed(2)}</b></span>
+        </span>
+      )}
       {showInst && prev && <span className="hint">法人圖例請見下方開關</span>}
     </div>
   );
@@ -184,7 +209,10 @@ export default function KChart({
   const [boll, setBoll] = useState(false);
   const [ind, setInd] = useState<"kd" | "rsi" | "macd">("kd");
   const [instFlags, setInstFlags] = useState<boolean[]>([true, true, true]);
-  const [legend, setLegend] = useState<{ b: KBar | null; prev: KBar | null }>({ b: null, prev: null });
+  const [legend, setLegend] = useState<{ b: KBar | null; prev: KBar | null; idx: number }>({ b: null, prev: null, idx: -1 });
+  const maDataRef = useRef<Record<number, (number | null)[]>>({});
+  const indTypeRef = useRef<"kd" | "rsi" | "macd">("kd");
+  const indDataRef = useRef<{ a: number[]; b: number[]; osc: number[] }>({ a: [], b: [], osc: [] });
 
   // 建立 chart（一次）
   useEffect(() => {
@@ -280,11 +308,11 @@ export default function KChart({
     chart.subscribeCrosshairMove((param) => {
       const data = dataRef.current;
       if (!param.time || !param.seriesData?.get(candle) || !data.length) {
-        setLegend({ b: null, prev: data[data.length - 2] ?? null });
+        setLegend({ b: null, prev: data[data.length - 2] ?? null, idx: data.length - 1 });
         return;
       }
       const i = data.findIndex((x) => tzTime(x.d) === param.time);
-      setLegend({ b: data[i] ?? null, prev: i > 0 ? data[i - 1] : null });
+      setLegend({ b: data[i] ?? null, prev: i > 0 ? data[i - 1] : null, idx: i });
     });
     return () => {
       mo.disconnect();
@@ -306,6 +334,7 @@ export default function KChart({
     vol.setData(bars.map((b) => ({ time: tzTime(b.d) as UTCTimestamp, value: b.v || 0, color: b.c >= b.o ? "rgba(178,74,69,0.45)" : "rgba(58,115,87,0.45)" })));
     [5, 10, 20, 60].forEach((p) => {
       const arr = calcMA(bars, p);
+      maDataRef.current[p] = arr;
       maRef.current[p].setData(bars.map((b, i) => ({ time: tzTime(b.d) as UTCTimestamp, value: arr[i] })).filter((x) => x.value != null) as { time: UTCTimestamp; value: number }[]);
       maRef.current[p].applyOptions({ visible: showMa && maActive.includes(p) });
     });
@@ -316,7 +345,7 @@ export default function KChart({
         bollRef.current[tag].setData(bars.map((x, i) => ({ time: tzTime(x.d) as UTCTimestamp, value: bb[tag][i] })).filter((x) => x.value != null) as { time: UTCTimestamp; value: number }[]);
       });
     }
-    setLegend({ b: null, prev: bars[bars.length - 2] ?? null });
+    setLegend({ b: null, prev: bars[bars.length - 2] ?? null, idx: bars.length - 1 });
   }, [bars, maActive, boll, showMa]);
 
   // 指標重繪
@@ -332,8 +361,10 @@ export default function KChart({
       indSeries.b.setData([]);
       indSeries.osc.setData([]);
     };
+    indTypeRef.current = ind;
     if (ind === "kd") {
       const { k, d } = calcKD(data);
+      indDataRef.current = { a: k, b: d, osc: [] };
       indSeries.a.applyOptions({ color: IND_COLORS.k });
       indSeries.b.applyOptions({ color: IND_COLORS.d });
       indSeries.a.setData(mk(k));
@@ -341,12 +372,14 @@ export default function KChart({
       indSeries.osc.setData([]);
     } else if (ind === "rsi") {
       const r = calcRSI(data);
+      indDataRef.current = { a: r, b: [], osc: [] };
       indSeries.a.applyOptions({ color: IND_COLORS.rsi });
       indSeries.b.setData([]);
       indSeries.osc.setData([]);
       indSeries.a.setData(mk(r));
     } else if (ind === "macd") {
       const { dif, macd, osc } = calcMACD(data);
+      indDataRef.current = { a: dif, b: macd, osc };
       indSeries.a.applyOptions({ color: IND_COLORS.dif });
       indSeries.b.applyOptions({ color: IND_COLORS.sig });
       indSeries.a.setData(mk(dif));
@@ -450,7 +483,7 @@ export default function KChart({
           </span>
         )}
       </div>
-      <Legend b={legend.b} prev={legend.b ? legend.prev : bars[bars.length - 2] ?? null} showInst={showInst} />
+      <Legend b={legend.b} prev={legend.b ? legend.prev : bars[bars.length - 2] ?? null} showInst={showInst} idx={legend.idx} maActive={maActive} maData={maDataRef.current} indType={indTypeRef.current} indData={indDataRef.current} />
       <div className="chart-canvas" ref={wrapRef} style={{ height }} />
     </div>
   );

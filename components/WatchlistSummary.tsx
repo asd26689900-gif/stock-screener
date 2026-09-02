@@ -41,7 +41,7 @@ export default function WatchlistSummary() {
 
   if (!ids.length) {
     return (
-      <div className="card" style={{ padding: "14px 16px" }}>
+      <div className="card">
         <div className="section-title" style={{ margin: 0 }}>
           自選股摘要
           <Link href="/watchlist" className="chip gold">前往管理</Link>
@@ -55,7 +55,7 @@ export default function WatchlistSummary() {
   const sorted = [...quotes].sort((a, b) => Math.abs(b.change_pct) - Math.abs(a.change_pct));
 
   return (
-    <div className="card" style={{ padding: "14px 16px" }}>
+    <div className="card">
       <div className="section-title" style={{ margin: "0 0 10px" }}>
         自選股摘要
         <span className="chip teal">{ids.length} 檔</span>

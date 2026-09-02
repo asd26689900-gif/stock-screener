@@ -1,8 +1,8 @@
 name: 新聞晨報
 on:
   schedule:
-    # 08:30 台北 = 00:30 UTC：每日新聞爬蟲（晨報）
-    - cron: '30 0 * * *'
+    # 08:00 台北 = 00:00 UTC：每日新聞爬蟲（晨報）
+    - cron: '0 0 * * *'
   workflow_dispatch:
 
 jobs:
