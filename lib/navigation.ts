@@ -33,9 +33,11 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "工具",
     items: [
       { href: "/filter", label: "自訂篩選" },
+      { href: "/compare", label: "股票比較" },
       { href: "/calendar", label: "投資行事曆" },
       { href: "/ipo", label: "股票抽籤" },
       { href: "/tools", label: "股票計算機" },
+      { href: "/settings", label: "設定" },
       { href: "/concepts/admin", label: "題材管理" },
     ],
   },

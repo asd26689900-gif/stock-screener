@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = { themeColor: "#F5F2EC" };
 
-const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',t)}catch(e){}})();`;
+const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',t);var s=JSON.parse(localStorage.getItem('app_settings')||'null');if(s&&s.colorMode)document.documentElement.setAttribute('data-color-mode',s.colorMode)}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

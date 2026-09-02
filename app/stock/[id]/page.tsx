@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getStockPage, resolveStock, getStockDisposition, getStockMargin } from "@/lib/stock";
+import { getStockPage, resolveStock, getStockDisposition, getStockMargin, getIndustryPeers } from "@/lib/stock";
 import { getLatestExecutionTimes } from "@/lib/data";
 import { fmt, fmtSigned, pctClass } from "@/lib/format";
 import { stockIntro } from "@/lib/intro";
@@ -46,6 +46,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
     getStockDisposition(sid),
     getStockMargin(sid),
   ]);
+  // peers fetched after data because we need industry
+  const peers = data?.industry ? await getIndustryPeers(sid, data.industry) : [];
   if (!data) notFound();
 
   const q = data.quote;
@@ -208,6 +210,47 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <div className="empty-msg">月營收資料待回填</div>
         )}
       </div>
+
+      {/* ── 同業比較 ── */}
+      {peers.length > 0 && (
+        <>
+          <div className="section-title">
+            同業比較
+            <span className="hint">{data.industry}（依成交量排序前 5 檔）</span>
+          </div>
+          <div className="table-wrap">
+            <table style={{ fontSize: 12.5 }}>
+              <thead>
+                <tr>
+                  <th>代號 / 名稱</th>
+                  <th className="num">收盤</th>
+                  <th className="num">漲跌%</th>
+                  <th className="num">成交量</th>
+                  <th className="num">營收 YoY%</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style={{ background: "var(--gold-soft)" }}>
+                  <td><b>{sid}</b> {data.name}</td>
+                  <td className="num">{fmt(q.close, 2)}</td>
+                  <td className={`num ${pctClass(q.changePct)}`}>{fmtSigned(q.changePct)}%</td>
+                  <td className="num">{fmt(q.volume, 0)}</td>
+                  <td className={`num ${pctClass(q.revYoy)}`}>{q.revYoy != null ? `${fmtSigned(q.revYoy)}%` : "—"}</td>
+                </tr>
+                {peers.map((p) => (
+                  <tr key={p.stock_id}>
+                    <td><Link href={`/stock/${p.stock_id}`}>{p.stock_id}</Link> {p.name}</td>
+                    <td className="num">{fmt(p.close, 2)}</td>
+                    <td className={`num ${pctClass(p.change_pct)}`}>{fmtSigned(p.change_pct)}%</td>
+                    <td className="num">{fmt(p.volume, 0)}</td>
+                    <td className={`num ${pctClass(p.rev_yoy)}`}>{p.rev_yoy != null ? `${fmtSigned(p.rev_yoy)}%` : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }

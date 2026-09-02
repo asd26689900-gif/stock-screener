@@ -422,6 +422,11 @@ td.num,th.num{text-align:right;font-family:var(--font-mono)}
 /* ─── 漲跌色 / 徽章 ─── */
 .up{color:var(--red)}
 .down{color:var(--green)}
+/* 國際慣例：綠漲紅跌 */
+:root[data-color-mode="intl"] .up{color:var(--green)}
+:root[data-color-mode="intl"] .down{color:var(--red)}
+:root[data-color-mode="intl"] .g-tile.up{border-left-color:var(--green)}
+:root[data-color-mode="intl"] .g-tile.dn{border-left-color:var(--red)}
 .flat{color:var(--text-secondary)}
 .chip{
   display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--text-secondary);

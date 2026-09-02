@@ -103,6 +103,20 @@ export default function WatchlistApp() {
 
   const [sortKey, setSortKey] = useState<"default" | "chg" | "chg_abs" | "vol">("default");
 
+  // 到價提醒
+  const triggeredAlerts = useMemo(() => {
+    try {
+      const raw = typeof window !== "undefined" ? JSON.parse(localStorage.getItem("price_alerts") || "[]") : [];
+      if (!Array.isArray(raw)) return [];
+      return raw.filter((a: { sid: string; dir: string; price: number; active: boolean }) => {
+        if (!a.active) return false;
+        const q = quotes[a.sid];
+        if (!q) return false;
+        return a.dir === "above" ? q.close >= a.price : q.close <= a.price;
+      });
+    } catch { return []; }
+  }, [quotes]);
+
   const activeIds = lists[active] ?? [];
   const sortedIds = useMemo(() => {
     const ids = [...activeIds];
@@ -121,6 +135,41 @@ export default function WatchlistApp() {
     const q = quotes[sid];
     const rev = q?.rev_yoy != null && q?.rev_mom != null;
     return { news, rev };
+  };
+
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+
+  const exportCSV = () => {
+    const ids = lists[active] ?? [];
+    if (!ids.length) return;
+    const headers = ["代號", "名稱", "收盤", "漲跌%", "成交量"];
+    const lines = [headers.join(",")];
+    for (const sid of ids) {
+      const q = quotes[sid];
+      lines.push([sid, q?.name ?? "", q ? String(q.close) : "", q ? String(q.change_pct) : "", q ? String(q.volume) : ""].join(","));
+    }
+    const blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${active}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  const onDragStart = (i: number) => setDragIdx(i);
+  const onDragOver = (e: React.DragEvent, i: number) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === i) return;
+    const ids = [...(lists[active] ?? [])];
+    const [item] = ids.splice(dragIdx, 1);
+    ids.splice(i, 0, item);
+    const next = { ...lists, [active]: ids };
+    setLists(next);
+    setDragIdx(i);
+  };
+  const onDragEnd = () => {
+    setDragIdx(null);
+    persist(WL_KEY, lists);
   };
 
   const addStock = async () => {
@@ -239,6 +288,9 @@ export default function WatchlistApp() {
         <button type="button" className="btn" onClick={addStock}>
           加入
         </button>
+        <button type="button" className="btn" onClick={exportCSV} title="匯出自選股為 CSV">
+          匯出 CSV
+        </button>
         <input
           value={newList}
           onChange={(e) => setNewList(e.target.value)}
@@ -248,6 +300,17 @@ export default function WatchlistApp() {
           style={{ padding: "7px 11px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", color: "var(--text)", fontSize: 12.5, maxWidth: 140 }}
         />
       </div>
+
+      {triggeredAlerts.length > 0 && (
+        <div className="dsp-alert-banner" style={{ marginBottom: 12 }}>
+          <span style={{ fontWeight: 600 }}>🔔 到價提醒</span>
+          {triggeredAlerts.map((a: { id: string; sid: string; dir: string; price: number }) => (
+            <span key={a.id} className="chip gold">
+              {a.sid} {a.dir === "above" ? "漲破" : "跌破"} {a.price}
+            </span>
+          ))}
+        </div>
+      )}
 
       {tab === "quote" ? (
         activeIds.length === 0 ? (
@@ -275,11 +338,11 @@ export default function WatchlistApp() {
                 </tr>
               </thead>
               <tbody>
-                {sortedIds.map((sid) => {
+                {sortedIds.map((sid, idx) => {
                   const q = quotes[sid];
                   const sig = signalsFor(sid, q?.name ?? "");
                   return (
-                    <tr key={sid}>
+                    <tr key={sid} draggable={sortKey === "default"} onDragStart={() => onDragStart(idx)} onDragOver={(e) => onDragOver(e, idx)} onDragEnd={onDragEnd} style={{ cursor: sortKey === "default" ? "grab" : undefined, opacity: dragIdx === idx ? 0.5 : 1 }}>
                       <td>
                         <Link href={`/stock/${sid}`}>{sid}</Link> {q?.name ?? "…"}
                       </td>

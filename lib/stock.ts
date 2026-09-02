@@ -145,6 +145,24 @@ export async function getStockMargin(sid: string): Promise<MarginInfo> {
   }
 }
 
+/** 同業比較：同 industry 前 5 檔（按成交量排序） */
+export type PeerStock = { stock_id: string; name: string; close: number; change_pct: number; volume: number; rev_yoy: number | null; pe?: number | null };
+export async function getIndustryPeers(sid: string, industry: string): Promise<PeerStock[]> {
+  if (!sb || !industry) return [];
+  try {
+    const { data } = await sb
+      .from("stock_metrics")
+      .select("stock_id,name,close,change_pct,volume,rev_yoy")
+      .eq("industry", industry)
+      .neq("stock_id", sid)
+      .order("volume", { ascending: false })
+      .limit(5);
+    return (data ?? []) as PeerStock[];
+  } catch {
+    return [];
+  }
+}
+
 export type ConceptStock = {
   stock_id: string;
   name: string;
