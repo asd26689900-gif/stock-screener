@@ -6,7 +6,6 @@ export const NAV_GROUPS: NavGroup[] = [
     label: "市場",
     items: [
       { href: "/", label: "市場總覽" },
-      { href: "/stock", label: "個股分析" },
       { href: "/global", label: "全球股市" },
       { href: "/heatmap", label: "產業熱力圖" },
       { href: "/history", label: "歷史漲跌幅" },
