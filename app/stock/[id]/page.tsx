@@ -1,6 +1,7 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getStockPage, resolveStock } from "@/lib/stock";
+import { getStockPage, resolveStock, getStockDisposition, getStockMargin } from "@/lib/stock";
 import { getLatestExecutionTimes } from "@/lib/data";
 import { fmt, fmtSigned, pctClass } from "@/lib/format";
 import { stockIntro } from "@/lib/intro";
@@ -8,6 +9,7 @@ import KChart, { type InstByDate } from "@/components/KChart";
 import InstitutionalPanel from "@/components/InstitutionalPanel";
 import HolderSlider from "@/components/HolderSlider";
 import UpdateStamp from "@/components/UpdateStamp";
+import WatchlistButton from "@/components/WatchlistButton";
 
 export const dynamic = "force-dynamic";
 
@@ -26,11 +28,24 @@ function QuoteCard({ label, value, sub, cls }: { label: string; value: string; s
   );
 }
 
+const LV_LABELS: Record<string, [string, string]> = {
+  disposing: ["disposing", "🔴 處置中"],
+  alert: ["alert", "🟡 已達處置標準"],
+  high: ["high", "🟡 高風險"],
+  near: ["near", "🔵 接近處置"],
+  watch: ["watch", "⚪ 觀察中"],
+};
+
 export default async function Page({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const resolved = await resolveStock(id);
   const sid = resolved?.stock_id ?? id;
-  const [data, times] = await Promise.all([getStockPage(sid), getLatestExecutionTimes()]);
+  const [data, times, dsp, margin] = await Promise.all([
+    getStockPage(sid),
+    getLatestExecutionTimes(),
+    getStockDisposition(sid),
+    getStockMargin(sid),
+  ]);
   if (!data) notFound();
 
   const q = data.quote;
@@ -49,7 +64,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
 
   return (
     <div className="container">
+      {/* ── 頁首：名稱 + 標籤 + 自選按鈕 ── */}
       <div className="page-header">
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <Link href="/" className="hint" style={{ fontSize: 12 }}>首頁</Link>
+          <span className="hint">/</span>
+          <span className="hint" style={{ fontSize: 12 }}>個股分析</span>
+        </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap" }}>
           <h1 className="page-title">
             {data.name} <span className="hint" style={{ fontSize: 14 }}>{sid}</span>
@@ -61,18 +82,31 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 {k === "chip" ? "籌碼" : k === "fundamental" ? "基本面" : "技術"} {fmt(Number(v), 0)}
               </span>
             ))}
+          <WatchlistButton sid={sid} />
         </div>
         <p className="page-desc" style={{ maxWidth: 760 }}>
           {intro}
         </p>
       </div>
 
+      {/* ── 處置/預警警示 ── */}
+      {dsp && (
+        <div className="dsp-alert-banner">
+          <span className={`dsp-tag ${dsp.level}`}>{LV_LABELS[dsp.level]?.[1] ?? dsp.level}</span>
+          {dsp.reason && <span className="dsp-alert-reason">{dsp.reason}</span>}
+          {dsp.period && <span className="hint">期間：{dsp.period}</span>}
+          <Link href="/disposition" className="chip gold" style={{ marginLeft: "auto" }}>查看全部</Link>
+        </div>
+      )}
+
+      {/* ── K 線 ── */}
       <div className="section-title" style={{ marginTop: 0 }}>
         報價 / K 線
         <UpdateStamp job="update" times={times} label="行情" />
       </div>
       <KChart bars={data.bars} instByDate={instByDate} />
 
+      {/* ── 即時報價 ── */}
       <div className="section-title">
         即時報價
         <span className="hint">Yahoo Finance 延遲約 15 分</span>
@@ -98,16 +132,35 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <QuoteCard label="營收 YoY" value={q.revYoy != null ? `${fmtSigned(q.revYoy)}%` : "—"} cls={pctClass(q.revYoy)} />
       </div>
 
+      {/* ── 融資融券 ── */}
+      {margin && (
+        <>
+          <div className="section-title">
+            融資融券
+            <UpdateStamp job="update" times={times} label="資券" />
+          </div>
+          <div className="summary-cards">
+            <QuoteCard label="融資餘額（張）" value={fmt(margin.m_today, 0)} sub={`前日 ${fmt(margin.m_prev, 0)}`} cls={pctClass(margin.m_today - margin.m_prev)} />
+            <QuoteCard label="融資增減" value={fmtSigned(margin.m_today - margin.m_prev, 0)} cls={pctClass(margin.m_today - margin.m_prev)} />
+            <QuoteCard label="融券餘額（張）" value={fmt(margin.s_today, 0)} sub={`前日 ${fmt(margin.s_prev, 0)}`} cls={pctClass(margin.s_today - margin.s_prev)} />
+            <QuoteCard label="融券增減" value={fmtSigned(margin.s_today - margin.s_prev, 0)} cls={pctClass(margin.s_today - margin.s_prev)} />
+          </div>
+        </>
+      )}
+
+      {/* ── 法人 ── */}
       <div className="section-title">
         法人累計 / 當日
         <UpdateStamp job="update" times={times} label="法人" />
       </div>
       <InstitutionalPanel rows={data.instRows} />
 
+      {/* ── 集保 ── */}
       <HolderSlider bigPct={data.chip?.bigHolderPct} retailPct={data.chip?.retailHolderPct} src={data.chip?.holderSrc} levels={data.chip?.tdccLevels} />
 
+      {/* ── 基本面 ── */}
       <div className="section-title">
-        基本面 / 月營收 / 本益比河流圖
+        基本面 / 月營收
         <span className="hint">PE / PB / 殖利率為最新快照</span>
       </div>
       <div className="card">
@@ -152,13 +205,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             </div>
           </>
         ) : (
-          <div className="empty-msg">月營收資料待回填（FinMind / histock）</div>
+          <div className="empty-msg">月營收資料待回填</div>
         )}
-        <div className="section-title" style={{ marginTop: 18 }}>
-          本益比河流圖
-          <span className="hint">歷史 PE 序列需回補後繪製（第 4 批）</span>
-        </div>
-        <div className="empty-msg">將以歷史 PE ± 1σ 畫河流帶，與月營收同區塊顯示。</div>
       </div>
     </div>
   );

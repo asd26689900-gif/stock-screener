@@ -238,7 +238,7 @@ export default function CalendarApp() {
               const shown = isExpanded ? list : list.slice(0, GROUP_CAP);
               return (
                 <div key={date} className="card" style={{ padding: 12, marginBottom: 10 }}>
-                  <div className="mega-col-title">{date}（{DOW[new Date(date).getDay()]}）・ {list.length} 筆</div>
+                  <div className="mega-col-title">{date}（{DOW[new Date(date + "T00:00:00+08:00").getDay()]}）・ {list.length} 筆</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {shown.map((e, i) => (
                       <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>

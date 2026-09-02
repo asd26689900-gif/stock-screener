@@ -1,6 +1,6 @@
 {
-  "name": "盤後精選模組 — 台股選股",
-  "short_name": "盤後精選",
+  "name": "盤後通 — 台股盤後分析",
+  "short_name": "盤後通",
   "description": "台股市場總覽、每日焦點、多因子選股與全球股市。",
   "start_url": "/",
   "display": "standalone",

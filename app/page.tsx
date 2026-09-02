@@ -5,8 +5,10 @@ import { fmt, fmtSigned, pctClass } from "@/lib/format";
 import UpdateStamp from "@/components/UpdateStamp";
 import FocusStrong from "@/components/FocusStrong";
 import IndexChart from "@/components/IndexChart";
+import WatchlistSummary from "@/components/WatchlistSummary";
+import NewsBrief from "@/components/NewsBrief";
 
-export const metadata: Metadata = { title: "市場總覽" };
+export const metadata: Metadata = { title: "首頁" };
 export const dynamic = "force-dynamic";
 
 function StockLink({ sid, name }: { sid: string; name: string }) {
@@ -69,23 +71,47 @@ export default async function Home() {
   return (
     <div className="container">
       <div className="page-header">
-        <h1 className="page-title">市場總覽</h1>
+        <h1 className="page-title">盤後通</h1>
         <p className="page-desc">
-          大盤走勢、每日焦點與新聞晨報，每日盤後自動更新。
-          <span className="hint" style={{ marginLeft: 8 }}>
-            （Phase 1 骨架已接真實資料，K線與完整模組陸續搬遷）
-          </span>
+          台股盤後自動更新：大盤走勢、自選股追蹤、法人籌碼、選股模組。
         </p>
       </div>
 
+      {/* ── 第一排：自選股摘要 + 新聞 ── */}
+      <div className="dash-grid">
+        <WatchlistSummary />
+        <NewsBrief />
+      </div>
+
+      {/* ── 大盤走勢 ── */}
       <IndexChart />
 
+      {/* ── 今日精選：強勢股 ── */}
       <div className="section-title">
         本週強勢股
         <UpdateStamp job="update" times={times} label="行情" />
       </div>
       <FocusStrong data={{ day: strong.day ?? [], week: strong.week ?? [], month: strong.month ?? [] }} />
 
+      {/* ── 法人動向 ── */}
+      <div className="section-title">
+        三大法人動向
+        <UpdateStamp job="update" times={times} label="法人" />
+      </div>
+      <div className="summary-cards" style={{ marginBottom: 10 }}>
+        <div className="summary-card">
+          <div className="summary-label">法人同時買超家數</div>
+          <div className="summary-val">{d.institutional?.both_buy ?? "—"}</div>
+          <div className="summary-sub">外資＋投信同買</div>
+        </div>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
+        <MiniTable title="外資買超 Top" rows={d.institutional?.foreign_top ?? []} cols={[{ key: "f", label: "外資淨買超", num: true, fmt: (v) => fmt(v / 1000, 0) }]} />
+        <MiniTable title="投信買超 Top" rows={d.institutional?.trust_top ?? []} cols={[{ key: "t", label: "投信淨買超", num: true, fmt: (v) => fmt(v / 1000, 0) }]} />
+        <MiniTable title="自營買超 Top" rows={d.institutional?.dealer_top ?? []} cols={[{ key: "d", label: "自營淨買超", num: true, fmt: (v) => fmt(v / 1000, 0) }]} />
+      </div>
+
+      {/* ── 大戶加碼 ── */}
       <div className="section-title">
         大戶加碼股
         <UpdateStamp job="update" times={times} label="集保" />
@@ -117,23 +143,7 @@ export default async function Home() {
         <div className="empty-msg">本週尚無集保快照（週六 06:30 更新）</div>
       )}
 
-      <div className="section-title">
-        三大法人動向
-        <UpdateStamp job="update" times={times} label="法人" />
-      </div>
-      <div className="summary-cards" style={{ marginBottom: 10 }}>
-        <div className="summary-card">
-          <div className="summary-label">法人同時買超家數</div>
-          <div className="summary-val">{d.institutional?.both_buy ?? "—"}</div>
-          <div className="summary-sub">外資＋投信同買</div>
-        </div>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(280px,1fr))", gap: 12 }}>
-        <MiniTable title="外資買超 Top" rows={d.institutional?.foreign_top ?? []} cols={[{ key: "f", label: "外資淨買超", num: true, fmt: (v) => fmt(v / 1000, 0) }]} />
-        <MiniTable title="投信買超 Top" rows={d.institutional?.trust_top ?? []} cols={[{ key: "t", label: "投信淨買超", num: true, fmt: (v) => fmt(v / 1000, 0) }]} />
-        <MiniTable title="自營買超 Top" rows={d.institutional?.dealer_top ?? []} cols={[{ key: "d", label: "自營淨買超", num: true, fmt: (v) => fmt(v / 1000, 0) }]} />
-      </div>
-
+      {/* ── ETF ── */}
       <div className="section-title">
         ETF 動向
         <span className="chip teal">主動式 {d.etf?.active_count ?? 0} 檔</span>
@@ -170,6 +180,7 @@ export default async function Home() {
         <div className="empty-msg">無 ETF 資料</div>
       )}
 
+      {/* ── 資券 ── */}
       <div className="section-title">
         資券變化
         <UpdateStamp job="update" times={times} label="資券" />

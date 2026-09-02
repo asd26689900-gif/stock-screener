@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { twDateStr } from "@/lib/format";
 
 // 美股/日股行情（Yahoo Finance v8 chart，一次平行抓取），沿用舊站 api/global.js
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
@@ -48,8 +49,7 @@ async function fetchQuote(sym: string) {
     const prev = bars[bars.length - 2];
     const chg = price - prev;
     const chgPct = prev ? (chg / prev) * 100 : 0;
-    const dt = new Date(res.timestamp[res.timestamp.length - 1] * 1000);
-    const d = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
+    const d = twDateStr(res.timestamp[res.timestamp.length - 1] * 1000);
     return { sym, price: Math.round(price * 100) / 100, chg: Math.round(chg * 100) / 100, chgPct: Math.round(chgPct * 100) / 100, date: d, spark: bars.slice(-22) };
   } catch {
     return null;

@@ -7,10 +7,10 @@ import BackToTop from "@/components/BackToTop";
 
 export const metadata: Metadata = {
   title: {
-    default: "盤後精選模組",
-    template: "%s — 盤後精選模組",
+    default: "盤後通 — 台股盤後分析",
+    template: "%s — 盤後通",
   },
-  description: "台股盤後資料整理：市場總覽、個股分析、三大法人、資券變化、選股策略與題材概念股。",
+  description: "台股盤後資料整理：大盤快報、自選股追蹤、法人籌碼、選股模組，每日自動更新。",
   icons: { icon: "/favicon.svg" },
 };
 

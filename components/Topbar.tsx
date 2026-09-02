@@ -106,7 +106,7 @@ export default function Topbar() {
   return (
     <header className="topbar">
       <Link className="brand" href="/">
-        盤後精選<span>模組</span>
+        盤後<span>通</span>
       </Link>
       <nav className="nav-links" aria-label="主選單">
         {NAV_GROUPS.map((g) => (

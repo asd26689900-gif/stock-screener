@@ -1,4 +1,5 @@
 import { sb } from "./supabase";
+import { twDateStr } from "./format";
 import type { InstRow } from "@/components/InstitutionalPanel";
 import type { KBar } from "@/components/KChart";
 
@@ -116,6 +117,34 @@ export async function getStockPage(sid: string): Promise<StockPageData | null> {
   }
 }
 
+/** 查詢個股是否在處置/預警名單 */
+export type DispositionInfo = { level: string; reason?: string; period?: string; measure?: string } | null;
+export async function getStockDisposition(sid: string): Promise<DispositionInfo> {
+  if (!sb) return null;
+  try {
+    const { data } = await sb.from("daily_disposition").select("data").order("date", { ascending: false }).limit(1);
+    const list = (data?.[0]?.data as { list?: { id: string; level: string; reason?: string; period?: string; measure?: string }[] })?.list ?? [];
+    return list.find((r) => r.id === sid) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** 查詢個股融資融券 */
+export type MarginInfo = { m_today: number; m_prev: number; s_today: number; s_prev: number } | null;
+export async function getStockMargin(sid: string): Promise<MarginInfo> {
+  if (!sb) return null;
+  try {
+    const { data } = await sb.from("daily_focus").select("data").order("date", { ascending: false }).limit(1);
+    const margin = (data?.[0]?.data as { margin?: { m_up?: { id: string; m_today: number; m_prev: number; s_today: number; s_prev: number }[]; m_dn?: { id: string; m_today: number; m_prev: number; s_today: number; s_prev: number }[]; s_up?: { id: string; m_today: number; m_prev: number; s_today: number; s_prev: number }[]; s_dn?: { id: string; m_today: number; m_prev: number; s_today: number; s_prev: number }[] } })?.margin;
+    if (!margin) return null;
+    const all = [...(margin.m_up ?? []), ...(margin.m_dn ?? []), ...(margin.s_up ?? []), ...(margin.s_dn ?? [])];
+    return all.find((r) => r.id === sid) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export type ConceptStock = {
   stock_id: string;
   name: string;
@@ -144,7 +173,7 @@ function pctFrom(base: number | undefined, cur: number | undefined): number | nu
 export async function getConceptStocks(ids: string[]): Promise<ConceptStock[]> {
   if (!sb || !ids.length) return [];
   try {
-    const cutoff = new Date(Date.now() - 120 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+    const cutoff = twDateStr(Date.now() - 120 * 24 * 3600_000);
     const [metricsRes, pricesRes, stkRes] = await Promise.all([
       sb.from("stock_metrics").select("stock_id,name,close,change_pct,volume,foreign_net_shares,trust_net_shares,rev_yoy,date,industry").in("stock_id", ids),
       sb.from("stock_prices").select("stock_id,date,close").in("stock_id", ids).gte("date", cutoff).order("date", { ascending: true }),

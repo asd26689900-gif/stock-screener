@@ -101,7 +101,21 @@ export default function WatchlistApp() {
     })();
   }, [lists, user]);
 
+  const [sortKey, setSortKey] = useState<"default" | "chg" | "chg_abs" | "vol">("default");
+
   const activeIds = lists[active] ?? [];
+  const sortedIds = useMemo(() => {
+    const ids = [...activeIds];
+    if (sortKey === "default") return ids;
+    return ids.sort((a, b) => {
+      const qa = quotes[a], qb = quotes[b];
+      if (!qa || !qb) return 0;
+      if (sortKey === "chg") return qb.change_pct - qa.change_pct;
+      if (sortKey === "chg_abs") return Math.abs(qb.change_pct) - Math.abs(qa.change_pct);
+      return qb.volume - qa.volume;
+    });
+  }, [activeIds, sortKey, quotes]);
+
   const signalsFor = (sid: string, name: string) => {
     const news = mops.filter((m) => m.id === sid || (name && m.company?.includes(name))).length;
     const q = quotes[sid];
@@ -167,6 +181,20 @@ export default function WatchlistApp() {
       .filter((h) => h.pos && (h.pos.shares > 0 || h.pos.realized !== 0));
   }, [txs, quotes]);
 
+  // 每日損益 = 持股數 × (今收 - 昨收)
+  const dailyPL = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const h of holdings) {
+      if (!h.pos || h.pos.shares <= 0) continue;
+      const q = quotes[h.sid];
+      if (!q || q.change_pct == null) continue;
+      const prevClose = q.close / (1 + q.change_pct / 100);
+      map[h.sid] = h.pos.shares * (q.close - prevClose);
+    }
+    return map;
+  }, [holdings, quotes]);
+  const totalDailyPL = Object.values(dailyPL).reduce((s, v) => s + v, 0);
+
   if (!ready) return <div className="sk-box"><i /><i /><i /></div>;
 
   return (
@@ -225,6 +253,15 @@ export default function WatchlistApp() {
         activeIds.length === 0 ? (
           <div className="empty-msg">此清單還沒有股票，用上方輸入框加入。</div>
         ) : (
+          <>
+          <div className="controls" style={{ marginBottom: 8 }}>
+            <span className="hint">排序</span>
+            {([["default", "預設"], ["chg", "漲跌%"], ["chg_abs", "振幅"], ["vol", "成交量"]] as const).map(([k, label]) => (
+              <button key={k} type="button" className={`toggle-chip ${sortKey === k ? "on" : ""}`} onClick={() => setSortKey(k)}>
+                {label}
+              </button>
+            ))}
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -238,7 +275,7 @@ export default function WatchlistApp() {
                 </tr>
               </thead>
               <tbody>
-                {activeIds.map((sid) => {
+                {sortedIds.map((sid) => {
                   const q = quotes[sid];
                   const sig = signalsFor(sid, q?.name ?? "");
                   return (
@@ -269,6 +306,7 @@ export default function WatchlistApp() {
               </tbody>
             </table>
           </div>
+          </>
         )
       ) : (
         <>
@@ -324,6 +362,12 @@ export default function WatchlistApp() {
                   {fmtSigned(holdings.reduce((s, h) => s + h.pos!.pl, 0), 0)}
                 </div>
               </div>
+              <div className="summary-card">
+                <div className="summary-label">今日損益</div>
+                <div className={`summary-val ${pctClass(totalDailyPL)}`}>
+                  {fmtSigned(totalDailyPL, 0)}
+                </div>
+              </div>
             </div>
           )}
           {holdings.map((h) => {
@@ -339,6 +383,9 @@ export default function WatchlistApp() {
                   <div className="summary-card"><div className="summary-label">平均成本</div><div className="summary-val">{fmt(p.avgCost, 2)}</div></div>
                   <div className="summary-card"><div className="summary-label">市值</div><div className="summary-val">{fmt(p.marketValue, 0)}</div></div>
                   <div className="summary-card"><div className="summary-label">已實現</div><div className={`summary-val ${pctClass(p.realized)}`}>{fmtSigned(p.realized, 0)}</div></div>
+                  {dailyPL[h.sid] != null && (
+                    <div className="summary-card"><div className="summary-label">今日損益</div><div className={`summary-val ${pctClass(dailyPL[h.sid])}`}>{fmtSigned(dailyPL[h.sid], 0)}</div></div>
+                  )}
                 </div>
                 <div className="mega-col-title">損益曲線</div>
                 <CurveChart points={h.curve} />

@@ -31,3 +31,17 @@ export function fmtTw(iso: string | null | undefined): string {
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(t.getUTCMonth() + 1)}/${p(t.getUTCDate())} ${p(t.getUTCHours())}:${p(t.getUTCMinutes())}`;
 }
+
+/** 台灣時間 (GMT+8) 的今天 YYYY-MM-DD */
+export function twToday(): string {
+  const t = new Date(Date.now() + 8 * 3600_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`;
+}
+
+/** 任意 epoch ms → 台灣時間 YYYY-MM-DD */
+export function twDateStr(ms: number): string {
+  const t = new Date(ms + 8 * 3600_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${t.getUTCFullYear()}-${p(t.getUTCMonth() + 1)}-${p(t.getUTCDate())}`;
+}

@@ -97,7 +97,7 @@ export function newTx(sid: string, partial?: Partial<Tx>): Tx {
     side: "buy",
     shares: 1000,
     price: 0,
-    date: new Date().toISOString().slice(0, 10),
+    date: new Date(Date.now() + 8 * 3600_000).toISOString().slice(0, 10),
     ...partial,
   };
 }
