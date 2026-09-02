@@ -5,6 +5,7 @@ import { fmt, fmtSigned, pctClass } from "@/lib/format";
 
 type Quote = { sym: string; name: string; price?: number; chg?: number; chgPct?: number; date?: string; spark?: number[] };
 type GlobalData = {
+  tw?: { indices: Quote[] };
   us: { indices: Quote[]; stocks: Quote[] };
   jp: { indices: Quote[]; stocks: Quote[] };
   extra: Quote[];
@@ -92,6 +93,7 @@ export default function GlobalView() {
       <p className="hint" style={{ marginBottom: 10 }}>
         資料來源：Yahoo Finance（延遲約 15 分）。美股為前一日收盤、日股為當日行情。
       </p>
+      {data.tw?.indices?.length ? <Section title="台股指數" items={data.tw.indices} /> : null}
       <Section title="美股指數" items={data.us.indices} />
       <Section title="美股熱門" items={[]} />
       <Heat items={data.us.stocks} />

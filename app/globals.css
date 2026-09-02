@@ -264,8 +264,8 @@ img,svg{display:block}
 .treemap{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;border-radius:4px}
 .tm-cell{position:absolute;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,0.18);cursor:pointer;overflow:hidden;transition:filter .12s;color:#fff}
 .tm-cell:hover{filter:brightness(1.08);z-index:2;outline:1px solid rgba(255,255,255,.5);outline-offset:-1px}
-.tm-label{font-size:11px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;max-width:100%;padding:0 4px}
-.tm-val{font-size:11px;font-family:var(--font-mono)}
+.tm-label{font-size:11px;font-weight:600;white-space:nowrap;text-overflow:ellipsis;overflow:hidden;max-width:100%;padding:0 4px;text-shadow:0 1px 3px rgba(0,0,0,.45)}
+.tm-val{font-size:11px;font-family:var(--font-mono);text-shadow:0 1px 3px rgba(0,0,0,.45)}
 .tm-cell.small .tm-label{font-size:9px}
 .tm-cell.tiny .tm-label,.tm-cell.tiny .tm-val{display:none}
 .tooltip{position:fixed;z-index:300;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:8px 10px;font-size:11px;font-family:var(--font-mono);line-height:1.6;white-space:nowrap;box-shadow:var(--shadow-modal);display:none;pointer-events:none}

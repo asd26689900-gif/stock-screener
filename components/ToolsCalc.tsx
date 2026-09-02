@@ -24,6 +24,8 @@ export default function ToolsCalc() {
   const [yOut, setYOut] = useState("");
   const [d, setD] = useState({ monthly: "10000", rate: "8", years: "20" });
   const [dOut, setDOut] = useState("");
+  const [p, setP] = useState({ capital: "1000000", riskPct: "2", entry: "100", stop: "95" });
+  const [pOut, setPOut] = useState("");
 
   const calcReturn = () => {
     const buy = num(r.buy), sell = num(r.sell), lots = num(r.lots) || 1;
@@ -58,6 +60,20 @@ export default function ToolsCalc() {
     for (let i = 0; i < years * 12; i++) total = (total + monthly) * (1 + rate);
     const invested = monthly * years * 12;
     setDOut(`<div>投入本金：${fmt(invested, 0)} 元</div><div>期末價值：<b class="big up">${fmt(total, 0)} 元</b></div><div>累積報酬：<b class="${pctClass(total - invested)}">${((total - invested) / invested * 100).toFixed(1)}%</b></div>`);
+  };
+
+  const calcPosition = () => {
+    const capital = num(p.capital), riskPct = num(p.riskPct), entry = num(p.entry), stop = num(p.stop);
+    if (!capital || !entry || !stop || entry === stop) return;
+    const maxRisk = capital * (riskPct / 100);
+    const riskPerShare = Math.abs(entry - stop);
+    const maxShares = Math.floor(maxRisk / riskPerShare);
+    const lots = Math.floor(maxShares / 1000);
+    const investAmt = lots * 1000 * entry;
+    const investPct = (investAmt / capital * 100).toFixed(1);
+    setPOut(
+      `<div>最大可承受虧損：${fmt(maxRisk, 0)} 元</div><div>每股風險：${fmt(riskPerShare, 2)} 元（${(riskPerShare / entry * 100).toFixed(2)}%）</div><hr/><div>建議張數：<b class="big">${lots} 張</b>（${fmt(lots * 1000, 0)} 股）</div><div>所需資金：${fmt(investAmt, 0)} 元（佔總資金 ${investPct}%）</div><div>最大虧損：${fmt(lots * 1000 * riskPerShare, 0)} 元</div>`,
+    );
   };
 
   const inputStyle = { padding: "8px 10px", border: "1px solid var(--border)", borderRadius: "var(--radius)", background: "var(--surface)", color: "var(--text)", fontSize: 13.5, fontFamily: "var(--font-mono)" } as const;
@@ -105,6 +121,18 @@ export default function ToolsCalc() {
         </div>
         <button type="button" className="calc-btn" onClick={calcDCA}>計算</button>
         {dOut && <div className="result-box show" dangerouslySetInnerHTML={{ __html: dOut }} />}
+      </div>
+
+      <div className="tool-card">
+        <div className="tool-title">部位計算機</div>
+        <div className="calc-form">
+          <Field label="總資金"><input type="number" value={p.capital} onChange={(e) => setP((f) => ({ ...f, capital: e.target.value }))} style={inputStyle} /></Field>
+          <Field label="風險比例%"><input type="number" step="0.5" value={p.riskPct} onChange={(e) => setP((f) => ({ ...f, riskPct: e.target.value }))} style={inputStyle} /></Field>
+          <Field label="進場價"><input type="number" value={p.entry} onChange={(e) => setP((f) => ({ ...f, entry: e.target.value }))} style={inputStyle} /></Field>
+          <Field label="停損價"><input type="number" value={p.stop} onChange={(e) => setP((f) => ({ ...f, stop: e.target.value }))} style={inputStyle} /></Field>
+        </div>
+        <button type="button" className="calc-btn" onClick={calcPosition}>計算</button>
+        {pOut && <div className="result-box show" dangerouslySetInnerHTML={{ __html: pOut }} />}
       </div>
     </>
   );

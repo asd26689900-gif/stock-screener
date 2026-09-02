@@ -4,6 +4,11 @@ import { twDateStr } from "@/lib/format";
 // 美股/日股行情（Yahoo Finance v8 chart，一次平行抓取），沿用舊站 api/global.js
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
+const TW_INDICES = [
+  { sym: "^TWII", name: "加權指數" },
+  { sym: "^TWOII", name: "櫃買指數" },
+];
+
 const US_INDICES = [
   { sym: "^DJI", name: "道瓊工業" },
   { sym: "^IXIC", name: "那斯達克" },
@@ -57,10 +62,11 @@ async function fetchQuote(sym: string) {
 }
 
 export async function GET() {
-  const symbols = [...US_INDICES, ...US_STOCKS, ...JP_INDICES, ...JP_STOCKS, ...EXTRA].map((s) => s.sym);
+  const symbols = [...TW_INDICES, ...US_INDICES, ...US_STOCKS, ...JP_INDICES, ...JP_STOCKS, ...EXTRA].map((s) => s.sym);
   const map = await Promise.all(symbols.map(async (sym) => [sym, await fetchQuote(sym)] as const));
   const q = Object.fromEntries(map);
   const out = {
+    tw: { indices: TW_INDICES.map((s) => ({ ...s, ...(q[s.sym] || {}) })) },
     us: { indices: US_INDICES.map((s) => ({ ...s, ...(q[s.sym] || {}) })), stocks: US_STOCKS.map((s) => ({ ...s, ...(q[s.sym] || {}) })) },
     jp: { indices: JP_INDICES.map((s) => ({ ...s, ...(q[s.sym] || {}) })), stocks: JP_STOCKS.map((s) => ({ ...s, ...(q[s.sym] || {}) })) },
     extra: EXTRA.map((s) => ({ ...s, ...(q[s.sym] || {}) })),
