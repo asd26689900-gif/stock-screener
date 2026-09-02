@@ -14,7 +14,7 @@ export const metadata: Metadata = {
   icons: { icon: "/favicon.svg" },
 };
 
-export const viewport: Viewport = { themeColor: "#F5F2EC" };
+export const viewport: Viewport = { themeColor: "#ffffff" };
 
 const themeScript = `(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'}document.documentElement.setAttribute('data-theme',t);var s=JSON.parse(localStorage.getItem('app_settings')||'null');if(s&&s.colorMode)document.documentElement.setAttribute('data-color-mode',s.colorMode)}catch(e){}})();`;
 
