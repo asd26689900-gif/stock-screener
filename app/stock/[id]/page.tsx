@@ -29,6 +29,39 @@ function QuoteCard({ label, value, sub, cls }: { label: string; value: string; s
   );
 }
 
+// 台股價格 tick 級距（依價格區間），用於精算漲跌停
+function tickSize(p: number): number {
+  if (p < 10) return 0.01;
+  if (p < 50) return 0.05;
+  if (p < 100) return 0.1;
+  if (p < 500) return 0.5;
+  if (p < 1000) return 1;
+  return 5;
+}
+function limitUp(prev: number): number { const r = prev * 1.1; const t = tickSize(r); return Math.floor(r / t) * t; }
+function limitDown(prev: number): number { const r = prev * 0.9; const t = tickSize(r); return Math.ceil(r / t) * t; }
+
+function DetailCell({ k, v }: { k: string; v: string }) {
+  return <div className="dq-cell"><span className="k">{k}</span><span className="v">{v}</span></div>;
+}
+
+// 價格區間位置條：low ── 最新 ── high，附開盤標記
+function RangeBar({ low, cur, high, open }: { low: number; cur: number; high: number; open?: number }) {
+  const span = high - low;
+  const pos = span > 0 ? Math.max(0, Math.min(100, ((cur - low) / span) * 100)) : 50;
+  const opos = open != null && span > 0 ? Math.max(0, Math.min(100, ((open - low) / span) * 100)) : null;
+  return (
+    <div className="range-bar">
+      <div className="rb-track">
+        <span className="rb-label" style={{ left: `${Math.max(10, Math.min(90, pos))}%` }}>最新 {fmt(cur, 2)}</span>
+        {opos != null && <span className="rb-open" style={{ left: `${opos}%` }} title={`開盤 ${fmt(open!, 2)}`} />}
+        <span className="rb-marker" style={{ left: `${pos}%` }} />
+      </div>
+      <div className="rb-ends"><span>{fmt(low, 2)}</span><span>{fmt(high, 2)}</span></div>
+    </div>
+  );
+}
+
 const LV_LABELS: Record<string, [string, string]> = {
   disposing: ["disposing", "🔴 處置中"],
   alert: ["alert", "🟡 已達處置標準"],
@@ -64,6 +97,24 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const intro = stockIntro(sid, data.name, data.industry);
   const rev = data.revenue ?? [];
   const maxRev = Math.max(...rev.map((r) => Number(r.rev) || 0), 1);
+
+  // ── 詳細報價衍生值（皆由現有資料計算或代數反推，無資料則 —）──
+  const prevClose = q.close - q.change;
+  const dqOpen = last?.o ?? q.close, dqHi = last?.h ?? q.close, dqLo = last?.l ?? q.close;
+  const amplitude = prevClose ? ((dqHi - dqLo) / prevClose) * 100 : null;
+  const hi52 = data.bars.length ? Math.max(...data.bars.map((b) => b.h)) : null;
+  const lo52 = data.bars.length ? Math.min(...data.bars.map((b) => b.l)) : null;
+  const lastBarV = last?.v ?? 0;
+  const volScale = lastBarV > 0 ? q.volume / lastBarV : 1; // 對齊 q.volume（張）的單位
+  const avgVol = data.bars.length
+    ? Math.round((data.bars.slice(-60).reduce((s, b) => s + (b.v || 0), 0) / Math.min(60, data.bars.length)) * volScale)
+    : null;
+  const volRatio = avgVol ? q.volume / avgVol : null;
+  const epsTTM = q.pe ? q.close / q.pe : null; // 近四季EPS ≈ 收盤 ÷ 本益比
+  const bvps = q.pb ? q.close / q.pb : null; // 每股淨值 ≈ 收盤 ÷ 股價淨值比
+  const annualDiv = q.dy != null ? (q.close * q.dy) / 100 : null; // 年現金股利 ≈ 收盤 × 殖利率
+  const lu = prevClose ? limitUp(prevClose) : null;
+  const ld = prevClose ? limitDown(prevClose) : null;
 
   // ── 重點提醒：純公開資料整理，非投資建議（僅陳述事實與已知事件，不給買賣方向）──
   const reminders: { label: string; text: string }[] = [];
@@ -138,6 +189,63 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <UpdateStamp job="update" times={times} label="行情" />
       </div>
       <KChart bars={data.bars} instByDate={instByDate} />
+
+      {/* ── 詳細報價 ── */}
+      {last && (
+        <>
+          <div className="section-title">
+            詳細報價
+            <UpdateStamp job="update" times={times} label="行情" />
+          </div>
+          <div className="dq-grid">
+            <DetailCell k="今開" v={fmt(dqOpen, 2)} />
+            <DetailCell k="最高" v={fmt(dqHi, 2)} />
+            <DetailCell k="成交量" v={`${fmt(q.volume, 0)} 張`} />
+            <DetailCell k="昨收" v={fmt(prevClose, 2)} />
+            <DetailCell k="最低" v={fmt(dqLo, 2)} />
+            <DetailCell k="振幅" v={amplitude != null ? `${fmt(amplitude, 2)}%` : "—"} />
+            <DetailCell k="漲停" v={lu != null ? fmt(lu, 2) : "—"} />
+            <DetailCell k="跌停" v={ld != null ? fmt(ld, 2) : "—"} />
+            <DetailCell k="本益比" v={q.pe != null ? fmt(q.pe, 2) : "—"} />
+            <DetailCell k="52W高" v={hi52 != null ? fmt(hi52, 2) : "—"} />
+            <DetailCell k="52W低" v={lo52 != null ? fmt(lo52, 2) : "—"} />
+            <DetailCell k="股價淨值比" v={q.pb != null ? fmt(q.pb, 2) : "—"} />
+            <DetailCell k="近四季EPS" v={epsTTM != null ? fmt(epsTTM, 2) : "—"} />
+            <DetailCell k="本期EPS" v={q.epsQ != null ? fmt(q.epsQ, 2) : "—"} />
+            <DetailCell k="每股淨值" v={bvps != null ? fmt(bvps, 2) : "—"} />
+            <DetailCell k="毛利率" v={q.grossMargin != null ? `${fmt(q.grossMargin, 2)}%` : "—"} />
+            <DetailCell k="營益率" v={q.opMargin != null ? `${fmt(q.opMargin, 2)}%` : "—"} />
+            <DetailCell k="淨利率" v={q.netMargin != null ? `${fmt(q.netMargin, 2)}%` : "—"} />
+            <DetailCell k="殖利率" v={q.dy != null ? `${fmt(q.dy, 2)}%` : "—"} />
+            <DetailCell k="年現金股利" v={annualDiv != null ? fmt(annualDiv, 2) : "—"} />
+            <DetailCell k="財報期別" v={q.finPeriod ?? "—"} />
+          </div>
+
+          {avgVol != null && (
+            <div className="range-bar">
+              <div className="rb-head">
+                <span>當日量 {fmt(q.volume, 0)}</span>
+                {volRatio != null && <span className="rb-pct">{fmt(volRatio * 100, 1)}%</span>}
+                <span>季均量 {fmt(avgVol, 0)}</span>
+              </div>
+              <div className="rb-track"><span className="rb-fill" style={{ width: `${Math.max(2, Math.min(100, (volRatio ?? 0) * 100))}%` }} /></div>
+            </div>
+          )}
+
+          <div className="dq-bar-label">當日區間</div>
+          <RangeBar low={dqLo} cur={q.close} high={dqHi} open={dqOpen} />
+
+          {hi52 != null && lo52 != null && (
+            <>
+              <div className="dq-bar-label">52 週區間</div>
+              <RangeBar low={lo52} cur={q.close} high={hi52} />
+            </>
+          )}
+          <p className="hint" style={{ marginTop: 4 }}>
+            漲跌停依 ±10% 及台股 tick 級距計算；近四季EPS／每股淨值／年現金股利由本益比、淨值比、殖利率反推；毛利率／營益率／淨利率／本期EPS 取自綜合損益表（累計至財報期別）；52 週區間取近一年日 K。
+          </p>
+        </>
+      )}
 
       {/* ── 個股評分（結論先行；可自訂條件與權重） ── */}
       {(data.raw || data.criteria?.chip?.length) && (

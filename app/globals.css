@@ -160,6 +160,23 @@ img,svg{display:block}
 .vs-meta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);margin-left:auto}
 .vs-ohlc{font-family:var(--font-mono)}
 @media (max-width:640px){.vs-close{font-size:30px}.vs-meta{margin-left:0;width:100%;gap:10px 14px}}
+
+/* ─── 詳細報價（密集格 + 量能/位置條）─── */
+.dq-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:18px}
+.dq-cell{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:9px 13px;background:var(--card);font-size:13px;min-width:0}
+.dq-cell .k{color:var(--text-secondary);white-space:nowrap}
+.dq-cell .v{font-family:var(--font-mono);color:var(--ink);font-weight:600;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media (max-width:640px){.dq-grid{grid-template-columns:repeat(2,1fr)}}
+.dq-bar-label{font-size:12px;color:var(--text-secondary);margin:10px 0 2px}
+.range-bar{margin:2px 0 12px}
+.rb-head{display:flex;justify-content:space-between;align-items:baseline;font-size:12px;color:var(--text-secondary);font-family:var(--font-mono);margin-bottom:8px}
+.rb-head .rb-pct{color:var(--gold);font-weight:700;font-size:13px}
+.rb-track{position:relative;height:6px;border-radius:99px;background:var(--border);margin:18px 0 6px}
+.rb-fill{position:absolute;left:0;top:0;bottom:0;border-radius:99px;background:var(--gold)}
+.rb-marker{position:absolute;top:-4px;width:3px;height:14px;border-radius:2px;background:var(--ink)}
+.rb-open{position:absolute;top:-2px;width:2px;height:10px;background:var(--text-secondary)}
+.rb-label{position:absolute;top:-17px;transform:translateX(-50%);font-size:11px;font-family:var(--font-mono);color:var(--ink);white-space:nowrap}
+.rb-ends{display:flex;justify-content:space-between;font-size:11.5px;color:var(--text-secondary);font-family:var(--font-mono)}
 .section-title{
   font-size:16px;font-weight:600;color:var(--ink);margin:32px 0 14px;
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;letter-spacing:-0.02em;

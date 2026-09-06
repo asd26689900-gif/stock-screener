@@ -476,6 +476,50 @@ def fetch_tpex_fundamentals():
         return result
     except: return {}
 
+def fetch_financials():
+    """綜合損益表（一般業）→ 毛利率/營益率/淨利率＋EPS。
+    上市 TWSE t187ap06_L_ci、上櫃 TPEX mopsfin_t187ap06_O_ci（各一次全市場 JSON）。
+    季別為累計（Q2=上半年累計），EPS 亦為該期別累計值；金融/保險等非一般業無此表 → 留空。"""
+    def n(v):
+        v = (v or "").strip()
+        if not v or v in ("--", "X", "-"): return None
+        try: return float(v.replace(",", ""))
+        except: return None
+
+    def parse(rows, code_key, year_key, season_key):
+        out = {}
+        for row in rows:
+            sid = str(row.get(code_key, "")).strip()
+            if not sid: continue
+            rev = n(row.get("營業收入"))
+            if not rev: continue  # 無營收無法算三率
+            gp = n(row.get("營業毛利（毛損）"))
+            op = n(row.get("營業利益（損失）"))
+            ni = n(row.get("淨利（淨損）歸屬於母公司業主")) or n(row.get("本期淨利（淨損）"))
+            yr = str(row.get(year_key, "")).strip()
+            sea = str(row.get(season_key, "")).strip()
+            out[sid] = {
+                "gross_margin": round(gp / rev * 100, 2) if gp is not None else None,
+                "op_margin": round(op / rev * 100, 2) if op is not None else None,
+                "net_margin": round(ni / rev * 100, 2) if ni is not None else None,
+                "eps": n(row.get("基本每股盈餘（元）")),
+                "fin_period": (f"{yr}Q{sea}" if yr and sea else None),
+            }
+        return out
+
+    result = {}
+    for url, ck, yk, sk in [
+        ("https://openapi.twse.com.tw/v1/opendata/t187ap06_L_ci", "公司代號", "年度", "季別"),
+        ("https://www.tpex.org.tw/openapi/v1/mopsfin_t187ap06_O_ci", "SecuritiesCompanyCode", "Year", "Season"),
+    ]:
+        try:
+            r = requests.get(url, headers=HEADERS, timeout=20)
+            if r.status_code == 200:
+                result.update(parse(r.json(), ck, yk, sk))
+        except Exception as e:
+            print(f"   ⚠ 財報抓取失敗 {url.rsplit('/', 1)[-1]}: {e}")
+    return result
+
 # ═══════════════════════════════════════
 #  主程式
 # ═══════════════════════════════════════
@@ -725,6 +769,8 @@ print("⏳ 抓取基本面資料 (PE/PB/殖利率)...")
 fundamentals = fetch_fundamentals()
 fundamentals.update(fetch_tpex_fundamentals())
 print(f"   基本面: {len(fundamentals)} 檔")
+financials = fetch_financials()
+print(f"   財報三率/EPS: {len(financials)} 檔")
 
 # ══════════════════════════════════════
 #  篩選模組 (邏輯不變)
@@ -1174,7 +1220,7 @@ for sid in stocks:
             "close": close,
         },
         "industry": sid_industry.get(sid, ""),
-        "fundamental": {"pe": pe, "pb": pb, "dividend_yield": dy},
+        "fundamental": {"pe": pe, "pb": pb, "dividend_yield": dy, **financials.get(sid, {})},
         "history": history,
         "revenue": rev_history,
     }

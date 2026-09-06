@@ -23,6 +23,11 @@ export type StockPageData = {
     dy?: number;
     revMom?: number;
     revYoy?: number;
+    grossMargin?: number;
+    opMargin?: number;
+    netMargin?: number;
+    epsQ?: number;
+    finPeriod?: string;
   };
   bars: KBar[];
   instRows: InstRow[];
@@ -81,7 +86,7 @@ export async function getStockPage(sid: string): Promise<StockPageData | null> {
             .map((p) => ({ d: p.date, o: p.open ?? p.close, h: p.high ?? p.close, l: p.low ?? p.close, c: p.close, v: p.volume ?? 0 }));
 
     const instHist = (d.inst_hist as { date: string; foreign_net: number; trust_net: number; dealer_net: number }[]) ?? [];
-    const fundamental = (d.fundamental ?? {}) as { pe?: number; pb?: number; dividend_yield?: number };
+    const fundamental = (d.fundamental ?? {}) as { pe?: number; pb?: number; dividend_yield?: number; gross_margin?: number; op_margin?: number; net_margin?: number; eps?: number; fin_period?: string };
     const revenue = (d.revenue as { m: string; rev: number; mom?: number; yoy?: number }[]) ?? [];
 
     return {
@@ -103,6 +108,11 @@ export async function getStockPage(sid: string): Promise<StockPageData | null> {
         dy: fundamental.dividend_yield,
         revMom: metrics?.rev_mom,
         revYoy: metrics?.rev_yoy,
+        grossMargin: fundamental.gross_margin,
+        opMargin: fundamental.op_margin,
+        netMargin: fundamental.net_margin,
+        epsQ: fundamental.eps,
+        finPeriod: fundamental.fin_period,
       },
       bars,
       instRows: instHist.map((r) => ({
