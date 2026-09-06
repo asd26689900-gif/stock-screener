@@ -594,9 +594,16 @@ for _mkt in ("twse", "tpex"):
         print(f"⚠ 偵測到 {_mkt} {_cur_iso} 為 {_prev_iso} 的回聲假資料（{_identical}/{len(_common)} 完全相同），捨棄", flush=True)
         dropped_echo.append((_mkt, _cur_iso, list(_cur_map.keys())))
         all_prices = [r for r in all_prices if not (r.get("mkt") == _mkt and r["date"] == _cur_iso)]
-_real_dates = sorted({r["date"] for r in all_prices})
-if _real_dates:
-    end_str = _real_dates[-1]
+# 資料日取「筆數足夠」的最新日：避免回聲被捨棄後只剩零星殘留日被誤當當日，
+# 導致個股分析全數 p["date"]!=end_str 而跳過（daily_stk 寫 0 檔、集保也連帶沒寫）。
+_date_counts = {}
+for r in all_prices:
+    _date_counts[r["date"]] = _date_counts.get(r["date"], 0) + 1
+if _date_counts:
+    _max = max(_date_counts.values())
+    _good = sorted(d for d, c in _date_counts.items() if c >= _max * 0.5)
+    if _good:
+        end_str = _good[-1]
 
 # 按 stock_id 分組，按日期排序
 stocks = defaultdict(list)
