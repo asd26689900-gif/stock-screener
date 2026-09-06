@@ -80,6 +80,17 @@ create table if not exists stock_prices (
   primary key (stock_id, date)
 );
 
+-- 6b. 單季 EPS（FinMind，週更；update_financials.py 寫入）
+create table if not exists stock_financials (
+  stock_id text primary key,
+  eps_q real,
+  period text,
+  updated_at timestamptz default now()
+);
+alter table stock_financials enable row level security;
+drop policy if exists "公開讀取" on stock_financials;
+create policy "公開讀取" on stock_financials for select using (true);
+
 -- 7. 可查詢的日期清單
 create or replace view available_dates as
   select distinct date from daily_modules order by date desc;

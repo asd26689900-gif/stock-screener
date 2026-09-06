@@ -28,6 +28,8 @@ export type StockPageData = {
     netMargin?: number;
     epsQ?: number;
     finPeriod?: string;
+    epsQuarter?: number;
+    finQuarter?: string;
   };
   bars: KBar[];
   instRows: InstRow[];
@@ -87,6 +89,15 @@ export async function getStockPage(sid: string): Promise<StockPageData | null> {
 
     const instHist = (d.inst_hist as { date: string; foreign_net: number; trust_net: number; dealer_net: number }[]) ?? [];
     const fundamental = (d.fundamental ?? {}) as { pe?: number; pb?: number; dividend_yield?: number; gross_margin?: number; op_margin?: number; net_margin?: number; eps?: number; fin_period?: string };
+
+    // 單季EPS（FinMind，另表；表未建或無資料時安全略過）
+    let finQ: { eps_q?: number; period?: string } | null = null;
+    try {
+      const fr = await sb.from("stock_financials").select("eps_q,period").eq("stock_id", sid).limit(1);
+      finQ = fr.data?.[0] ?? null;
+    } catch {
+      finQ = null;
+    }
     const revenue = (d.revenue as { m: string; rev: number; mom?: number; yoy?: number }[]) ?? [];
 
     return {
@@ -113,6 +124,8 @@ export async function getStockPage(sid: string): Promise<StockPageData | null> {
         netMargin: fundamental.net_margin,
         epsQ: fundamental.eps,
         finPeriod: fundamental.fin_period,
+        epsQuarter: finQ?.eps_q,
+        finQuarter: finQ?.period,
       },
       bars,
       instRows: instHist.map((r) => ({

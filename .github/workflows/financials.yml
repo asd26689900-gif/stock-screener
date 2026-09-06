@@ -1,0 +1,27 @@
+name: 單季EPS 更新（FinMind，週更）
+on:
+  schedule:
+    # 週日 03:00 台北 = 週六 19:00 UTC（財報僅季度變動，週更即可）
+    - cron: '0 19 * * 6'
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: '只跑前 N 檔 (0=全部，分批用)'
+        default: '0'
+
+jobs:
+  financials:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -X utf8 -u update_financials.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          FIN_LIMIT: ${{ github.event.inputs.limit || '0' }}
+          PYTHONUNBUFFERED: "1"

@@ -11,6 +11,7 @@ import HolderSlider from "@/components/HolderSlider";
 import UpdateStamp from "@/components/UpdateStamp";
 import WatchlistButton from "@/components/WatchlistButton";
 import ScoreCard from "@/components/ScoreCard";
+import PerfChart from "@/components/PerfChart";
 
 export const dynamic = "force-dynamic";
 
@@ -211,7 +212,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             <DetailCell k="52W低" v={lo52 != null ? fmt(lo52, 2) : "—"} />
             <DetailCell k="股價淨值比" v={q.pb != null ? fmt(q.pb, 2) : "—"} />
             <DetailCell k="近四季EPS" v={epsTTM != null ? fmt(epsTTM, 2) : "—"} />
-            <DetailCell k="本期EPS" v={q.epsQ != null ? fmt(q.epsQ, 2) : "—"} />
+            <DetailCell k="單季EPS" v={q.epsQuarter != null ? fmt(q.epsQuarter, 2) : "—"} />
             <DetailCell k="每股淨值" v={bvps != null ? fmt(bvps, 2) : "—"} />
             <DetailCell k="毛利率" v={q.grossMargin != null ? `${fmt(q.grossMargin, 2)}%` : "—"} />
             <DetailCell k="營益率" v={q.opMargin != null ? `${fmt(q.opMargin, 2)}%` : "—"} />
@@ -242,10 +243,13 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             </>
           )}
           <p className="hint" style={{ marginTop: 4 }}>
-            漲跌停依 ±10% 及台股 tick 級距計算；近四季EPS／每股淨值／年現金股利由本益比、淨值比、殖利率反推；毛利率／營益率／淨利率／本期EPS 取自綜合損益表（累計至財報期別）；52 週區間取近一年日 K。
+            漲跌停依 ±10% 及台股 tick 級距計算；近四季EPS／每股淨值／年現金股利由本益比、淨值比、殖利率反推；毛利率／營益率／淨利率取自綜合損益表（累計至財報期別）；單季EPS 取自 FinMind 最近一季；52 週區間取近一年日 K。
           </p>
         </>
       )}
+
+      {/* ── 績效表現（個股 vs 加權指數）── */}
+      <PerfChart sid={sid} name={data.name} />
 
       {/* ── 個股評分（結論先行；可自訂條件與權重） ── */}
       {(data.raw || data.criteria?.chip?.length) && (
