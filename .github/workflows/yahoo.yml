@@ -1,0 +1,22 @@
+name: Yahoo 早班（收盤後快速報價）
+on:
+  schedule:
+    # 13:50 台北 = 05:50 UTC，週一~五（台股 13:30 收盤後約 15 分）
+    - cron: '50 5 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  yahoo:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -X utf8 -u update_yahoo.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          PYTHONUNBUFFERED: "1"
