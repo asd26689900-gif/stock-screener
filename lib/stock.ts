@@ -184,8 +184,9 @@ export async function getIndustryPeers(sid: string, industry: string): Promise<P
       .eq("industry", industry)
       .neq("stock_id", sid)
       .order("volume", { ascending: false })
-      .limit(5);
-    return (data ?? []) as PeerStock[];
+      .limit(20);
+    // 只留 4 位數普通股（排除 ETF/債券 ETF 如 00937B、權證等非同業標的），取前 5
+    return ((data ?? []) as PeerStock[]).filter((p) => /^\d{4}$/.test(p.stock_id)).slice(0, 5);
   } catch {
     return [];
   }
