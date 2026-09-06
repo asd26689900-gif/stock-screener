@@ -20,8 +20,9 @@ on:
         type: boolean
         default: false
   schedule:
-    # 每2小時跑一次，盡量吃滿流量
-    - cron: '0 */2 * * *'
+    # 歷史已回填至 2016（10+ 年），改每週一次補新上市股歷史即可（原每 2 小時已到底空轉）
+    # 週一 04:00 台北 = 週日 20:00 UTC
+    - cron: '0 20 * * 0'
   push:
     paths:
       - '.github/backfill-trigger'
