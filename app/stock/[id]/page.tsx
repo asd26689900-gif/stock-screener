@@ -10,6 +10,7 @@ import InstitutionalPanel from "@/components/InstitutionalPanel";
 import HolderSlider from "@/components/HolderSlider";
 import UpdateStamp from "@/components/UpdateStamp";
 import WatchlistButton from "@/components/WatchlistButton";
+import ScoreCard from "@/components/ScoreCard";
 
 export const dynamic = "force-dynamic";
 
@@ -64,6 +65,30 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
   const rev = data.revenue ?? [];
   const maxRev = Math.max(...rev.map((r) => Number(r.rev) || 0), 1);
 
+  // ── 重點提醒：純公開資料整理，非投資建議（僅陳述事實與已知事件，不給買賣方向）──
+  const reminders: { label: string; text: string }[] = [];
+  if (dsp) {
+    reminders.push({ label: "處置", text: `${LV_LABELS[dsp.level]?.[1] ?? dsp.level}${dsp.period ? `，期間 ${dsp.period}` : ""}` });
+  }
+  if (rev.length) {
+    const lr = rev[rev.length - 1];
+    reminders.push({ label: "月營收", text: `最新一期 ${lr.m}${lr.yoy != null ? `（YoY ${fmtSigned(Number(lr.yoy))}%）` : ""}；下期月營收依規定於次月 10 日前公佈` });
+  }
+  if (data.instRows.length) {
+    const sorted = [...data.instRows].sort((a, b) => (a.date < b.date ? 1 : -1));
+    const fSign = Math.sign(sorted[0].foreign_net);
+    if (fSign !== 0) {
+      let streak = 0;
+      for (const r of sorted) { if (Math.sign(r.foreign_net) === fSign) streak++; else break; }
+      const dir = fSign > 0 ? "買超" : "賣超";
+      reminders.push({ label: "法人", text: `外資最近一日${dir} ${fmt(Math.abs(sorted[0].foreign_net) / 1000, 0)} 張${streak > 1 ? `，已連 ${streak} 日${dir}` : ""}` });
+    }
+  }
+  if (margin) {
+    const sDelta = margin.s_today - margin.s_prev;
+    reminders.push({ label: "融券", text: `餘額 ${fmt(margin.s_today, 0)} 張（較前日 ${fmtSigned(sDelta, 0)} 張）` });
+  }
+
   return (
     <div className="container">
       {/* ── 頁首：名稱 + 標籤 + 自選按鈕 ── */}
@@ -78,12 +103,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
             {data.name} <span className="hint" style={{ fontSize: 14 }}>{sid}</span>
           </h1>
           {data.industry && <span className="chip teal">{data.industry}</span>}
-          {data.scores &&
-            Object.entries(data.scores).map(([k, v]) => (
-              <span key={k} className="chip gold">
-                {k === "chip" ? "籌碼" : k === "fundamental" ? "基本面" : "技術"} {fmt(Number(v), 0)}
-              </span>
-            ))}
           <WatchlistButton sid={sid} />
         </div>
         <p className="page-desc" style={{ maxWidth: 760 }}>
@@ -108,6 +127,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       </div>
       <KChart bars={data.bars} instByDate={instByDate} />
 
+      {/* ── 個股評分（結論先行；可自訂條件與權重） ── */}
+      {(data.raw || data.criteria?.chip?.length) && (
+        <>
+          <div className="section-title">
+            個股評分
+            <span className="hint">30 項條件・可自訂勾選與權重</span>
+          </div>
+          <ScoreCard raw={data.raw} criteria={data.criteria ?? {}} />
+        </>
+      )}
+
       {/* ── 即時報價 ── */}
       <div className="section-title">
         即時報價
@@ -120,16 +150,10 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         {last && (
           <>
             <QuoteCard label="開" value={fmt(last.o, 2)} />
-            <QuoteCard label="高" value={fmt(last.h, 2)} cls="up" />
-            <QuoteCard label="低" value={fmt(last.l, 2)} cls="down" />
+            <QuoteCard label="高" value={fmt(last.h, 2)} />
+            <QuoteCard label="低" value={fmt(last.l, 2)} />
           </>
         )}
-        {[["MA5", q.ma5], ["MA10", q.ma10], ["MA20", q.ma20], ["MA60", q.ma60]].map(([label, v]) => (
-          <QuoteCard key={label as string} label={label as string} value={v != null ? fmt(Number(v), 2) : "—"} />
-        ))}
-        <QuoteCard label="本益比" value={q.pe != null ? fmt(q.pe, 2) : "—"} />
-        <QuoteCard label="股價淨值比" value={q.pb != null ? fmt(q.pb, 2) : "—"} />
-        <QuoteCard label="殖利率" value={q.dy != null ? `${fmt(q.dy, 2)}%` : "—"} />
         <QuoteCard label="營收 MoM" value={q.revMom != null ? `${fmtSigned(q.revMom)}%` : "—"} cls={pctClass(q.revMom)} />
         <QuoteCard label="營收 YoY" value={q.revYoy != null ? `${fmtSigned(q.revYoy)}%` : "—"} cls={pctClass(q.revYoy)} />
       </div>
@@ -158,58 +182,60 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
       <InstitutionalPanel rows={data.instRows} />
 
       {/* ── 集保 ── */}
-      <HolderSlider bigPct={data.chip?.bigHolderPct} retailPct={data.chip?.retailHolderPct} src={data.chip?.holderSrc} levels={data.chip?.tdccLevels} />
+      <div className="section-title">
+        集保大戶 / 小戶
+        <span className="chip gold">{data.chip?.holderSrc ?? "TDCC"} · 週六 06:30 更新</span>
+      </div>
+      <HolderSlider bigPct={data.chip?.bigHolderPct} retailPct={data.chip?.retailHolderPct} levels={data.chip?.tdccLevels} />
 
       {/* ── 基本面 ── */}
       <div className="section-title">
         基本面 / 月營收
         <span className="hint">PE / PB / 殖利率為最新快照</span>
       </div>
-      <div className="card">
-        <div className="summary-cards" style={{ marginBottom: 16 }}>
-          <QuoteCard label="本益比" value={q.pe != null ? fmt(q.pe, 2) : "—"} />
-          <QuoteCard label="股價淨值比" value={q.pb != null ? fmt(q.pb, 2) : "—"} />
-          <QuoteCard label="殖利率" value={q.dy != null ? `${fmt(q.dy, 2)}%` : "—"} />
-        </div>
-        {rev.length > 0 ? (
-          <>
-            <div className="mega-col-title">月營收（近 12 個月，單位：千元）</div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "flex-end",
-                gap: 6,
-                height: 150,
-                borderBottom: "1px solid var(--border)",
-                padding: "8px 4px 0",
-                overflowX: "auto",
-              }}
-            >
-              {rev.map((r) => (
-                <div key={r.m} style={{ flex: "1 0 44px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-                  <span className="hint" style={{ fontSize: 10 }}>
-                    {r.mom != null ? `${fmtSigned(r.mom, 0)}%` : "—"}
-                  </span>
-                  <div
-                    title={`${r.m} 營收 ${fmt(Number(r.rev), 0)}`}
-                    style={{
-                      width: "100%",
-                      height: Math.max(4, (Number(r.rev) / maxRev) * 100),
-                      background: Number(r.yoy) >= 0 ? "var(--gold)" : "var(--teal)",
-                      opacity: 0.85,
-                      borderRadius: 3,
-                      minWidth: 24,
-                    }}
-                  />
-                  <span style={{ fontSize: 10, fontFamily: "var(--font-mono)" }}>{r.m.slice(5)}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="empty-msg">月營收資料待回填</div>
-        )}
+      <div className="summary-cards">
+        <QuoteCard label="本益比" value={q.pe != null ? fmt(q.pe, 2) : "—"} />
+        <QuoteCard label="股價淨值比" value={q.pb != null ? fmt(q.pb, 2) : "—"} />
+        <QuoteCard label="殖利率" value={q.dy != null ? `${fmt(q.dy, 2)}%` : "—"} />
       </div>
+      {rev.length > 0 ? (
+        <div className="card">
+          <div className="mega-col-title">月營收（近 12 個月，單位：千元）</div>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "flex-end",
+              gap: 6,
+              height: 150,
+              borderBottom: "1px solid var(--border)",
+              padding: "8px 4px 0",
+              overflowX: "auto",
+            }}
+          >
+            {rev.map((r) => (
+              <div key={r.m} style={{ flex: "1 0 44px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                <span className="hint" style={{ fontSize: 10 }}>
+                  {r.mom != null ? `${fmtSigned(r.mom, 0)}%` : "—"}
+                </span>
+                <div
+                  title={`${r.m} 營收 ${fmt(Number(r.rev), 0)}`}
+                  style={{
+                    width: "100%",
+                    height: Math.max(4, (Number(r.rev) / maxRev) * 100),
+                    background: Number(r.yoy) >= 0 ? "var(--gold)" : "var(--teal)",
+                    opacity: 0.85,
+                    borderRadius: 3,
+                    minWidth: 24,
+                  }}
+                />
+                <span style={{ fontSize: 10, fontFamily: "var(--font-mono)" }}>{r.m.slice(5)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div className="empty-msg">月營收資料待回填</div>
+      )}
 
       {/* ── 同業比較 ── */}
       {peers.length > 0 && (
@@ -248,6 +274,26 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                 ))}
               </tbody>
             </table>
+          </div>
+        </>
+      )}
+
+      {/* ── 重點提醒（收尾：公開資料整理，非投資建議）── */}
+      {reminders.length > 0 && (
+        <>
+          <div className="section-title">
+            重點提醒
+            <span className="hint">公開資料整理，非投資建議</span>
+          </div>
+          <div className="card">
+            <ul className="reminder-list">
+              {reminders.map((r) => (
+                <li key={r.label} className="reminder-item">
+                  <span className="chip">{r.label}</span>
+                  <span className="reminder-text">{r.text}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         </>
       )}

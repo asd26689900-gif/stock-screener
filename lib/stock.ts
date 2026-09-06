@@ -2,6 +2,7 @@ import { sb } from "./supabase";
 import { twDateStr } from "./format";
 import type { InstRow } from "@/components/InstitutionalPanel";
 import type { KBar } from "@/components/KChart";
+import type { Raw, Criteria } from "@/components/ScoreCard";
 
 export type StockPageData = {
   sid: string;
@@ -34,6 +35,8 @@ export type StockPageData = {
     tdccLevels?: Record<string, number>;
   };
   scores?: Record<string, number>;
+  raw?: Raw;
+  criteria?: Criteria;
   revenue?: { m: string; rev: number; mom?: number; yoy?: number }[];
 };
 
@@ -110,6 +113,8 @@ export async function getStockPage(sid: string): Promise<StockPageData | null> {
       })),
       chip: d.chip as StockPageData["chip"],
       scores: d.scores as Record<string, number> | undefined,
+      raw: d.raw as Raw | undefined,
+      criteria: (d.criteria ?? {}) as Criteria,
       revenue,
     };
   } catch {
