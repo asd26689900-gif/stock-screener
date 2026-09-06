@@ -110,6 +110,18 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </p>
       </div>
 
+      {/* ── 當日快照（結論先行）── */}
+      <div className="verdict-strip">
+        <span className={`vs-close ${pctClass(q.changePct)}`}>{fmt(q.close, 2)}</span>
+        <span className={`vs-chg ${pctClass(q.changePct)}`}>{fmtSigned(q.change, 2)}（{fmtSigned(q.changePct)}%）</span>
+        <div className="vs-meta">
+          {last && <span className="vs-ohlc">開 {fmt(last.o, 2)}　高 {fmt(last.h, 2)}　低 {fmt(last.l, 2)}</span>}
+          <span>量 {fmt(q.volume, 0)} 張</span>
+          {dsp && <span className={`dsp-tag ${dsp.level}`}>{LV_LABELS[dsp.level]?.[1] ?? dsp.level}</span>}
+          <span className="hint">{q.date}・Yahoo 延遲約 15 分</span>
+        </div>
+      </div>
+
       {/* ── 處置/預警警示 ── */}
       {dsp && (
         <div className="dsp-alert-banner">
@@ -137,26 +149,6 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
           <ScoreCard raw={data.raw} criteria={data.criteria ?? {}} />
         </>
       )}
-
-      {/* ── 即時報價 ── */}
-      <div className="section-title">
-        即時報價
-        <span className="hint">Yahoo Finance 延遲約 15 分</span>
-      </div>
-      <div className="summary-cards">
-        <QuoteCard label="收盤" value={fmt(q.close, 2)} sub={q.date} cls={pctClass(q.changePct)} />
-        <QuoteCard label="漲跌" value={fmtSigned(q.change, 2)} sub={`${fmtSigned(q.changePct)}%`} cls={pctClass(q.changePct)} />
-        <QuoteCard label="成交量" value={`${fmt(q.volume, 0)} 張`} />
-        {last && (
-          <>
-            <QuoteCard label="開" value={fmt(last.o, 2)} />
-            <QuoteCard label="高" value={fmt(last.h, 2)} />
-            <QuoteCard label="低" value={fmt(last.l, 2)} />
-          </>
-        )}
-        <QuoteCard label="營收 MoM" value={q.revMom != null ? `${fmtSigned(q.revMom)}%` : "—"} cls={pctClass(q.revMom)} />
-        <QuoteCard label="營收 YoY" value={q.revYoy != null ? `${fmtSigned(q.revYoy)}%` : "—"} cls={pctClass(q.revYoy)} />
-      </div>
 
       {/* ── 融資融券 ── */}
       {margin && (
@@ -197,10 +189,17 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         <QuoteCard label="本益比" value={q.pe != null ? fmt(q.pe, 2) : "—"} />
         <QuoteCard label="股價淨值比" value={q.pb != null ? fmt(q.pb, 2) : "—"} />
         <QuoteCard label="殖利率" value={q.dy != null ? `${fmt(q.dy, 2)}%` : "—"} />
+        <QuoteCard label="營收 MoM" value={q.revMom != null ? `${fmtSigned(q.revMom)}%` : "—"} cls={pctClass(q.revMom)} />
+        <QuoteCard label="營收 YoY" value={q.revYoy != null ? `${fmtSigned(q.revYoy)}%` : "—"} cls={pctClass(q.revYoy)} />
       </div>
       {rev.length > 0 ? (
         <div className="card">
           <div className="mega-col-title">月營收（近 12 個月，單位：千元）</div>
+          <div className="graph-legend" style={{ padding: "0 0 10px" }}>
+            <span className="legend-item"><i style={{ background: "var(--teal)" }} />年增（YoY ≥ 0）</span>
+            <span className="legend-item"><i style={{ background: "var(--text-secondary)" }} />年減（YoY &lt; 0）</span>
+            <span className="legend-item" style={{ marginLeft: "auto" }}>上方數字＝MoM%</span>
+          </div>
           <div
             style={{
               display: "flex",
@@ -222,7 +221,7 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
                   style={{
                     width: "100%",
                     height: Math.max(4, (Number(r.rev) / maxRev) * 100),
-                    background: Number(r.yoy) >= 0 ? "var(--gold)" : "var(--teal)",
+                    background: Number(r.yoy) >= 0 ? "var(--teal)" : "var(--text-secondary)",
                     opacity: 0.85,
                     borderRadius: 3,
                     minWidth: 24,

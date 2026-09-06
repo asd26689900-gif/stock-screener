@@ -5,7 +5,8 @@ import { ColorType, createChart, type IChartApi, type ISeriesApi, type UTCTimest
 
 export type InstRow = { date: string; foreign_net: number; trust_net: number; dealer_net: number };
 
-const COLORS = ["#2962FF", "#FF9800", "#9C27B0"];
+const SERIES_VAR = ["--gold", "--teal", "--text-secondary"] as const;
+const SERIES_FB = ["#8A6508", "#2F6E6C", "#7c828a"];
 const LABELS = ["外資", "投信", "自營"];
 const KEYS = ["foreign_net", "trust_net", "dealer_net"] as const;
 
@@ -19,6 +20,10 @@ function cssVar(name: string, fb: string): string {
   } catch {
     return fb;
   }
+}
+
+function seriesColor(ci: number): string {
+  return cssVar(SERIES_VAR[ci], SERIES_FB[ci]);
 }
 
 function MiniChart({
@@ -55,18 +60,19 @@ function MiniChart({
     });
     seriesRef.current = KEYS.map((_, ci) =>
       mode === "bar"
-        ? chart.addHistogramSeries({ priceFormat: { type: "price", precision: 0 }, color: COLORS[ci], priceLineVisible: false, lastValueVisible: false })
-        : chart.addLineSeries({ color: COLORS[ci], lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
+        ? chart.addHistogramSeries({ priceFormat: { type: "price", precision: 0 }, color: seriesColor(ci), priceLineVisible: false, lastValueVisible: false })
+        : chart.addLineSeries({ color: seriesColor(ci), lineWidth: 2, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }),
     );
     chartRef.current = chart;
-    const mo = new MutationObserver(() =>
+    const mo = new MutationObserver(() => {
       chart.applyOptions({
         layout: { background: { type: ColorType.Solid, color: cssVar("--card", "#ffffff") }, textColor: cssVar("--text-secondary", "#666666") },
         grid: { vertLines: { color: cssVar("--border-light", "#eeeeee") }, horzLines: { color: cssVar("--border-light", "#eeeeee") } },
         rightPriceScale: { borderColor: cssVar("--border", "#dddddd") },
         timeScale: { borderColor: cssVar("--border", "#dddddd") },
-      }),
-    );
+      });
+      seriesRef.current.forEach((s, ci) => s.applyOptions({ color: seriesColor(ci) }));
+    });
     mo.observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
     return () => {
       mo.disconnect();
@@ -81,10 +87,10 @@ function MiniChart({
     if (mode === "bar") {
       KEYS.forEach((k, ci) => {
         const s = seriesRef.current[ci] as ISeriesApi<"Histogram">;
-        s.applyOptions({ visible: flags[ci], color: COLORS[ci] });
+        s.applyOptions({ visible: flags[ci], color: seriesColor(ci) });
         s.setData(
           flags[ci]
-            ? rows.map((r) => ({ time: tz(r.date), value: Math.round((r[k] ?? 0) / 1000), color: COLORS[ci] }))
+            ? rows.map((r) => ({ time: tz(r.date), value: Math.round((r[k] ?? 0) / 1000), color: seriesColor(ci) }))
             : [],
         );
       });
@@ -121,7 +127,7 @@ export default function InstitutionalPanel({ rows }: { rows: InstRow[] }) {
               key={label}
               type="button"
               className={`toggle-chip ${flags[ci] ? "on" : ""}`}
-              style={{ color: COLORS[ci], borderColor: flags[ci] ? COLORS[ci] : undefined }}
+              style={{ color: `var(${SERIES_VAR[ci]})`, borderColor: flags[ci] ? `var(${SERIES_VAR[ci]})` : undefined }}
               onClick={() => setFlags((prev) => prev.map((v, i) => (i === ci ? !v : v)))}
             >
               {label}

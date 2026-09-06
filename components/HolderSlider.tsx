@@ -14,7 +14,6 @@ export default function HolderSlider({
   const [threshold, setThreshold] = useState(400);
   const hasLevels = !!levels && Object.keys(levels).length > 0;
   const THRESHOLDS = [50, 100, 200, 400, 600, 800, 1000];
-  const dataLevel = hasLevels ? 400 : 400; // 無級距時仍以 400 張分界顯示既有資料
   const nearest = THRESHOLDS.reduce((best, t) => (Math.abs(t - threshold) < Math.abs(best - threshold) ? t : best), 400);
   const ratio = hasLevels ? levels?.[String(nearest)] : bigPct;
   const retail = hasLevels && ratio != null ? Math.max(0, 100 - ratio) : retailPct;
@@ -31,8 +30,9 @@ export default function HolderSlider({
           max={1000}
           step={10}
           value={threshold}
+          disabled={!hasLevels}
           onChange={(e) => setThreshold(Number(e.target.value))}
-          style={{ accentColor: "var(--gold)" }}
+          style={{ accentColor: "var(--gold)", opacity: hasLevels ? 1 : 0.45, cursor: hasLevels ? "pointer" : "not-allowed" }}
         />
       </div>
       <div className="summary-cards" style={{ marginBottom: 0 }}>
@@ -40,7 +40,7 @@ export default function HolderSlider({
           <div className="summary-label">大戶持股比（{nearest} 張以上）</div>
           <div className="summary-val">{ratio != null ? `${ratio.toFixed(2)}%` : "—"}</div>
           <div className="summary-sub">
-            {hasLevels ? "依 TDCC 各級距累計比率" : `暫以 ${dataLevel} 張分界顯示`}
+            {hasLevels ? "依 TDCC 各級距累計比率" : "暫以 400 張分界顯示"}
           </div>
         </div>
         <div className="summary-card">

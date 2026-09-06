@@ -153,6 +153,13 @@ img,svg{display:block}
 .page-header{margin-bottom:24px}
 .page-title{font-size:28px;font-weight:600;color:var(--ink);letter-spacing:-0.03em}
 .page-desc{font-size:14px;color:var(--text-secondary);margin-top:4px}
+/* ─── 當日快照（結論先行）─── */
+.verdict-strip{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 18px;padding:2px 0 18px;margin-bottom:20px;border-bottom:1px solid var(--border)}
+.vs-close{font-family:var(--font-mono);font-size:38px;font-weight:700;letter-spacing:-0.02em;line-height:1}
+.vs-chg{font-family:var(--font-mono);font-size:18px;font-weight:600}
+.vs-meta{display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:12.5px;color:var(--text-secondary);margin-left:auto}
+.vs-ohlc{font-family:var(--font-mono)}
+@media (max-width:640px){.vs-close{font-size:30px}.vs-meta{margin-left:0;width:100%;gap:10px 14px}}
 .section-title{
   font-size:16px;font-weight:600;color:var(--ink);margin:32px 0 14px;
   display:flex;align-items:center;gap:10px;flex-wrap:wrap;letter-spacing:-0.02em;

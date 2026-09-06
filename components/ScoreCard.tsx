@@ -99,7 +99,7 @@ function isDefaultCfg(cfg: Cfg): boolean {
 }
 
 function badge(n: number) { const p = n / 10; return p >= 0.7 ? "badge-high" : p >= 0.4 ? "badge-mid" : "badge-low"; }
-function comment(t: number) { return t >= 25 ? "多項指標正向" : t >= 20 ? "指標偏正向" : t >= 15 ? "指標中性" : t >= 10 ? "指標偏弱" : "多項指標偏空"; }
+function comment(t: number) { return t >= 25 ? "多數條件符合" : t >= 20 ? "逾半條件符合" : t >= 15 ? "部分條件符合" : t >= 10 ? "少數條件符合" : "多數條件未符合"; }
 function color(t: number) { return t >= 25 ? "var(--green)" : t >= 20 ? "var(--teal)" : t >= 15 ? "var(--gold)" : "var(--red)"; }
 
 type Row = { id: string; text: string; pass: boolean; on: boolean; w: number };
@@ -173,6 +173,7 @@ export default function ScoreCard({ raw, criteria }: { raw?: Raw; criteria: Crit
                 <span key={dim}>{i > 0 && " ・ "}{DIM_LABEL[dim]} {cfg.dims[dim] ? dimScore(dimRows[dim]) : 0}/10</span>
               ))}
             </div>
+            <div className="score-cfg-hint" style={{ marginTop: 4 }}>條件符合度統計，非投資建議</div>
           </div>
         </div>
         <button className="btn btn-sm score-cfg-btn" onClick={openModal} type="button">評分設定</button>
