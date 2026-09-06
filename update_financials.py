@@ -59,11 +59,14 @@ def finmind_eps(sid):
 
 
 def main():
-    ids = [r["stock_id"] for r in (sb.table("stock_metrics").select("stock_id").execute().data or [])]
-    ids = [s for s in ids if s and s[0].isdigit()]
+    # 依成交值（收盤×成交量）由大到小排序：FinMind 若限流，先補真正有人交易的股票
+    rows = sb.table("stock_metrics").select("stock_id,close,volume").execute().data or []
+    rows = [r for r in rows if r.get("stock_id") and r["stock_id"][0].isdigit()]
+    rows.sort(key=lambda r: (r.get("close") or 0) * (r.get("volume") or 0), reverse=True)
+    ids = [r["stock_id"] for r in rows]
     if LIMIT:
         ids = ids[:LIMIT]
-    print(f"📊 單季EPS：{len(ids)} 檔（FinMind，起始 {START}）", flush=True)
+    print(f"📊 單季EPS：{len(ids)} 檔（FinMind，起始 {START}，依成交值大→小）", flush=True)
 
     batch, done, miss = [], 0, 0
     for i, sid in enumerate(ids):
