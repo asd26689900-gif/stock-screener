@@ -58,36 +58,50 @@ def finmind_eps(sid):
         return None
 
 
+def read_all(table, cols):
+    """分頁讀整張表（Supabase 單次上限 1000 列）。"""
+    out, off = [], 0
+    while True:
+        b = sb.table(table).select(cols).range(off, off + 999).execute().data or []
+        out += b
+        if len(b) < 1000:
+            break
+        off += 1000
+    return out
+
+
 def main():
-    # 依成交值（收盤×成交量）由大到小排序：FinMind 若限流，先補真正有人交易的股票
-    rows = sb.table("stock_metrics").select("stock_id,close,volume").execute().data or []
-    rows = [r for r in rows if r.get("stock_id") and r["stock_id"][0].isdigit()]
-    rows.sort(key=lambda r: (r.get("close") or 0) * (r.get("volume") or 0), reverse=True)
-    ids = [r["stock_id"] for r in rows]
+    # 全市場依成交值（收盤×成交量）大→小排序：FinMind 若限流，先補真正有人交易的股票
+    metrics = [r for r in read_all("stock_metrics", "stock_id,close,volume")
+               if r.get("stock_id") and r["stock_id"][0].isdigit()]
+    metrics.sort(key=lambda r: (r.get("close") or 0) * (r.get("volume") or 0), reverse=True)
+    # 跳過已補過的（含記錄為無資料者），每輪往下推進、不重複耗配額
+    done_set = {r["stock_id"] for r in read_all("stock_financials", "stock_id")}
+    ids = [r["stock_id"] for r in metrics if r["stock_id"] not in done_set]
     if LIMIT:
         ids = ids[:LIMIT]
-    print(f"📊 單季EPS：{len(ids)} 檔（FinMind，起始 {START}，依成交值大→小）", flush=True)
+    print(f"📊 單季EPS：待補 {len(ids)} 檔（已完成 {len(done_set)}／全市場 {len(metrics)}，依成交值大→小）", flush=True)
 
     batch, done, miss = [], 0, 0
     for i, sid in enumerate(ids):
         res = finmind_eps(sid)
         if res == "LIMIT":
-            print(f"⚠ FinMind 限流，於第 {i} 檔停止（已更新 {done}）；下週續補。", flush=True)
+            print(f"⚠ FinMind 限流，於第 {i} 檔停止（本輪 {done} 檔）；再次觸發或下週續補即可。", flush=True)
             break
-        if not res:
+        now = datetime.now(timezone.utc).isoformat()
+        if res:
+            batch.append({"stock_id": sid, "eps_q": res["eps_q"], "period": res["period"], "updated_at": now})
+            done += 1
+        else:  # 記錄無資料，下輪跳過，不重複浪費配額
+            batch.append({"stock_id": sid, "eps_q": None, "period": None, "updated_at": now})
             miss += 1
-            time.sleep(0.25)
-            continue
-        batch.append({"stock_id": sid, "eps_q": res["eps_q"], "period": res["period"],
-                      "updated_at": datetime.now(timezone.utc).isoformat()})
-        done += 1
         if len(batch) >= 200:
             sb.table("stock_financials").upsert(batch, on_conflict="stock_id").execute()
             batch = []
         time.sleep(0.3)
     if batch:
         sb.table("stock_financials").upsert(batch, on_conflict="stock_id").execute()
-    print(f"✅ 完成：更新 {done} 檔單季EPS，{miss} 檔 FinMind 無資料。", flush=True)
+    print(f"✅ 本輪：更新 {done} 檔單季EPS、{miss} 檔無資料（已記錄）。累計約 {len(done_set) + done + miss}／{len(metrics)} 檔。", flush=True)
 
 
 if __name__ == "__main__":
