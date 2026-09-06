@@ -248,8 +248,8 @@ export default async function Page({ params }: { params: Promise<{ id: string }>
         </>
       )}
 
-      {/* ── 績效表現（個股 vs 加權指數）── */}
-      <PerfChart sid={sid} name={data.name} />
+      {/* ── 績效表現（個股 vs 同業均值 vs 加權指數）── */}
+      <PerfChart sid={sid} name={data.name} peerIds={peers.map((p) => p.stock_id)} />
 
       {/* ── 個股評分（結論先行；可自訂條件與權重） ── */}
       {(data.raw || data.criteria?.chip?.length) && (
