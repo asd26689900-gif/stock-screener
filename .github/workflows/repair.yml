@@ -1,0 +1,24 @@
+name: 修復被汙染的近月K線（Yahoo 覆蓋）
+on:
+  workflow_dispatch:
+    inputs:
+      range:
+        description: 'Yahoo 回補範圍 (1mo/3mo)'
+        default: '1mo'
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+      - run: pip install -r requirements.txt
+      - run: python -X utf8 -u repair_prices.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          REPAIR_RANGE: ${{ github.event.inputs.range || '1mo' }}
+          PYTHONUNBUFFERED: "1"
