@@ -1,15 +1,15 @@
 import { sb } from "@/lib/supabase";
 import { fmtTw } from "@/lib/format";
 
-type NewsItem = { title: string; link: string; source: string; published: string };
+type NewsItem = { title: string; link: string; source: string; published_at: string };
 
 async function getNews(limit = 8): Promise<NewsItem[]> {
   if (!sb) return [];
   try {
     const { data } = await sb
       .from("daily_news")
-      .select("title,link,source,published")
-      .order("published", { ascending: false })
+      .select("title,link,source,published_at")
+      .order("published_at", { ascending: false })
       .limit(limit);
     return (data ?? []) as NewsItem[];
   } catch {
@@ -40,7 +40,7 @@ export default async function NewsBrief() {
           <a key={i} href={n.link} target="_blank" rel="noopener noreferrer" className="news-item">
             <span className="news-title">{n.title}</span>
             <span className="news-meta">
-              {n.source} · {fmtTw(n.published)}
+              {n.source} · {fmtTw(n.published_at)}
             </span>
           </a>
         ))}
