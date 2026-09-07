@@ -122,18 +122,38 @@ export default async function Home() {
             <thead>
               <tr>
                 <th>代號 / 名稱</th>
-                <th className="num">三大法人淨買超（張）</th>
-                <th className="num">連續買超天數</th>
-                <th className="num">收盤</th>
+                {d.big_buyer.fallback ? (
+                  <>
+                    <th className="num">三大法人淨買超（張）</th>
+                    <th className="num">連續買超天數</th>
+                    <th className="num">收盤</th>
+                  </>
+                ) : (
+                  <>
+                    <th className="num">大戶持股比率（%）</th>
+                    <th className="num">週增減（%）</th>
+                    <th className="num">收盤</th>
+                  </>
+                )}
               </tr>
             </thead>
             <tbody>
               {d.big_buyer.rows.slice(0, 15).map((r) => (
                 <tr key={r[0]}>
                   <StockLink sid={r[0]} name={r[1]} />
-                  <td className="num up">{fmt(r[2], 0)}</td>
-                  <td className="num">{r[3]}</td>
-                  <td className="num">{fmt(r[4], 2)}</td>
+                  {d.big_buyer!.fallback ? (
+                    <>
+                      <td className="num up">{fmt(r[2], 0)}</td>
+                      <td className="num">{fmt(r[3], 0)}</td>
+                      <td className="num">{fmt(r[4], 2)}</td>
+                    </>
+                  ) : (
+                    <>
+                      <td className="num">{fmt(r[3], 2)}</td>
+                      <td className="num up">+{fmt(r[4], 2)}</td>
+                      <td className="num">{fmt(r[2], 2)}</td>
+                    </>
+                  )}
                 </tr>
               ))}
             </tbody>
