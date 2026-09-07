@@ -88,11 +88,15 @@ def fetch_twse_prices(date_dt):
         if not sid or len(sid) < 4: continue
         close = parse_num(line[8])
         if close <= 0: continue  # 暫停交易 / 異常行情不寫入
+        # STOCK_DAY_ALL 忽略 date 參數、一律回「最新交易日」→ 必須用 CSV 實際日期欄(ROC)標記，
+        # 否則會把最新資料貼上舊日期標籤，被回聲偵測誤判丟棄（造成資料卡在前一天）。
+        d0 = line[0].strip().strip('"')
+        row_date = f"{int(d0[:3]) + 1911}-{d0[3:5]}-{d0[5:7]}" if len(d0) == 7 and d0.isdigit() else iso_date(date_dt)
         try:
             rows.append({
                 "stock_id": sid,
                 "name": line[2].strip().strip('"'),
-                "date": iso_date(date_dt),
+                "date": row_date,
                 "mkt": "twse",
                 "open": parse_num(line[5]),
                 "high": parse_num(line[6]),
@@ -565,6 +569,17 @@ for i, d in enumerate(work_days):
         time.sleep(1.5)
 
 print(f"\n   共取得 {fetched_days} 個交易日行情")
+
+# 去重：STOCK_DAY_ALL 每輪回同一份最新資料，多個工作日會拿到重複列（同市場同股同日）
+_seen = set()
+_dedup = []
+for _r in all_prices:
+    _k = (_r.get("mkt"), _r["stock_id"], _r["date"])
+    if _k in _seen:
+        continue
+    _seen.add(_k)
+    _dedup.append(_r)
+all_prices = _dedup
 
 if fetched_days < 3:
     print("❌ 行情資料不足（可能是假日），結束")
